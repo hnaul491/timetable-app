@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { calendarHref } from "../lib/calendarLocation";
 import { CalendarPage } from "./CalendarPage";
 
 const apiFetch = vi.fn();
@@ -52,6 +53,7 @@ describe("CalendarPage", () => {
     expect(screen.getByTestId("where")).toHaveTextContent("/?date=2026-11-18&view=week");
     await userEvent.click(screen.getByRole("button", { name: "day" }));
     expect(screen.getByTestId("where")).toHaveTextContent("/?date=2026-11-18&view=day");
+    expect(calendarHref()).toBe("/?date=2026-11-18&view=day"); // "Back to calendar" returns here
   });
 
   it("ignores a broken date in the address", async () => {

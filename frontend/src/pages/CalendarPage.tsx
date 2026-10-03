@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { useEffect } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { WeekGrid } from "../components/WeekGrid";
 import { apiFetch } from "../lib/api";
+import { rememberCalendarSearch } from "../lib/calendarLocation";
 import { addDays, dayLabel, formatLongDate, rangeUtc, startOfWeek, todayParis } from "../lib/time";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import type { EventsResponse, GoogleStatus, SyncStatus } from "../types";
@@ -25,6 +27,8 @@ export function CalendarPage() {
   const isPhone = useMediaQuery("(max-width: 767px)");
   // The shown date and view live in the address, so coming back from an event keeps the same week.
   const [params, setParams] = useSearchParams();
+  const { search } = useLocation();
+  useEffect(() => rememberCalendarSearch(search), [search]);
   const view = parseView(params.get("view")) ?? (isPhone ? "day" : "week");
   const anchor = parseDate(params.get("date")) ?? todayParis();
   const show = (next: { date?: string; view?: View }) =>
