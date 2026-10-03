@@ -4,6 +4,7 @@ import { AuthGate } from "./auth/AuthGate";
 import { Layout } from "./components/Layout";
 import { ApiError } from "./lib/api";
 import { CalendarPage } from "./pages/CalendarPage";
+import { EventPage } from "./pages/EventPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 const queryClient = new QueryClient({
@@ -24,6 +25,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route index element={<CalendarPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="events/:id" element={<EventPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
