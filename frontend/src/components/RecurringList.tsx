@@ -13,6 +13,8 @@ export function RecurringList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["event"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
 
