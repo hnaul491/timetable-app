@@ -78,3 +78,25 @@ def test_sync_handles_duplicate_titles(session, semester):
     [only] = sync_note_tasks(session, note, event, T0)
     assert only.id == first.id and only.status == "done"
     assert len(session.scalars(select(Task)).all()) == 1
+
+
+def test_long_title_truncated_consistently(session, semester):
+    long_title = "x" * 350
+    body = f"[ ] {long_title}"
+    [line] = parse_task_lines(body)
+    assert len(line.title) == 300
+    note, event = make_note(session, semester, body)
+    [task] = sync_note_tasks(session, note, event, T0)
+    assert task.title == line.title and len(task.title) == 300
+    assert "[x] " + line.title in update_line(body, task.title, True, None)
+
+
+def test_parse_crlf_body():
+    assert parse_task_lines("[ ] A\r\n[x] B\r\n") == [TaskLine("A", False, None), TaskLine("B", True, None)]
+
+
+def test_parse_and_update_agree_on_exotic_separators():
+    body = "[ ] A\x0cB\n[ ] C"
+    first, second = parse_task_lines(body)
+    assert (first.title, second.title) == ("A\x0cB", "C")
+    assert update_line(body, first.title, True, None) == "[x] A\x0cB\n[ ] C"

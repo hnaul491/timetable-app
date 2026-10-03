@@ -9,6 +9,7 @@ from app.models import Event, Note, Task
 
 LINE_RE = re.compile(r"^(\s*)\[( |x|X)\]\s+(.*?)\s*$")
 DUE_RE = re.compile(r"\s+@(\d{4}-\d{2}-\d{2})$")
+MAX_TITLE = 300
 
 
 @dataclass(frozen=True)
@@ -31,13 +32,15 @@ def _parse(line: str) -> TaskLine | None:
             text = text[: due_match.start()].rstrip()
         except ValueError:
             due = None
+    text = text[:MAX_TITLE].rstrip()
     if not text:
         return None
     return TaskLine(text, match.group(2) in "xX", due)
 
 
 def parse_task_lines(body: str) -> list[TaskLine]:
-    return [parsed for line in body.splitlines() if (parsed := _parse(line)) is not None]
+    lines = (raw[:-1] if raw.endswith("\r") else raw for raw in body.split("\n"))
+    return [parsed for line in lines if (parsed := _parse(line)) is not None]
 
 
 def render_line(title: str, done: bool, due: date | None) -> str:
