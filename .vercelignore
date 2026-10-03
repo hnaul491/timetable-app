@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.prod
+backend/dev.db
+.superpowers/
+node_modules/
+frontend/node_modules/
+backend/.venv/
+.venv/
+**/__pycache__/

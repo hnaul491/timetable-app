@@ -3058,9 +3058,11 @@ Expected: `0002`; every table (now 10) shows `True` for RLS.
 
 - [ ] **Step 4: Push and deploy** (the user allowed direct pushes to `main`; push without switching branches)
 
+Step 3 (the production migration) must have run before this deploy.
+
 ```bash
-git push origin plan-1-foundation
-git push origin plan-1-foundation:main
+git push origin plan-2a-study-workflow
+git push origin plan-2a-study-workflow:main
 npx --yes vercel deploy --prod --yes
 ```
 
