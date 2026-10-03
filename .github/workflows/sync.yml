@@ -1,0 +1,17 @@
+name: Daily Zeus sync
+on:
+  schedule:
+    - cron: "0 4 * * *"   # 06:00 Paris in summer, 05:00 in winter
+  workflow_dispatch:
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsS -X POST "$APP_URL/api/sync" -H "X-Cron-Secret: $CRON_SECRET" -o result.json
+          cat result.json
+          grep -q '"status":"ok"' result.json
