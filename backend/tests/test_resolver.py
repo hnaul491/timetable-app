@@ -31,3 +31,13 @@ def test_creates_missing_subject_once_with_palette_color(session, semester):
 def test_new_subjects_get_different_colors(session, semester):
     resolver = SubjectResolver(session, semester.id)
     assert resolver.resolve("A").color != resolver.resolve("B").color
+
+
+def test_new_subject_avoids_colors_already_in_use(session, semester):
+    session.add(Subject(semester_id=semester.id, display_name="X", color=PALETTE[0], aliases=[]))
+    session.add(Subject(semester_id=semester.id, display_name="Y", color=PALETTE[2], aliases=[]))
+    session.flush()
+    resolver = SubjectResolver(session, semester.id)
+    color = resolver.resolve("Z").color
+    assert color == PALETTE[1]
+    assert color not in {PALETTE[0], PALETTE[2]}

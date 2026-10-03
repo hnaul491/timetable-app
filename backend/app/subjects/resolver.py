@@ -17,6 +17,13 @@ class SubjectResolver:
             select(Subject).where(Subject.semester_id == semester_id).order_by(Subject.id)
         ))
 
+    def _next_color(self) -> str:
+        used = {s.color for s in self._subjects}
+        for color in PALETTE:
+            if color not in used:
+                return color
+        return PALETTE[len(self._subjects) % len(PALETTE)]
+
     def resolve(self, base_name: str) -> Subject:
         key = base_name.casefold()
         for subject in self._subjects:
@@ -25,7 +32,7 @@ class SubjectResolver:
         subject = Subject(
             semester_id=self._semester_id,
             display_name=base_name,
-            color=PALETTE[len(self._subjects) % len(PALETTE)],
+            color=self._next_color(),
             aliases=[],
             hidden=False,
         )
