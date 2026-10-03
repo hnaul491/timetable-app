@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class EventOut(BaseModel):
@@ -107,3 +108,60 @@ class EventDetailOut(BaseModel):
 class NoteUpdate(BaseModel):
     body: str = Field(default="", max_length=20000)
     important: bool = False
+
+
+CustomKind = Literal["work", "french_ext", "other"]
+HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
+
+
+class CustomEventIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    kind: CustomKind
+    start: datetime
+    end: datetime
+    room: str = Field(default="", max_length=200)
+
+
+class RecurringRuleIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    kind: CustomKind
+    weekdays: list[int] = Field(min_length=1, max_length=7)
+    start_time: str = Field(pattern=HHMM)
+    end_time: str = Field(pattern=HHMM)
+    from_date: date
+    until_date: date
+    location: str = Field(default="", max_length=200)
+
+    @field_validator("weekdays")
+    @classmethod
+    def _valid_weekdays(cls, value: list[int]) -> list[int]:
+        if any(day < 0 or day > 6 for day in value):
+            raise ValueError("weekdays must be 0 (Monday) to 6 (Sunday)")
+        return sorted(set(value))
+
+    @model_validator(mode="after")
+    def _valid_range(self) -> "RecurringRuleIn":
+        if self.until_date < self.from_date:
+            raise ValueError("until_date must be on or after from_date")
+        if (self.until_date - self.from_date).days > 400:
+            raise ValueError("a repeating event can span at most 400 days")
+        if self.start_time == self.end_time:
+            raise ValueError("start and end time must differ")
+        return self
+
+
+class RecurringRuleOut(BaseModel):
+    id: int
+    title: str
+    kind: str
+    weekdays: list[int]
+    start_time: str
+    end_time: str
+    from_date: date
+    until_date: date
+    location: str
+    occurrences: int
+
+
+class Deleted(BaseModel):
+    deleted: bool
