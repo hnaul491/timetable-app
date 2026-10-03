@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timetable — Privacy policy</title>
+<meta name="theme-color" content="#2E55E6">
+<style>
+  :root { --ink: #15171C; --muted: #5B6170; --line: #E4E7EC; --canvas: #F4F5F7; --accent: #2E55E6; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #E8EAEE; --muted: #A3A9B6; --line: #2A2E36; --canvas: #121418; --accent: #7C9BFF; } }
+  body { margin: 0; background: var(--canvas); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 28px 0 6px; }
+  p, li { color: var(--ink); }
+  .muted { color: var(--muted); font-size: 14px; }
+  a { color: var(--accent); }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Timetable — Privacy policy</h1>
+  <p class="muted">Last updated: 4 October 2026 · App: <a href="/">timetable-app-lake.vercel.app</a></p>
+
+  <p>Timetable is a personal, single-user web app. It shows its owner's EPITA school timetable together with their own events, notes and tasks. Only one allow-listed Google account can sign in; nobody else can use it.</p>
+
+  <h2>What the app stores</h2>
+  <ul>
+    <li>The signed-in Google account's email address (to check it is the allowed account).</li>
+    <li>The school timetable imported from the school's calendar feed, plus the owner's own events, notes, tasks and settings.</li>
+    <li>If Google Calendar push is connected: a Google refresh token, stored encrypted, and the ids of the calendar and events the app created.</li>
+  </ul>
+  <p>Data is stored in a Supabase database (EU region) and processed by the app's server on Vercel. It is not sold, shared with or shown to anyone else.</p>
+
+  <h2>Google user data</h2>
+  <p>With the owner's permission the app uses the Google Calendar scope <code>calendar.app.created</code> only to create one calendar named "My Timetable" and to add, change and remove events in that calendar. It cannot see or change any other calendar. Event details sent to Google are the class or event title, time, room and a link back to the app; notes are never sent.</p>
+  <p>Timetable's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+  <h2>Removing data</h2>
+  <ul>
+    <li>Settings → Google Calendar → Disconnect deletes the stored token and revokes it at Google. Access can also be removed at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+    <li>The "My Timetable" calendar can be deleted from Google Calendar at any time.</li>
+    <li>On request, all of the owner's data in the app's database is deleted.</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p><a href="mailto:huynhluan491@gmail.com">huynhluan491@gmail.com</a></p>
+</main>
+</body>
+</html>
