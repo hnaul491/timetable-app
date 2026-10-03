@@ -38,6 +38,11 @@ export function Layout() {
               onChange={(e) => switchSemester.mutate(Number(e.target.value))}
               className="h-10 rounded-xl border border-line bg-[#F8F9FB] px-2.5 text-sm font-semibold text-ink"
             >
+              {!active && (
+                <option value="" disabled>
+                  Select semester
+                </option>
+              )}
               {semesters.data.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
