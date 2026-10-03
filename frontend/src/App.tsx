@@ -7,6 +7,7 @@ import { BoardPage } from "./pages/BoardPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
 import { NewEventPage } from "./pages/NewEventPage";
+import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SubjectPage } from "./pages/SubjectPage";
 import { SubjectsPage } from "./pages/SubjectsPage";
@@ -30,6 +31,7 @@ export default function App() {
               <Route index element={<CalendarPage />} />
               <Route path="board" element={<BoardPage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="review" element={<ReviewPage />} />
               <Route path="subjects" element={<SubjectsPage />} />
               <Route path="subjects/:id" element={<SubjectPage />} />
               <Route path="events/new" element={<NewEventPage />} />
