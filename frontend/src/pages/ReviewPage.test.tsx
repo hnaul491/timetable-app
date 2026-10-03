@@ -70,6 +70,17 @@ describe("ReviewPage", () => {
     await userEvent.click(await screen.findByRole("checkbox", { name: "Read ch. 4" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/tasks/2", { method: "PATCH", body: JSON.stringify({ status: "done" }) });
   });
+  it("refreshes note, event and subject views after ticking a task", async () => {
+    const spy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    renderPage();
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Read ch. 4" }));
+    await vi.waitFor(() => {
+      const keys = spy.mock.calls.map((c) => JSON.stringify((c[0] as { queryKey?: unknown })?.queryKey));
+      expect(keys).toEqual(expect.arrayContaining(['["event"]', '["subjects"]', '["subject"]', '["events"]', '["tasks"]', '["review"]']));
+    });
+    spy.mockRestore();
+  });
+
 
   it("marks the week reviewed and moves between weeks", async () => {
     renderPage();

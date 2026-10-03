@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
+import { invalidateTaskViews } from "../lib/invalidate";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 
@@ -66,6 +67,7 @@ function EventPageInner() {
   const invalidateLists = () => {
     queryClient.invalidateQueries({ queryKey: ["events"] });
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    invalidateTaskViews(queryClient);
   };
   const save = useMutation({
     mutationFn: (v: { tab: NoteTab; draft: Draft }) =>

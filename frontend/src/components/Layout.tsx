@@ -49,6 +49,7 @@ export function Layout() {
                 </option>
               ))}
             </select>
+            {switchSemester.error && <p className="text-xs text-[#8B1A1A]">{(switchSemester.error as Error).message}</p>}
           </label>
         )}
         <div className="flex flex-col gap-0.5">

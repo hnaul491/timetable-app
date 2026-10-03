@@ -7,7 +7,7 @@ import type { SubjectDetail } from "../types";
 
 export function SubjectPage() {
   const { id } = useParams();
-  const detail = useQuery({ queryKey: ["subject", id], queryFn: () => apiFetch<SubjectDetail>(`/api/subjects/${id}`) });
+  const detail = useQuery({ queryKey: ["subject", id], queryFn: () => apiFetch<SubjectDetail>(`/api/subjects/${id}`), refetchOnMount: "always" });
   if (detail.error) return <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />;
   if (!detail.data) return <p className="text-sm text-muted">Loading…</p>;
   const { subject, sessions, tasks } = detail.data;

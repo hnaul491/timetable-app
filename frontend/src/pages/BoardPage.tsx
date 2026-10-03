@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
+import { invalidateTaskViews } from "../lib/invalidate";
 import type { Task, TaskStatus } from "../types";
 
 const COLUMNS: { status: TaskStatus; label: string; dot: string }[] = [
@@ -19,11 +20,7 @@ export function BoardPage() {
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
 
-  const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["tasks"] });
-    queryClient.invalidateQueries({ queryKey: ["event"] });
-    queryClient.invalidateQueries({ queryKey: ["events"] });
-  };
+  const refresh = () => invalidateTaskViews(queryClient);
   const move = useMutation({
     mutationFn: (v: { id: number; status: TaskStatus }) =>
       apiFetch(`/api/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),

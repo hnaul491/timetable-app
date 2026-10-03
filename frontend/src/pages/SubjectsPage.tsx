@@ -6,7 +6,7 @@ import { formatLongDate, parisParts } from "../lib/time";
 import type { SubjectSummary } from "../types";
 
 export function SubjectsPage() {
-  const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => apiFetch<SubjectSummary[]>("/api/subjects") });
+  const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => apiFetch<SubjectSummary[]>("/api/subjects"), refetchOnMount: "always" });
   if (subjects.error) return <ErrorPanel error={subjects.error} onRetry={() => subjects.refetch()} />;
   if (!subjects.data) return <p className="text-sm text-muted">Loading subjects…</p>;
   return (

@@ -3,6 +3,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
+import { invalidateTaskViews } from "../lib/invalidate";
 import { addDays, dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { ApiEvent, Review, Task } from "../types";
 
@@ -45,8 +46,7 @@ export function ReviewPage() {
   const tick = useMutation({
     mutationFn: (t: Task) => apiFetch(`/api/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ status: "done" }) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["review"] });
-      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateTaskViews(queryClient);
     },
   });
   const mark = useMutation({
