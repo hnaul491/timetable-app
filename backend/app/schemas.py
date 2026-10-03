@@ -1,7 +1,7 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 
 class EventOut(BaseModel):
@@ -112,10 +112,11 @@ class NoteUpdate(BaseModel):
 
 CustomKind = Literal["work", "french_ext", "other"]
 HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
+Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 class CustomEventIn(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
+    title: Title
     kind: CustomKind
     start: datetime
     end: datetime
@@ -123,7 +124,7 @@ class CustomEventIn(BaseModel):
 
 
 class RecurringRuleIn(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
+    title: Title
     kind: CustomKind
     weekdays: list[int] = Field(min_length=1, max_length=7)
     start_time: str = Field(pattern=HHMM)

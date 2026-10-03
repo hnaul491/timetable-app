@@ -73,3 +73,23 @@ def test_weekly_rule_validation(client, semester):
                 {**WEEKLY, "end_time": "19:30"}, {**WEEKLY, "until_date": "2026-10-01"},
                 {**WEEKLY, "until_date": "2028-01-01"}):
         assert client.post("/api/recurring", headers=AUTH, json=bad).status_code == 422, bad
+
+
+def test_blank_titles_are_rejected(client, semester):
+    assert client.post("/api/events", headers=AUTH, json={**ONE_OFF, "title": "   "}).status_code == 422
+    assert client.post("/api/recurring", headers=AUTH, json={**WEEKLY, "title": "   "}).status_code == 422
+
+
+def test_noted_occurrence_survives_rule_edit_and_delete(client, session, semester):
+    rule = client.post("/api/recurring", headers=AUTH, json=WEEKLY).json()
+    events = client.get("/api/events?start=2026-10-18T22:00:00Z&end=2026-10-25T23:00:00Z", headers=AUTH).json()["events"]
+    second = sorted(events, key=lambda e: e["start"])[1]  # Thu 22 Oct
+    assert client.put(f"/api/events/{second['id']}/notes/after", headers=AUTH, json={"body": "[ ] homework"}).status_code == 200
+
+    assert client.put(f"/api/recurring/{rule['id']}", headers=AUTH, json={**WEEKLY, "weekdays": [3]}).status_code == 200
+    assert client.get(f"/api/events/{second['id']}", headers=AUTH).status_code == 200
+
+    assert client.delete(f"/api/recurring/{rule['id']}", headers=AUTH).json() == {"deleted": True}
+    detail = client.get(f"/api/events/{second['id']}", headers=AUTH)
+    assert detail.status_code == 200
+    assert detail.json()["recurring_rule_id"] is None
