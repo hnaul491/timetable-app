@@ -16,7 +16,9 @@ function since(iso: string | null): string {
   return `${date} ${formatTime(iso)}`;
 }
 
-export function SyncBanner({ status }: { status: SyncStatus | undefined }) {
+export const STALE_AFTER_MS = 36 * 3600 * 1000;
+
+export function SyncBanner({ status, now = new Date() }: { status: SyncStatus | undefined; now?: Date }) {
   if (!status) return null;
   const run = status.last_run;
   if (run === null) {
@@ -35,6 +37,14 @@ export function SyncBanner({ status }: { status: SyncStatus | undefined }) {
   }
   if (run.status === "failed") {
     return <Banner tone="warn">School sync failed. Showing data from {since(status.last_success_at)}.</Banner>;
+  }
+  if (status.last_success_at && now.getTime() - new Date(status.last_success_at).getTime() > STALE_AFTER_MS) {
+    return (
+      <Banner tone="warn">
+        School timetable last updated {since(status.last_success_at)}. The daily sync may have stopped — press{" "}
+        <Link to="/settings" className="font-semibold underline">Sync now in Settings</Link> or check GitHub Actions.
+      </Banner>
+    );
   }
   return null;
 }

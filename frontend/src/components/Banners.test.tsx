@@ -22,9 +22,18 @@ describe("banners", () => {
     expect(screen.getByText(/generate a new link in Zeus/i)).toBeInTheDocument();
   });
 
-  it("shows nothing when the last sync was ok", () => {
-    const { container } = wrap(<SyncBanner status={{ last_run: run("ok"), last_success_at: "2026-10-15T04:00:02Z" }} />);
+  it("shows nothing when the last sync was ok and recent", () => {
+    const { container } = wrap(
+      <SyncBanner status={{ last_run: run("ok"), last_success_at: "2026-10-15T04:00:02Z" }} now={new Date("2026-10-15T10:00:00Z")} />,
+    );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("warns when the last successful sync is older than 36 hours", () => {
+    wrap(
+      <SyncBanner status={{ last_run: run("ok"), last_success_at: "2026-10-15T04:00:02Z" }} now={new Date("2026-10-17T10:00:00Z")} />,
+    );
+    expect(screen.getByText(/daily sync may have stopped/i)).toBeInTheDocument();
   });
 
   it("lists subjects that need a section", () => {

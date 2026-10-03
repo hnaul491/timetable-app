@@ -31,4 +31,9 @@ describe("apiFetch", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 403, message: "this account is not allowed" });
   });
+
+  it("returns undefined for 204 No Content", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    await expect(apiFetch("/api/x", { method: "DELETE" })).resolves.toBeUndefined();
+  });
 });
