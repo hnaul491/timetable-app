@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { ErrorPanel, MissingSectionsBanner, SyncBanner } from "../components/Banners";
+import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { WeekGrid } from "../components/WeekGrid";
 import { apiFetch } from "../lib/api";
 import { addDays, dayLabel, formatLongDate, rangeUtc, startOfWeek, todayParis } from "../lib/time";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import type { EventsResponse, SyncStatus } from "../types";
+import type { EventsResponse, GoogleStatus, SyncStatus } from "../types";
 
 type View = "week" | "day";
 
@@ -27,6 +27,7 @@ export function CalendarPage() {
     queryFn: () => apiFetch<EventsResponse>(`/api/events?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}`),
   });
   const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
+  const google = useQuery({ queryKey: ["google"], queryFn: () => apiFetch<GoogleStatus>("/api/google") });
 
   const title =
     view === "week"
@@ -66,6 +67,7 @@ export function CalendarPage() {
         </Link>
       </header>
       <SyncBanner status={sync.data} />
+      <GoogleBanner status={google.data} />
       <MissingSectionsBanner names={events.data?.missing_sections ?? []} />
       {events.error ? <ErrorPanel error={events.error} onRetry={() => events.refetch()} /> : <WeekGrid days={days} events={events.data?.events ?? []} onSelect={(id) => navigate(`/events/${id}`)} />}
     </div>

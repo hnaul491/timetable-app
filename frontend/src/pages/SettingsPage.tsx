@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ErrorPanel } from "../components/Banners";
+import { GoogleSettings } from "../components/GoogleSettings";
 import { RecurringList } from "../components/RecurringList";
 import { SemesterSettings } from "../components/SemesterSettings";
 import { SubjectSettings } from "../components/SubjectSettings";
@@ -121,6 +122,7 @@ export function SettingsPage() {
       <RecurringList />
       <SemesterSettings />
       <SubjectSettings />
+      <GoogleSettings />
     </div>
   );
 }
