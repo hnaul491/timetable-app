@@ -1,0 +1,101 @@
+import json
+
+import httpx
+import pytest
+
+from app.gcal.api import GoogleAuthError, GoogleError, GoogleNotFound, GoogleRateLimited
+from app.gcal.http_client import HttpGoogleCalendar
+
+API = "https://www.googleapis.com/calendar/v3"
+
+
+class Google:
+    """Scripted Google: token responses and API responses are consumed in order."""
+
+    def __init__(self, tokens=None, api=None):
+        self.tokens = list(tokens or [httpx.Response(200, json={"access_token": "at1", "expires_in": 3599})])
+        self.api = list(api or [])
+        self.requests: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if request.url.host == "oauth2.googleapis.com":
+            return self.tokens.pop(0)
+        return self.api.pop(0)
+
+
+def client(google: Google) -> HttpGoogleCalendar:
+    return HttpGoogleCalendar("cid", "csecret", "1//refresh", http=httpx.Client(transport=httpx.MockTransport(google)))
+
+
+def test_creates_calendar_and_reuses_the_access_token():
+    google = Google(api=[httpx.Response(200, json={"id": "abc@group.calendar.google.com"}),
+                         httpx.Response(200, json={"id": "ev1"})])
+    gcal = client(google)
+    assert gcal.create_calendar("My Timetable", "Europe/Paris") == "abc@group.calendar.google.com"
+    assert gcal.insert_event("abc@group.calendar.google.com", {"summary": "x"}) == "ev1"
+    token_request, create, insert = google.requests
+    form = dict(httpx.QueryParams(token_request.content.decode()))
+    assert form == {"client_id": "cid", "client_secret": "csecret", "refresh_token": "1//refresh",
+                    "grant_type": "refresh_token"}
+    assert (create.method, str(create.url)) == ("POST", f"{API}/calendars")
+    assert json.loads(create.content) == {"summary": "My Timetable", "timeZone": "Europe/Paris"}
+    assert create.headers["Authorization"] == "Bearer at1"
+    assert str(insert.url) == f"{API}/calendars/abc%40group.calendar.google.com/events"
+
+
+def test_update_and_delete_use_put_and_delete():
+    google = Google(api=[httpx.Response(200, json={"id": "ev1"}), httpx.Response(204)])
+    gcal = client(google)
+    gcal.update_event("cal", "ev1", {"summary": "y"})
+    gcal.delete_event("cal", "ev1")
+    assert [(r.method, str(r.url)) for r in google.requests[1:]] == [
+        ("PUT", f"{API}/calendars/cal/events/ev1"), ("DELETE", f"{API}/calendars/cal/events/ev1")]
+
+
+def test_revoked_refresh_token_is_an_auth_error_without_secrets():
+    google = Google(tokens=[httpx.Response(400, json={"error": "invalid_grant"})])
+    with pytest.raises(GoogleAuthError) as caught:
+        client(google).create_calendar("My Timetable", "Europe/Paris")
+    assert "1//refresh" not in str(caught.value) and "csecret" not in str(caught.value)
+
+
+def test_wrong_client_secret_is_not_reported_as_revoked():
+    google = Google(tokens=[httpx.Response(401, json={"error": "invalid_client"})])
+    with pytest.raises(GoogleError) as caught:
+        client(google).create_calendar("My Timetable", "Europe/Paris")
+    assert not isinstance(caught.value, GoogleAuthError)
+
+
+def test_expired_access_token_is_refreshed_once():
+    google = Google(tokens=[httpx.Response(200, json={"access_token": "at1"}), httpx.Response(200, json={"access_token": "at2"})],
+                    api=[httpx.Response(401), httpx.Response(200, json={"id": "ev1"})])
+    assert client(google).insert_event("cal", {}) == "ev1"
+    assert google.requests[-1].headers["Authorization"] == "Bearer at2"
+
+
+def test_api_401_twice_is_an_auth_error():
+    google = Google(tokens=[httpx.Response(200, json={"access_token": "at1"}), httpx.Response(200, json={"access_token": "at2"})],
+                    api=[httpx.Response(401), httpx.Response(401)])
+    with pytest.raises(GoogleAuthError):
+        client(google).insert_event("cal", {})
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_missing_event_is_not_found(status):
+    with pytest.raises(GoogleNotFound):
+        client(Google(api=[httpx.Response(status)])).delete_event("cal", "ev1")
+
+
+def test_rate_limits():
+    reason = {"error": {"errors": [{"reason": "rateLimitExceeded"}], "code": 403}}
+    with pytest.raises(GoogleRateLimited):
+        client(Google(api=[httpx.Response(403, json=reason)])).insert_event("cal", {})
+    with pytest.raises(GoogleRateLimited):
+        client(Google(api=[httpx.Response(429)])).insert_event("cal", {})
+
+
+def test_other_errors_name_status_and_reason():
+    body = {"error": {"errors": [{"reason": "accessNotConfigured"}], "code": 403}}
+    with pytest.raises(GoogleError, match=r"Google Calendar returned 403 \(accessNotConfigured\)"):
+        client(Google(api=[httpx.Response(403, json=body)])).insert_event("cal", {})
