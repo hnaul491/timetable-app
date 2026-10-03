@@ -12,6 +12,8 @@ from app.zeus.ics_client import ZeusFetchError
 from app.zeus.ics_parser import InvalidFeedError, ParsedFeed, parse_ics
 
 Fetcher = Callable[[Semester], str]
+MIN_EVENTS_FOR_GUARD = 10
+MAX_CANCEL_RATIO = 0.3
 
 
 @dataclass
@@ -35,6 +37,12 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
             select(Event).where(Event.semester_id == semester.id, Event.source == "zeus")
         )
     }
+    feed_uids = {item.uid for item in feed.events}
+    upcoming = [e for e in existing.values() if e.start_at >= now and e.status != "cancelled"]
+    would_cancel = sum(1 for e in upcoming if e.zeus_uid not in feed_uids)
+    if len(upcoming) >= MIN_EVENTS_FOR_GUARD and would_cancel / len(upcoming) > MAX_CANCEL_RATIO:
+        # A truncated feed (wrong group, Zeus hiccup) must not wipe the semester.
+        raise InvalidFeedError(f"feed would cancel {would_cancel} of {len(upcoming)} upcoming events")
     result = SyncResult(fetched=len(feed.events), skipped=feed.skipped)
 
     for item in feed.events:

@@ -153,3 +153,37 @@ def test_unexpected_error_is_persisted_as_failed_without_leaking_secret(session,
     assert stored.finished_at == LATER
     assert event_by_uid(session, "u-fr").status == "normal"
     assert len(session.scalars(select(Event)).all()) == 1
+
+
+from datetime import timedelta
+
+
+def many(n: int) -> list[FeedEvent]:
+    base = datetime(2026, 11, 2, 8, 0)
+    return [FeedEvent(f"m{i}", "Relational Databases", base + timedelta(days=i),
+                      base + timedelta(days=i, hours=2), "KB602", "") for i in range(n)]
+
+
+def test_partial_feed_guard_blocks_mass_cancellation(session, semester):
+    events = many(20)
+    apply_feed(session, semester, feed(*events), NOW)
+    session.commit()
+    with pytest.raises(InvalidFeedError, match="would cancel 15 of 20"):
+        apply_feed(session, semester, feed(*events[:5]), LATER)
+    statuses = {e.status for e in session.scalars(select(Event))}
+    assert statuses == {"normal"}
+
+    text = "\r\n".join(["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//t//EN",
+                        "BEGIN:VEVENT", "UID:m0", "SUMMARY:Relational Databases",
+                        "DTSTART:20261102T080000Z", "DTEND:20261102T100000Z", "END:VEVENT",
+                        "END:VCALENDAR", ""])
+    run = run_sync(session, lambda sem: text, LATER)
+    assert run.status == "failed"
+    assert "would cancel 19 of 20" in run.error
+
+
+def test_small_cancellations_still_apply(session, semester):
+    events = many(20)
+    apply_feed(session, semester, feed(*events), NOW)
+    result = apply_feed(session, semester, feed(*events[:18]), LATER)
+    assert result.cancelled == 2
