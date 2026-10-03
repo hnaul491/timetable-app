@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, dayLabel, formatLongDate, formatTime, parisMidnightUtc, parisParts, rangeUtc, startOfWeek, todayParis } from "./time";
+import { addDays, dayLabel, formatLongDate, formatTime, parisLocalToUtc, parisMidnightUtc, parisParts, rangeUtc, startOfWeek, todayParis, weekdayIndex } from "./time";
 
 describe("Paris time", () => {
   it("converts summer time (CEST, UTC+2)", () => {
@@ -34,5 +34,16 @@ describe("Paris time", () => {
     expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
     expect(dayLabel("2026-10-19")).toEqual({ weekday: "Mon", day: "19" });
     expect(formatLongDate("2026-10-25")).toBe("25 October 2026");
+  });
+});
+
+describe("Paris local → UTC", () => {
+  it("converts summer and winter local times", () => {
+    expect(parisLocalToUtc("2026-10-19", "19:30")).toBe("2026-10-19T17:30:00.000Z");
+    expect(parisLocalToUtc("2026-10-26", "19:30")).toBe("2026-10-26T18:30:00.000Z");
+  });
+  it("weekdayIndex is Monday-based", () => {
+    expect(weekdayIndex("2026-10-19")).toBe(0);
+    expect(weekdayIndex("2026-10-25")).toBe(6);
   });
 });

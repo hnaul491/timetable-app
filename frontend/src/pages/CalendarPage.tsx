@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link, useNavigate } from "react-router";
 import { ErrorPanel, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { WeekGrid } from "../components/WeekGrid";
 import { apiFetch } from "../lib/api";
@@ -12,6 +13,7 @@ type View = "week" | "day";
 const buttonClass = "h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold hover:bg-[#F8F9FB]";
 
 export function CalendarPage() {
+  const navigate = useNavigate();
   const isPhone = useMediaQuery("(max-width: 767px)");
   const [view, setView] = useState<View>(isPhone ? "day" : "week");
   const [anchor, setAnchor] = useState(todayParis());
@@ -59,10 +61,13 @@ export function CalendarPage() {
             </button>
           ))}
         </div>
+        <Link to="/events/new" className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong">
+          Add event
+        </Link>
       </header>
       <SyncBanner status={sync.data} />
       <MissingSectionsBanner names={events.data?.missing_sections ?? []} />
-      {events.error ? <ErrorPanel error={events.error} onRetry={() => events.refetch()} /> : <WeekGrid days={days} events={events.data?.events ?? []} />}
+      {events.error ? <ErrorPanel error={events.error} onRetry={() => events.refetch()} /> : <WeekGrid days={days} events={events.data?.events ?? []} onSelect={(id) => navigate(`/events/${id}`)} />}
     </div>
   );
 }

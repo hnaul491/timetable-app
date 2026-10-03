@@ -7,6 +7,7 @@ interface Props {
   days: string[];
   events: ApiEvent[];
   hourHeight?: number;
+  onSelect?: (id: number) => void;
 }
 
 type Timed = ApiEvent & Span;
@@ -23,7 +24,7 @@ function bounds(timed: Timed[]): [number, number] {
   return [first, last];
 }
 
-export function WeekGrid({ days, events, hourHeight = 52 }: Props) {
+export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
   const today = todayParis();
   const { byDay, holidays, firstHour, lastHour } = useMemo(() => {
     const byDay = new Map<string, Timed[]>(days.map((d) => [d, []]));
@@ -88,6 +89,7 @@ export function WeekGrid({ days, events, hourHeight = 52 }: Props) {
                 ev={item}
                 column={column}
                 columns={count}
+                onSelect={onSelect}
                 style={{
                   top: ((item.startMin - firstHour * 60) / 60) * hourHeight + 2,
                   height: ((item.endMin - item.startMin) / 60) * hourHeight - 4,
@@ -103,19 +105,43 @@ export function WeekGrid({ days, events, hourHeight = 52 }: Props) {
   );
 }
 
-function EventBlock({ ev, style, column, columns }: { ev: ApiEvent; style: CSSProperties; column: number; columns: number }) {
-  const color = ev.color ?? "#3B4252";
+const KIND_COLORS: Partial<Record<ApiEvent["kind"], string>> = { work: "#3B4252", french_ext: "#0E7F72" };
+
+function EventBlock({
+  ev,
+  style,
+  column,
+  columns,
+  onSelect,
+}: {
+  ev: ApiEvent;
+  style: CSSProperties;
+  column: number;
+  columns: number;
+  onSelect?: (id: number) => void;
+}) {
+  const color = ev.color ?? KIND_COLORS[ev.kind] ?? "#3B4252";
   const title = ev.section ? `${ev.title} ${ev.section}` : ev.title;
   const label = `${title}, ${formatTime(ev.start)} to ${formatTime(ev.end)}${ev.room ? `, ${ev.room}` : ""}`;
+  const outline = ev.kind === "french_ext" ? { border: `1.5px dashed ${color}`, background: "#FFFFFF" } : { background: `${color}1F` };
   return (
     <div
       role="group"
       aria-label={label}
       data-column={column}
       data-columns={columns}
+      data-kind={ev.kind}
       className={`absolute flex flex-col gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-xs ${ev.status === "cancelled" ? "line-through opacity-60" : ""}`}
-      style={{ ...style, background: `${color}1F` }}
+      style={{ ...style, ...outline }}
     >
+      {onSelect && (
+        <button
+          type="button"
+          aria-label={`Open ${title}`}
+          className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent"
+          onClick={() => onSelect(ev.id)}
+        />
+      )}
       <span className="flex items-center gap-1.5 leading-tight font-bold">
         <span className="size-2 shrink-0 rounded-full" style={{ background: color }} />
         {ev.title}
@@ -128,6 +154,13 @@ function EventBlock({ ev, style, column, columns }: { ev: ApiEvent; style: CSSPr
       <span className="flex flex-wrap gap-1">
         {ev.kind === "exam" && <span className="rounded-full bg-[#8B1A1A] px-1.5 text-[10.5px] font-bold text-white">Exam</span>}
         {ev.status === "changed" && <span className="rounded-full bg-[#9A3412] px-1.5 text-[10.5px] font-bold text-white">Changed</span>}
+        {ev.important && <span className="rounded-full bg-[#FFF1E0] px-1.5 text-[10.5px] font-bold text-[#7C2D12]">Important</span>}
+        {ev.note_count > 0 && <span className="rounded-full bg-white px-1.5 text-[10.5px] font-semibold">Note</span>}
+        {ev.open_tasks > 0 && (
+          <span className="rounded-full bg-white px-1.5 text-[10.5px] font-semibold">
+            {ev.open_tasks} {ev.open_tasks === 1 ? "task" : "tasks"}
+          </span>
+        )}
       </span>
     </div>
   );

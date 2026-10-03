@@ -72,3 +72,15 @@ export function dayLabel(date: string): { weekday: string; day: string } {
 export function formatLongDate(date: string): string {
   return utcNoon(date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
+
+export function parisLocalToUtc(date: string, hhmm: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = hhmm.split(":").map(Number);
+  const naive = Date.UTC(y, m - 1, d, hh, mm);
+  const firstGuess = naive - offsetMinutes(naive) * 60_000;
+  return new Date(naive - offsetMinutes(firstGuess) * 60_000).toISOString();
+}
+
+export function weekdayIndex(date: string): number {
+  return (utcNoon(date).getUTCDay() + 6) % 7;
+}

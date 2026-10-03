@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import type { ApiEvent } from "../types";
 import { WeekGrid } from "./WeekGrid";
 
@@ -8,7 +9,8 @@ const WEEK = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-2
 const event = (over: Partial<ApiEvent>): ApiEvent => ({
   id: 1, title: "French for Fall 26 T1", subject_id: 1, subject_name: "French for Fall 26 T1", color: "#0E7F72",
   section: "GR5", start: "2026-10-20T12:30:00Z", end: "2026-10-20T14:30:00Z", room: "KB605",
-  kind: "class", status: "normal", source: "zeus", ...over,
+  kind: "class", status: "normal", source: "zeus",
+  note_count: 0, open_tasks: 0, important: false, ...over,
 });
 
 describe("WeekGrid", () => {
@@ -42,5 +44,24 @@ describe("WeekGrid", () => {
     expect(screen.queryByText("07:00")).not.toBeInTheDocument();
     render(<WeekGrid days={["2026-10-26"]} events={[event({ start: "2026-10-26T06:00:00Z", end: "2026-10-26T08:00:00Z" })]} />);
     expect(screen.getByText("07:00")).toBeInTheDocument();
+  });
+
+  it("opens an event when onSelect is given", async () => {
+    const onSelect = vi.fn();
+    render(<WeekGrid days={WEEK} events={[event({ id: 42 })]} onSelect={onSelect} />);
+    await userEvent.click(screen.getByRole("button", { name: "Open French for Fall 26 T1 GR5" }));
+    expect(onSelect).toHaveBeenCalledWith(42);
+  });
+
+  it("shows note, task and important badges", () => {
+    render(<WeekGrid days={WEEK} events={[event({ note_count: 1, open_tasks: 2, important: true })]} />);
+    expect(screen.getByText("Note")).toBeInTheDocument();
+    expect(screen.getByText("2 tasks")).toBeInTheDocument();
+    expect(screen.getByText("Important")).toBeInTheDocument();
+  });
+
+  it("marks external French with a dashed outline", () => {
+    render(<WeekGrid days={WEEK} events={[event({ title: "French (external)", kind: "french_ext", color: null, section: null, subject_id: null })]} />);
+    expect(screen.getByRole("group").dataset.kind).toBe("french_ext");
   });
 });
