@@ -3,8 +3,8 @@
 Collected from the per-task and final whole-branch reviews of plan 1. None blocks use; items marked **before Plan 3** must land before Google Calendar push.
 
 ## Before Plan 3 (Google push)
-- Partial-feed guard: fail the sync if more than ~30% of future events would be cancelled (a truncated but valid feed currently cancels the rest of the semester; Plan 3 would delete them from Google).
-- Stale-sync banner: warn when `last_success_at` is older than ~36 h (a broken cron currently shows nothing).
+- Partial-feed guard: fail the sync if more than ~30% of future events would be cancelled (a truncated but valid feed currently cancels the rest of the semester; Plan 3 would delete them from Google). — DONE in plan 2A (Task 1)
+- Stale-sync banner: warn when `last_success_at` is older than ~36 h (a broken cron currently shows nothing). — DONE in plan 2A (Task 2)
 
 ## Verify against the real feed
 - Multi-day holidays (date-only `Vacances` spanning days) render only on their start date.
