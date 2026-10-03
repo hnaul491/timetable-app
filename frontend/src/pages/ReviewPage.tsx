@@ -59,6 +59,8 @@ export function ReviewPage() {
     return review.error ? <ErrorPanel error={review.error} onRetry={() => review.refetch()} /> : <p className="text-sm text-muted">Loading review…</p>;
   }
   const days = Array.from({ length: 7 }, (_, i) => addDays(r.week_start, i));
+  // Step from the week asked for, so arrows still work after a failed week.
+  const shownWeek = weekStart ?? r.week_start;
   const error = (tick.error ?? mark.error) as Error | null;
 
   return (
@@ -68,10 +70,10 @@ export function ReviewPage() {
           <p className="text-sm text-muted">Weekend review</p>
           <h1 className="text-2xl font-bold tracking-tight">{weekTitle(r.week_start, r.week_end)}</h1>
         </div>
-        <button type="button" aria-label="Previous week" onClick={() => setWeekStart(addDays(r.week_start, -7))} className="h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold">
+        <button type="button" aria-label="Previous week" onClick={() => setWeekStart(addDays(shownWeek, -7))} className="h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold">
           ‹
         </button>
-        <button type="button" aria-label="Next week" onClick={() => setWeekStart(addDays(r.week_start, 7))} className="h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold">
+        <button type="button" aria-label="Next week" onClick={() => setWeekStart(addDays(shownWeek, 7))} className="h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold">
           ›
         </button>
         {r.reviewed_at ? (
