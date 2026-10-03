@@ -44,3 +44,9 @@ Single-key shortcuts never fire while typing in an input, textarea or editor. Ne
 - Server messages shown to the user (validation, sync/Google errors) mapped to translated text on the frontend via stable codes rather than English strings.
 - School data (subject names, rooms from Zeus) stays as Zeus sends it; only the app's own text is translated.
 - Plan 4 (AI): the assistant answers in the chosen language.
+
+## 7. Dark mode (requested 2026-10-03)
+- Theme setting in Settings: System (default) / Light / Dark, remembered per browser (localStorage, safe fallback), applied before first paint so there is no white flash.
+- Colours become tokens (CSS variables behind the Tailwind theme: canvas, surface, ink, muted, line, accent, warn/error/success backgrounds) with a dark set; the many hard-coded hex classes in components (e.g. `text-[#8B1A1A]`, `bg-[#FDECEC]`, `bg-[#F8F9FB]`) are replaced by tokens — do this together with the UX work so it's done once.
+- Subject colours keep their hue but get a dark-safe tint for event blocks; text on them must keep readable contrast (WCAG AA).
+- `theme-color` meta follows the active theme (phone status bar / installed app).
