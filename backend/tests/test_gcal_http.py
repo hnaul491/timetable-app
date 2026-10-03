@@ -99,3 +99,31 @@ def test_other_errors_name_status_and_reason():
     body = {"error": {"errors": [{"reason": "accessNotConfigured"}], "code": 403}}
     with pytest.raises(GoogleError, match=r"Google Calendar returned 403 \(accessNotConfigured\)"):
         client(Google(api=[httpx.Response(403, json=body)])).insert_event("cal", {})
+
+
+def test_network_error_is_a_google_error_not_an_auth_error():
+    def boom(request):
+        raise httpx.ConnectTimeout("secret-detail")
+
+    gcal = HttpGoogleCalendar("cid", "csecret", "1//refresh", http=httpx.Client(transport=httpx.MockTransport(boom)))
+    with pytest.raises(GoogleError, match="Could not reach Google") as caught:
+        gcal.insert_event("cal", {})
+    assert not isinstance(caught.value, GoogleAuthError)
+    assert "secret-detail" not in str(caught.value)
+
+
+def test_non_json_token_response_is_an_unexpected_response():
+    google = Google(tokens=[httpx.Response(200, content=b"<html>")])
+    with pytest.raises(GoogleError, match="unexpected response"):
+        client(google).insert_event("cal", {})
+
+
+def test_token_error_body_that_is_not_an_object_is_still_an_auth_error():
+    google = Google(tokens=[httpx.Response(400, json=[])])
+    with pytest.raises(GoogleAuthError):
+        client(google).insert_event("cal", {})
+
+
+def test_insert_response_without_id_is_an_unexpected_response():
+    with pytest.raises(GoogleError, match="unexpected response"):
+        client(Google(api=[httpx.Response(200, json={})])).insert_event("cal", {})
