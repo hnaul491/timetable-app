@@ -2,7 +2,9 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from app.models import Event, MySection, Note, Subject, Task
+from datetime import date
+
+from app.models import Event, MySection, Note, Semester, Subject, Task
 from tests.conftest import AUTH
 
 T = datetime(2026, 10, 15, 12, 0)  # conftest NOW
@@ -96,3 +98,37 @@ def test_merge_validation(client, session, semester):
     db, fr, *_ = seed(session, semester)
     assert client.post(f"/api/subjects/{db.id}/merge", headers=AUTH, json={"into_id": db.id}).status_code == 422
     assert client.post(f"/api/subjects/{db.id}/merge", headers=AUTH, json={"into_id": 999}).status_code == 404
+
+
+def test_merge_keeps_target_group_choice(client, session, semester):
+    db, fr, spring, _ = seed(session, semester)
+    session.add(MySection(subject_id=spring.id, section="GR2"))
+    session.commit()
+    fr_id, spring_id = fr.id, spring.id
+    assert client.post(f"/api/subjects/{spring_id}/merge", headers=AUTH, json={"into_id": fr_id}).status_code == 200
+    session.expire_all()
+    assert session.get(MySection, fr_id).section == "GR5"
+    assert session.get(MySection, spring_id) is None
+
+
+def test_merge_moves_source_group_choice_when_target_has_none(client, session, semester):
+    db, fr, spring, _ = seed(session, semester)
+    session.delete(session.get(MySection, fr.id))
+    session.add(MySection(subject_id=spring.id, section="GR2"))
+    session.commit()
+    fr_id, spring_id = fr.id, spring.id
+    assert client.post(f"/api/subjects/{spring_id}/merge", headers=AUTH, json={"into_id": fr_id}).status_code == 200
+    session.expire_all()
+    assert session.get(MySection, fr_id).section == "GR2"
+    assert session.get(MySection, spring_id) is None
+
+
+def test_merge_into_other_semester_rejected(client, session, semester):
+    db, *_ = seed(session, semester)
+    other = Semester(code="S2", name="Other", start_date=date(2027, 2, 1), end_date=date(2027, 6, 1), is_active=False)
+    session.add(other)
+    session.flush()
+    foreign = Subject(semester_id=other.id, display_name="Elsewhere", aliases=[], color="#2E55E6")
+    session.add(foreign)
+    session.commit()
+    assert client.post(f"/api/subjects/{db.id}/merge", headers=AUTH, json={"into_id": foreign.id}).status_code == 422

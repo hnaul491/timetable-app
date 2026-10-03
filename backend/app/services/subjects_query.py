@@ -83,7 +83,11 @@ def note_snippets(session: Session, event_ids: list[int]) -> dict[int, str]:
 def merge_subjects(session: Session, source: Subject, target: Subject) -> None:
     session.execute(update(Event).where(Event.subject_id == source.id).values(subject_id=target.id))
     session.execute(update(Task).where(Task.subject_id == source.id).values(subject_id=target.id))
-    session.execute(delete(MySection).where(MySection.subject_id == source.id))
+    source_choice = session.get(MySection, source.id)
+    if source_choice is not None:
+        if session.get(MySection, target.id) is None:
+            session.add(MySection(subject_id=target.id, section=source_choice.section))
+        session.delete(source_choice)
     known = {target.display_name.casefold(), *(a.casefold() for a in target.aliases)}
     aliases = list(target.aliases)
     for name in [source.display_name, *source.aliases]:
