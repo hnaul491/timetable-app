@@ -231,3 +231,9 @@ class SubjectPatch(BaseModel):
 
 class MergeIn(BaseModel):
     into_id: int
+
+
+class SemesterPatch(BaseModel):
+    zeus_group_id: int | None = Field(default=None, gt=0)
+    start_date: date | None = None
+    end_date: date | None = None

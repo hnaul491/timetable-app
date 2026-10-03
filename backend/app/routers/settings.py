@@ -1,23 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import require_user
 from app.config import Settings, get_settings
 from app.db import get_session
-from app.models import MySection, Semester
-from app.schemas import SectionChoiceOut, SectionUpdate, SemesterOut, ZeusKeyStatus, ZeusKeyUpdate
+from app.models import MySection
+from app.schemas import SectionChoiceOut, SectionUpdate, ZeusKeyStatus, ZeusKeyUpdate
 from app.secret_store import ZEUS_KEY_NAME, SecretStore, get_zeus_key
 from app.services.events_query import ALL_SECTIONS, active_semester, section_choices
 from app.zeus.ics_client import extract_key
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
-
-
-@router.get("/semesters", response_model=list[SemesterOut])
-def list_semesters(session: Session = Depends(get_session)) -> list[SemesterOut]:
-    rows = session.scalars(select(Semester).order_by(Semester.code))
-    return [SemesterOut.model_validate(row, from_attributes=True) for row in rows]
 
 
 @router.get("/settings/sections", response_model=list[SectionChoiceOut])
