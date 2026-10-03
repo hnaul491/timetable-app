@@ -190,4 +190,15 @@ describe("EventPage", () => {
     renderPage();
     expect(await screen.findByRole("textbox", { name: "After class note" })).toHaveAttribute("maxlength", "20000");
   });
+
+  it("discards unsaved changes", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "After class note" });
+    fireEvent.change(box, { target: { value: "scratch" } });
+    await userEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(box).toHaveValue("[ ] Redo ex 3");
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    expect(localStorage.getItem("timetable:draft:7:after")).toBeNull();
+  });
 });

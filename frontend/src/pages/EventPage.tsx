@@ -117,6 +117,12 @@ function EventPageInner() {
       return out;
     });
   };
+  const discard = () =>
+    setDrafts((d) => {
+      const out = { ...d };
+      delete out[tab];
+      return out;
+    });
   const dirty = current.body !== saved.body || current.important !== saved.important;
   const anyDirty = TABS.some((t) => {
     const d = drafts[t.id];
@@ -197,6 +203,11 @@ function EventPageInner() {
           >
             Save note
           </button>
+          {dirty && (
+            <button type="button" onClick={discard} className="h-10 rounded-xl border border-line px-4 text-sm font-semibold text-[#3A3F4B]">
+              Discard changes
+            </button>
+          )}
           {dirty ? <span className="text-sm text-muted">Unsaved changes</span> : saved.updated_at ? <span className="text-sm text-muted">Saved</span> : null}
           {save.error && <p className="text-sm text-[#8B1A1A]">{(save.error as Error).message}</p>}
         </div>

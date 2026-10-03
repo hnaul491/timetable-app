@@ -67,4 +67,14 @@ describe("BoardPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add task" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/tasks", { method: "POST", body: JSON.stringify({ title: "Print slides", due_date: null }) });
   });
+
+  it("names delete buttons per task and resets the confirmation on blur", async () => {
+    renderBoard();
+    const del = await screen.findByRole("button", { name: "Delete Buy notebook" });
+    await userEvent.click(del);
+    expect(screen.getByRole("button", { name: "Click again to delete Buy notebook" })).toBeInTheDocument();
+    await userEvent.tab();
+    expect(screen.getByRole("button", { name: "Delete Buy notebook" })).toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalledWith("/api/tasks/3", { method: "DELETE" });
+  });
 });
