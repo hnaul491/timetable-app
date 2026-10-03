@@ -127,3 +127,31 @@ def test_token_error_body_that_is_not_an_object_is_still_an_auth_error():
 def test_insert_response_without_id_is_an_unexpected_response():
     with pytest.raises(GoogleError, match="unexpected response"):
         client(Google(api=[httpx.Response(200, json={})])).insert_event("cal", {})
+
+
+def test_missing_scope_is_an_auth_error():
+    body = {"error": {"errors": [{"reason": "insufficientPermissions"}], "code": 403}}
+    with pytest.raises(GoogleAuthError, match="permission is missing"):
+        client(Google(api=[httpx.Response(403, json=body)])).insert_event("cal", {})
+    body = {"error": {"code": 403, "details": [{"reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}
+    with pytest.raises(GoogleAuthError, match="permission is missing"):
+        client(Google(api=[httpx.Response(403, json=body)])).insert_event("cal", {})
+
+
+def test_quota_exceeded_is_rate_limited():
+    body = {"error": {"errors": [{"reason": "quotaExceeded"}], "code": 403}}
+    with pytest.raises(GoogleRateLimited):
+        client(Google(api=[httpx.Response(403, json=body)])).insert_event("cal", {})
+
+
+def test_revoke_posts_the_token_and_ignores_errors():
+    google = Google(tokens=[httpx.Response(400, json={"error": "invalid_token"})])
+    client(google).revoke()
+    (request,) = google.requests
+    assert str(request.url) == "https://oauth2.googleapis.com/revoke"
+    assert dict(httpx.QueryParams(request.content.decode())) == {"token": "1//refresh"}
+
+    def boom(request):
+        raise httpx.ConnectTimeout("x")
+
+    HttpGoogleCalendar("cid", "s", "1//refresh", http=httpx.Client(transport=httpx.MockTransport(boom))).revoke()

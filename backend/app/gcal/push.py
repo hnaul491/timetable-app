@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.config import Settings
 from app.gcal.api import (ACCOUNT_ID, CALENDAR_NAME, REFRESH_TOKEN_NAME, TIME_ZONE, GcalFactory, GoogleAuthError,
@@ -24,6 +25,8 @@ logger = logging.getLogger(__name__)
 KEEP_PAST = timedelta(days=7)
 FAR_FUTURE = datetime(2100, 1, 1)
 FAR_PAST = datetime(2000, 1, 1)
+LEASE = timedelta(minutes=2)
+SAME_ERROR_LIMIT = 3
 CALENDAR_GONE = 'The "My Timetable" calendar is gone from Google; it will be recreated on the next push.'
 
 
@@ -164,6 +167,7 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
                 return result
             session.commit()
         ops = plan_ops(session, account, now, app_url)
+        streak, last_error = 0, None
         for index, op in enumerate(ops):
             if clock() >= deadline:
                 result.remaining = len(ops) - index
@@ -179,13 +183,24 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
                 break
             except GoogleAuthError:
                 raise
+            except StaleDataError:
+                session.rollback()
+                result.failed += 1
+                result.error = "A timetable row changed while pushing; it is retried on the next push"
+                continue
             except GoogleError as exc:
                 session.rollback()
                 result.failed += 1
                 result.error = str(exc)
+                streak = streak + 1 if result.error == last_error else 1
+                last_error = result.error
+                if streak >= SAME_ERROR_LIMIT:  # persistent error: stop hammering Google
+                    result.remaining = len(ops) - index - 1
+                    break
                 continue
             session.commit()
             result.done += 1
+            streak, last_error = 0, None
     except GoogleAuthError as exc:
         session.rollback()
         account.needs_reconnect = True
@@ -203,26 +218,70 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
     return result
 
 
+def _close(gcal: object) -> None:
+    close = getattr(gcal, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception:  # noqa: BLE001
+            logger.warning("Closing the Google client failed")
+
+
+def _take_lease(session: Session, now: datetime) -> bool:
+    taken = session.execute(
+        update(GoogleAccount)
+        .where(GoogleAccount.id == ACCOUNT_ID,
+               or_(GoogleAccount.push_lock_until.is_(None), GoogleAccount.push_lock_until < now))
+        .values(push_lock_until=now + LEASE)
+    )
+    session.commit()
+    return taken.rowcount == 1
+
+
+def _release_lease(session: Session) -> None:
+    try:
+        session.rollback()
+        session.execute(update(GoogleAccount).where(GoogleAccount.id == ACCOUNT_ID).values(push_lock_until=None))
+        session.commit()
+    except Exception:  # noqa: BLE001 - the lease expires by itself
+        logger.warning("Releasing the push lease failed")
+        session.rollback()
+
+
 def run_push(session: Session, settings: Settings, factory: GcalFactory, now: datetime, deadline: float,
              clock: Callable[[], float] = time.monotonic) -> PushResult:
     """Push for the connected account, if any. Never raises: the daily sync must not fail because of Google."""
-    account = session.get(GoogleAccount, ACCOUNT_ID)
-    if account is None or account.needs_reconnect or not settings.google_configured:
-        return PushResult(status="skipped")
+    leased = False
     try:
+        account = session.get(GoogleAccount, ACCOUNT_ID)
+        if account is None or account.needs_reconnect or not settings.google_configured:
+            return PushResult(status="skipped")
         token = SecretStore(session, settings.token_encryption_key).get(REFRESH_TOKEN_NAME)
         if not token:
             account.needs_reconnect = True
             account.last_push_error = "Google is not connected any more — connect it again in Settings"
             session.commit()
             return PushResult(status="failed", error=account.last_push_error)
-        return push(session, account, factory(token), now, settings.app_url, deadline, clock)
-    except Exception as exc:  # noqa: BLE001 — record and move on
+        if not _take_lease(session, now):
+            return PushResult(status="skipped", error="Another push is already running")
+        leased = True
+        gcal = factory(token)
+        try:
+            return push(session, account, gcal, now, settings.app_url, deadline, clock)
+        finally:
+            _close(gcal)
+    except Exception as exc:  # noqa: BLE001 - record and move on
         logger.exception("Google Calendar push failed")
-        session.rollback()
         error = f"unexpected error ({type(exc).__name__})"
-        account = session.get(GoogleAccount, ACCOUNT_ID)
-        if account is not None:
-            account.last_push_at, account.last_push_error = now, error
-            session.commit()
+        try:
+            session.rollback()
+            account = session.get(GoogleAccount, ACCOUNT_ID)
+            if account is not None:
+                account.last_push_at, account.last_push_error = now, error
+                session.commit()
+        except Exception:  # noqa: BLE001
+            session.rollback()
         return PushResult(status="failed", error=error)
+    finally:
+        if leased:
+            _release_lease(session)

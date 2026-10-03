@@ -110,7 +110,7 @@ def test_connect_reports_google_errors(client, settings, semester):
     configure(client, settings, FakeCalendar(fail={"create_calendar": [GoogleAuthError(REVOKED)]}))
     response = connect(client)
     assert response.status_code == 400
-    assert response.json()["detail"].startswith("Could not reach Google Calendar")
+    assert response.json()["detail"].startswith("Google Calendar refused the connection: ")
     assert client.get("/api/google", headers=AUTH).json()["connected"] is False
 
 
@@ -133,3 +133,25 @@ def test_sync_still_works_when_google_is_not_connected(client, semester):
                        "END:VEVENT", "END:VCALENDAR", ""])
     client.app.dependency_overrides[get_fetcher] = lambda: (lambda sem: ics)
     assert client.post("/api/sync", headers={"X-Cron-Secret": "cron-secret"}).json()["status"] == "ok"
+
+
+def test_short_token_is_422_and_never_echoed(client, settings, semester):
+    configure(client, settings, FakeCalendar())
+    response = client.post("/api/google/connect", headers=AUTH, json={"refresh_token": "1//short"})
+    assert response.status_code == 422 and "1//short" not in response.text
+
+
+def test_connect_clears_last_push_error_and_disconnect_revokes(client, settings, session, semester):
+    from app.models import GoogleAccount
+    fake = FakeCalendar()
+    revoked = []
+    fake.revoke = lambda: revoked.append(True)
+    configure(client, settings, fake)
+    connect(client)
+    session.get(GoogleAccount, 1).last_push_error = "old"
+    session.commit()
+    connect(client)
+    session.expire_all()
+    assert session.get(GoogleAccount, 1).last_push_error is None
+    client.delete("/api/google", headers=AUTH)
+    assert revoked == [True]

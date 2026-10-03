@@ -6,8 +6,9 @@ import httpx
 from app.gcal.api import GoogleAuthError, GoogleError, GoogleNotFound, GoogleRateLimited
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 API = "https://www.googleapis.com/calendar/v3"
-RATE_REASONS = {"rateLimitExceeded", "userRateLimitExceeded"}
+RATE_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
 
 
 def _q(value: str) -> str:
@@ -35,6 +36,13 @@ def _reason(response: httpx.Response) -> str:
     return ""
 
 
+def _scope_missing(response: httpx.Response) -> bool:
+    error = _json(response).get("error")
+    details = error.get("details") if isinstance(error, dict) else None
+    return isinstance(details, list) and any(
+        isinstance(d, dict) and d.get("reason") == "ACCESS_TOKEN_SCOPE_INSUFFICIENT" for d in details)
+
+
 class HttpGoogleCalendar:
     def __init__(self, client_id: str, client_secret: str, refresh_token: str,
                  http: httpx.Client | None = None) -> None:
@@ -42,12 +50,19 @@ class HttpGoogleCalendar:
         self._client_secret = client_secret
         self._refresh_token = refresh_token
         self._owns_http = http is None
-        self._http = http or httpx.Client(timeout=10.0)
+        self._http = http or httpx.Client(timeout=httpx.Timeout(5.0))
         self._access_token: str | None = None
 
     def close(self) -> None:
         if self._owns_http:
             self._http.close()
+
+    def revoke(self) -> None:
+        """Best-effort: tell Google to forget the refresh token. Never raises."""
+        try:
+            self._http.post(REVOKE_URL, data={"token": self._refresh_token})
+        except Exception:  # noqa: BLE001
+            pass
 
     def _token(self) -> str:
         if self._access_token is None:
@@ -83,6 +98,8 @@ class HttpGoogleCalendar:
             raise GoogleAuthError("Google access was revoked or expired — reconnect Google in Settings")
         if status in (404, 410):
             raise GoogleNotFound(f"Google Calendar returned {status}")
+        if status == 403 and (reason == "insufficientPermissions" or _scope_missing(response)):
+            raise GoogleAuthError("Google Calendar permission is missing — reconnect Google in Settings")
         if status == 429 or (status == 403 and reason in RATE_REASONS):
             raise GoogleRateLimited("Google rate limit reached; the rest is sent on the next push")
         raise GoogleError(f"Google Calendar returned {status} ({reason or 'no reason'})")

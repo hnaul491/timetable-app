@@ -280,7 +280,7 @@ class GoogleStatusOut(BaseModel):
 
 
 class GoogleConnectIn(BaseModel):
-    refresh_token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=10, max_length=2048)]
+    refresh_token: str
 
 
 class GoogleKindsIn(BaseModel):

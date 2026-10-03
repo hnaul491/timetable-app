@@ -25,6 +25,7 @@ def upgrade() -> None:
         sa.Column("connected_at", sa.DateTime(), nullable=False),
         sa.Column("last_push_at", sa.DateTime(), nullable=True),
         sa.Column("last_push_error", sa.String(500), nullable=True),
+        sa.Column("push_lock_until", sa.DateTime(), nullable=True),
     )
     op.create_table(
         "gcal_tombstone",

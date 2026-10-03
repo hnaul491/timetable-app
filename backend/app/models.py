@@ -146,6 +146,7 @@ class GoogleAccount(Base):
     connected_at: Mapped[datetime] = mapped_column(DateTime)
     last_push_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_push_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    push_lock_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class GcalTombstone(Base):

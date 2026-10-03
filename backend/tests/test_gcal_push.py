@@ -292,3 +292,85 @@ def test_calendar_create_error_is_reported_as_failed(session, world):
     result = run(session, account, fake)
     assert (result.status, result.error) == ("failed", "Google rate limit reached")
     assert account.last_push_error == "Google rate limit reached" and account.last_push_at == NOW
+
+
+def _stored(session, cfg):
+    from app.gcal.api import REFRESH_TOKEN_NAME
+    from app.secret_store import SecretStore
+    SecretStore(session, cfg.token_encryption_key).set(REFRESH_TOKEN_NAME, "tok")
+    session.commit()
+
+
+def test_push_lease_held_skips_without_google_calls(session, world):
+    from app.gcal.push import run_push
+    _, account = world
+    cfg = settings()
+    _stored(session, cfg)
+    account.push_lock_until = NOW + timedelta(minutes=1)
+    session.commit()
+    fake = FakeCalendar()
+    result = run_push(session, cfg, lambda token: fake, NOW, NEVER)
+    assert (result.status, result.error) == ("skipped", "Another push is already running")
+    assert fake.calls == [] and account.last_push_at is None
+
+
+def test_push_lease_released_after_run_and_expired_lease_does_not_block(session, world):
+    from app.gcal.push import run_push
+    _, account = world
+    cfg = settings()
+    _stored(session, cfg)
+    account.push_lock_until = NOW - timedelta(minutes=1)
+    session.commit()
+    assert run_push(session, cfg, lambda token: FakeCalendar(), NOW, NEVER).status == "ok"
+    session.refresh(account)
+    assert account.push_lock_until is None
+
+
+def test_run_push_lookup_error_never_raises(session, world, monkeypatch):
+    from app.gcal.push import run_push
+    cfg = settings()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(session, "get", boom)
+    result = run_push(session, cfg, lambda token: FakeCalendar(), NOW, NEVER)
+    assert result.status == "failed"
+
+
+def test_run_push_closes_the_client(session, world):
+    from app.gcal.push import run_push
+    cfg = settings()
+    _stored(session, cfg)
+    fake = FakeCalendar()
+    closed = []
+    fake.close = lambda: closed.append(True)
+    run_push(session, cfg, lambda token: fake, NOW, NEVER)
+    assert closed == [True]
+
+
+def test_three_identical_failures_in_a_row_stop_the_run(session, world):
+    _, account = world
+    err = GoogleError("Google Calendar returned 500 (backendError)")
+    fake = FakeCalendar(fail={"insert_event": [err, err, err]})
+    result = run(session, account, fake)
+    assert (result.failed, result.done, result.remaining) == (3, 0, 1)
+    assert result.status == "partial" and result.error == str(err)
+
+
+def test_stale_data_error_counts_as_failed_and_continues(session, world, monkeypatch):
+    from sqlalchemy.orm.exc import StaleDataError
+    from app.gcal import push as push_module
+    _, account = world
+    real = push_module._apply
+    state = {"n": 0}
+
+    def flaky(session_, gcal, calendar_id, op):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise StaleDataError("gone")
+        return real(session_, gcal, calendar_id, op)
+
+    monkeypatch.setattr(push_module, "_apply", flaky)
+    result = run(session, account, FakeCalendar())
+    assert (result.failed, result.done, result.status) == (1, 3, "partial")

@@ -11,7 +11,7 @@ from app.db import get_session
 from app.deps import get_gcal_factory, get_now
 from app.gcal.api import (ACCOUNT_ID, ALL_KINDS, CALENDAR_NAME, DEFAULT_KINDS, REFRESH_TOKEN_NAME, TIME_ZONE,
                           GcalFactory, GoogleError)
-from app.gcal.push import plan_ops, reset_calendar, run_push
+from app.gcal.push import _close, plan_ops, reset_calendar, run_push
 from app.models import AppSecret, GoogleAccount
 from app.schemas import GoogleConnectIn, GoogleKindsIn, GoogleStatusOut, PushResultOut
 from app.secret_store import SecretStore
@@ -19,7 +19,7 @@ from app.timeutil import iso_utc
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 
-PUSH_BUDGET_S = 40.0
+PUSH_BUDGET_S = 35.0
 
 
 def _status(session: Session, settings: Settings, now: datetime) -> GoogleStatusOut:
@@ -50,18 +50,25 @@ def connect(body: GoogleConnectIn, user: CurrentUser = Depends(require_user),
     if not settings.google_configured:
         raise HTTPException(status_code=400, detail="Google Calendar is not set up on the server yet "
                                                     "(GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)")
+    refresh_token = body.refresh_token.strip()
+    if not 10 <= len(refresh_token) <= 2048:
+        raise HTTPException(status_code=422, detail="That Google token is not valid")
     account = session.get(GoogleAccount, ACCOUNT_ID)
     if account is None:
         account = GoogleAccount(id=ACCOUNT_ID, email=user.email, kinds=list(DEFAULT_KINDS), connected_at=now)
         session.add(account)
     account.email, account.needs_reconnect, account.connected_at = user.email, False, now
+    account.last_push_error = None
+    gcal = factory(refresh_token)
     try:
         if account.calendar_id is None:
-            account.calendar_id = factory(body.refresh_token).create_calendar(CALENDAR_NAME, TIME_ZONE)
+            account.calendar_id = gcal.create_calendar(CALENDAR_NAME, TIME_ZONE)
     except GoogleError as exc:
         session.rollback()
-        raise HTTPException(status_code=400, detail=f"Could not reach Google Calendar: {exc}") from None
-    SecretStore(session, settings.token_encryption_key).set(REFRESH_TOKEN_NAME, body.refresh_token)
+        raise HTTPException(status_code=400, detail=f"Google Calendar refused the connection: {exc}") from None
+    finally:
+        _close(gcal)
+    SecretStore(session, settings.token_encryption_key).set(REFRESH_TOKEN_NAME, refresh_token)
     session.commit()
     return _status(session, settings, now)
 
@@ -86,7 +93,10 @@ def push_now(session: Session = Depends(get_session), settings: Settings = Depen
 
 
 @router.delete("/google", status_code=204)
-def disconnect(session: Session = Depends(get_session)) -> Response:
+def disconnect(session: Session = Depends(get_session), settings: Settings = Depends(get_settings),
+               factory: GcalFactory = Depends(get_gcal_factory)) -> Response:
+    if settings.google_configured:
+        _revoke_quietly(session, settings, factory)
     account = session.get(GoogleAccount, ACCOUNT_ID)
     if account is not None:
         reset_calendar(session, account)
@@ -94,3 +104,20 @@ def disconnect(session: Session = Depends(get_session)) -> Response:
     session.execute(delete(AppSecret).where(AppSecret.name == REFRESH_TOKEN_NAME))
     session.commit()
     return Response(status_code=204)
+
+
+def _revoke_quietly(session: Session, settings: Settings, factory: GcalFactory) -> None:
+    """Tell Google to forget the stored refresh token. Best effort: never raises."""
+    try:
+        token = SecretStore(session, settings.token_encryption_key).get(REFRESH_TOKEN_NAME)
+        if not token:
+            return
+        gcal = factory(token)
+        try:
+            revoke = getattr(gcal, "revoke", None)
+            if callable(revoke):
+                revoke()
+        finally:
+            _close(gcal)
+    except Exception:  # noqa: BLE001
+        session.rollback()
