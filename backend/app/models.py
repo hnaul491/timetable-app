@@ -59,6 +59,8 @@ class Event(Base):
     recurring_rule_id: Mapped[int | None] = mapped_column(
         ForeignKey("recurring_rule.id", name="fk_event_recurring_rule"), nullable=True
     )
+    gcal_event_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    gcal_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class SyncRun(Base):
@@ -131,3 +133,23 @@ class WeekReview(Base):
 
     week_start: Mapped[date] = mapped_column(Date, primary_key=True)
     reviewed_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class GoogleAccount(Base):
+    __tablename__ = "google_account"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320))
+    calendar_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    kinds: Mapped[list[str]] = mapped_column(JSON, default=list)
+    needs_reconnect: Mapped[bool] = mapped_column(Boolean, default=False)
+    connected_at: Mapped[datetime] = mapped_column(DateTime)
+    last_push_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_push_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class GcalTombstone(Base):
+    __tablename__ = "gcal_tombstone"
+
+    gcal_event_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
