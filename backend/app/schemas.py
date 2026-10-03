@@ -166,3 +166,20 @@ class RecurringRuleOut(BaseModel):
 
 class Deleted(BaseModel):
     deleted: bool
+
+
+TaskTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)]
+
+
+class TaskCreate(BaseModel):
+    title: TaskTitle
+    due_date: date | None = None
+    subject_id: int | None = None
+    important: bool = False
+
+
+class TaskPatch(BaseModel):
+    status: Literal["todo", "doing", "done"] | None = None
+    due_date: date | None = None
+    title: TaskTitle | None = None
+    important: bool | None = None
