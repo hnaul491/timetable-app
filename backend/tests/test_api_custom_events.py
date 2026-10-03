@@ -82,14 +82,17 @@ def test_blank_titles_are_rejected(client, semester):
 
 def test_noted_occurrence_survives_rule_edit_and_delete(client, session, semester):
     rule = client.post("/api/recurring", headers=AUTH, json=WEEKLY).json()
-    events = client.get("/api/events?start=2026-10-18T22:00:00Z&end=2026-10-25T23:00:00Z", headers=AUTH).json()["events"]
-    second = sorted(events, key=lambda e: e["start"])[1]  # Thu 22 Oct
-    assert client.put(f"/api/events/{second['id']}/notes/after", headers=AUTH, json={"body": "[ ] homework"}).status_code == 200
+    events = client.get("/api/events?start=2026-10-18T22:00:00Z&end=2026-11-01T23:00:00Z", headers=AUTH).json()["events"]
+    by_day = {e["start"][:10]: e["id"] for e in events if e["start"][:10] in ("2026-10-19", "2026-10-26")}
+    monday_19, monday_26 = by_day["2026-10-19"], by_day["2026-10-26"]
+    assert client.put(f"/api/events/{monday_26}/notes/after", headers=AUTH, json={"body": "[ ] homework"}).status_code == 200
 
+    # Thursdays only: un-noted Monday 19 goes away, noted Monday 26 is kept
     assert client.put(f"/api/recurring/{rule['id']}", headers=AUTH, json={**WEEKLY, "weekdays": [3]}).status_code == 200
-    assert client.get(f"/api/events/{second['id']}", headers=AUTH).status_code == 200
+    assert client.get(f"/api/events/{monday_26}", headers=AUTH).status_code == 200
+    assert client.get(f"/api/events/{monday_19}", headers=AUTH).status_code == 404
 
     assert client.delete(f"/api/recurring/{rule['id']}", headers=AUTH).json() == {"deleted": True}
-    detail = client.get(f"/api/events/{second['id']}", headers=AUTH)
+    detail = client.get(f"/api/events/{monday_26}", headers=AUTH)
     assert detail.status_code == 200
     assert detail.json()["recurring_rule_id"] is None
