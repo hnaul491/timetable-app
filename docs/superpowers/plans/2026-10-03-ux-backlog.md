@@ -4,7 +4,7 @@ User feedback: too many screen changes for one action, no confirmation dialogs, 
 
 ## 1. Create and edit events without leaving the calendar
 - "Add event" (and clicking an empty slot in the week/day grid) opens a **modal** with the new-event form, prefilled with the clicked day/time.
-- Clicking an event opens a **side panel / modal** with details, quick note view, Edit and Delete; "Open full page" keeps the current event page for long notes.
+- Clicking an event opens a **details popup / side panel** (asked for again by the user): time, room, group, notes preview, open tasks, Edit and Delete; "Open full page" keeps the current event page for long notes. The calendar stays where it was underneath.
 - Deleting from the panel asks for confirmation (see 2) and stays on the calendar.
 
 ## 2. Confirmation dialog
@@ -36,3 +36,11 @@ Single-key shortcuts never fire while typing in an input, textarea or editor. Ne
 - Buttons show a spinner/disabled state while their request runs (some already do).
 - Skeleton placeholders instead of "Loading…" text for the calendar, board, subjects, review.
 - A thin top progress bar while background refreshes run.
+
+## 6. Vietnamese language (requested 2026-10-03)
+- Language switch in Settings (English / Tiếng Việt), remembered per account (server setting) with the browser language as the first default.
+- All UI text goes through one translation layer (small in-house dictionary + `t("key")`, or a free library such as react-i18next if it earns its place); new UX work (modals, dialogs, toasts, shortcuts help) is written translatable from the start.
+- Dates and times formatted with `Intl` in the chosen locale (`vi-VN`: "Thứ Hai, 19 tháng 10, 2026"), still in Europe/Paris time.
+- Server messages shown to the user (validation, sync/Google errors) mapped to translated text on the frontend via stable codes rather than English strings.
+- School data (subject names, rooms from Zeus) stays as Zeus sends it; only the app's own text is translated.
+- Plan 4 (AI): the assistant answers in the chosen language.
