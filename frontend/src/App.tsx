@@ -1,9 +1,33 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Route, Routes } from "react-router";
 import { AuthGate } from "./auth/AuthGate";
+import { Layout } from "./components/Layout";
+import { ApiError } from "./lib/api";
+import { CalendarPage } from "./pages/CalendarPage";
+import { SettingsPage } from "./pages/SettingsPage";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (count, error) => !(error instanceof ApiError && error.status < 500) && count < 2,
+      staleTime: 60_000,
+    },
+  },
+});
 
 export default function App() {
   return (
-    <AuthGate>
-      <p className="p-8">Signed in.</p>
-    </AuthGate>
+    <QueryClientProvider client={queryClient}>
+      <AuthGate>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<CalendarPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthGate>
+    </QueryClientProvider>
   );
 }
