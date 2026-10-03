@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 from alembic import command
@@ -23,3 +24,15 @@ def test_migrations_match_models(tmp_path):
         diff = compare_metadata(MigrationContext.configure(conn), Base.metadata)
     engine.dispose()
     assert diff == []
+
+
+def test_postgres_migration_enables_rls_on_every_table():
+    buf = io.StringIO()
+    cfg = Config(str(BACKEND / "alembic.ini"), output_buffer=buf)
+    cfg.set_main_option("script_location", str(BACKEND / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", "postgresql+psycopg://u:p@localhost/db")
+    command.upgrade(cfg, "head", sql=True)
+    sql = buf.getvalue()
+    for table in ["semester", "subject", "my_section", "event", "sync_run", "app_secret",
+                  "alembic_version"]:
+        assert f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" in sql

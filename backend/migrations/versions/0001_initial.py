@@ -76,10 +76,12 @@ def upgrade() -> None:
         sa.Column("name", sa.String(64), primary_key=True),
         sa.Column("value_encrypted", sa.Text(), nullable=False),
     )
-    if op.get_bind().dialect.name == "postgresql":
+    if op.get_context().dialect.name == "postgresql":
         # Close the Supabase Data API: no policies = anon/authenticated roles see nothing.
         for table in TABLES:
             op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+        # Alembic's own version table is also exposed by the Data API.
+        op.execute("ALTER TABLE alembic_version ENABLE ROW LEVEL SECURITY")
 
 
 def downgrade() -> None:
