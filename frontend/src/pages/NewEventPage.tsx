@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { apiFetch } from "../lib/api";
+import { calendarHref } from "../lib/calendarLocation";
 import { addDays, parisLocalToUtc, todayParis, weekdayIndex } from "../lib/time";
 import type { CustomKind } from "../types";
 
@@ -56,7 +57,7 @@ export function NewEventPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["recurring"] });
-      navigate("/");
+      navigate(calendarHref());
     },
   });
 
@@ -78,7 +79,7 @@ export function NewEventPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to="/" className="text-sm font-semibold text-accent">
+      <Link to={calendarHref()} className="text-sm font-semibold text-accent">
         ‹ Back to calendar
       </Link>
       <form onSubmit={submit} className="flex max-w-xl flex-col gap-4 rounded-2xl border border-line bg-white p-5 md:p-7">

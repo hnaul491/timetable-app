@@ -158,3 +158,24 @@ export interface Review {
   week: ApiEvent[];
   hours: Record<"school" | "work" | "french_ext" | "other", number>;
 }
+
+export type GoogleKind = "class" | "exam" | "holiday" | "work" | "french_ext" | "other";
+
+export interface GoogleStatus {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  kinds: GoogleKind[];
+  needs_reconnect: boolean;
+  last_push_at: string | null;
+  last_push_error: string | null;
+  pending: number;
+}
+
+export interface PushResult {
+  status: "ok" | "partial" | "failed" | "skipped";
+  done: number;
+  failed: number;
+  remaining: number;
+  error: string | null;
+}

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { ApiError } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { formatTime, parisParts } from "../lib/time";
-import type { SyncStatus } from "../types";
+import type { GoogleStatus, SyncStatus } from "../types";
 
 function Banner({ tone, children }: { tone: "warn" | "error"; children: ReactNode }) {
   const styles = tone === "warn" ? "border-[#F5D9B8] bg-[#FFF7ED] text-[#7C2D12]" : "border-[#F3C4C4] bg-[#FDECEC] text-[#8B1A1A]";
@@ -86,6 +86,18 @@ export function ErrorPanel({ error, onRetry }: { error: unknown; onRetry?: () =>
           Try again
         </button>
       )}
+    </Banner>
+  );
+}
+
+export function GoogleBanner({ status }: { status: GoogleStatus | undefined }) {
+  if (!status?.connected || !status.needs_reconnect) return null;
+  return (
+    <Banner tone="error">
+      Google Calendar stopped updating: {status.last_push_error ?? "access was revoked"}.{" "}
+      <Link to="/settings" className="font-semibold underline">
+        Reconnect Google
+      </Link>
     </Banner>
   );
 }

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
-import { MissingSectionsBanner, SyncBanner } from "./Banners";
+import { GoogleBanner, MissingSectionsBanner, SyncBanner } from "./Banners";
 
 const run = (status: "ok" | "failed" | "auth_failed") => ({
   status, started_at: "2026-10-15T04:00:00Z", finished_at: "2026-10-15T04:00:02Z",
@@ -50,5 +50,21 @@ describe("banners", () => {
       />,
     );
     expect(screen.getByText(/kept 15 upcoming classes/)).toBeInTheDocument();
+  });
+
+  it("asks to reconnect Google when its access stopped", () => {
+    wrap(
+      <GoogleBanner
+        status={{ configured: true, connected: true, email: "me@example.com", kinds: [], needs_reconnect: true,
+                  last_push_at: null, last_push_error: "Google access was revoked or expired — reconnect Google in Settings", pending: 0 }}
+      />,
+    );
+    expect(screen.getByText(/Google Calendar stopped updating/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Reconnect Google" })).toHaveAttribute("href", "/settings");
+  });
+
+  it("shows nothing for Google when all is well", () => {
+    const { container } = wrap(<GoogleBanner status={undefined} />);
+    expect(container).toBeEmptyDOMElement();
   });
 });

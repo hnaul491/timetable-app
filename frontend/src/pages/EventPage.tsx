@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
+import { calendarHref } from "../lib/calendarLocation";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
@@ -97,7 +98,7 @@ function EventPageInner() {
     mutationFn: () => apiFetch(`/api/events/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       invalidateLists();
-      navigate("/");
+      navigate(calendarHref());
     },
   });
 
@@ -134,7 +135,7 @@ function EventPageInner() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link to="/" className="text-sm font-semibold text-accent">
+      <Link to={calendarHref()} className="text-sm font-semibold text-accent">
         ‹ Back to calendar
       </Link>
       <article className="flex flex-col gap-4 rounded-2xl border border-line bg-white p-5 md:p-7">
