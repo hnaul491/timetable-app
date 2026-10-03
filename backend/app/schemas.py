@@ -237,3 +237,29 @@ class SemesterPatch(BaseModel):
     zeus_group_id: int | None = Field(default=None, gt=0)
     start_date: date | None = None
     end_date: date | None = None
+
+
+class ImportantNoteOut(BaseModel):
+    event_id: int
+    title: str
+    start: str
+    tab: str
+    body: str
+
+
+class ReviewOut(BaseModel):
+    week_start: date
+    week_end: date
+    reviewed_at: str | None
+    overdue: list[TaskOut]
+    due_this_week: list[TaskOut]
+    important: list[ImportantNoteOut]
+    without_notes: list[EventOut]
+    changes: list[EventOut]
+    week: list[EventOut]
+    hours: dict[str, float]
+
+
+class ReviewMarkOut(BaseModel):
+    week_start: date
+    reviewed_at: str

@@ -124,3 +124,10 @@ class Task(Base):
     position: Mapped[int] = mapped_column(Integer, default=0)
     source: Mapped[str] = mapped_column(String(8))
     created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class WeekReview(Base):
+    __tablename__ = "week_review"
+
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime)
