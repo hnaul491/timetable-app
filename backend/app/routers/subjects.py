@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import require_user
@@ -74,12 +74,19 @@ def get_subject(subject_id: int, session: Session = Depends(get_session),
 def patch_subject(subject_id: int, body: SubjectPatch, session: Session = Depends(get_session),
                   now: datetime = Depends(get_now)) -> SubjectSummaryOut:
     subject = _subject(session, subject_id)
-    if body.display_name is not None:
-        clash = session.scalar(select(Subject.id).where(
-            Subject.semester_id == subject.semester_id, Subject.id != subject.id,
-            func.lower(Subject.display_name) == body.display_name.lower()))
-        if clash is not None:
-            raise HTTPException(status_code=409, detail="another subject already has this name")
+    if body.display_name is not None and body.display_name != subject.display_name:
+        new_key = body.display_name.casefold()
+        others = session.scalars(select(Subject).where(
+            Subject.semester_id == subject.semester_id, Subject.id != subject.id))
+        for other in others:
+            if other.display_name.casefold() == new_key or any(a.casefold() == new_key for a in other.aliases):
+                raise HTTPException(status_code=409, detail="another subject already has this name")
+        # Keep the old name resolvable so the next Zeus sync does not create a duplicate subject.
+        aliases = [a for a in subject.aliases if a.casefold() != new_key]
+        if subject.display_name.casefold() != new_key and not any(
+                a.casefold() == subject.display_name.casefold() for a in aliases):
+            aliases.append(subject.display_name)
+        subject.aliases = aliases
         subject.display_name = body.display_name
     if body.color is not None:
         subject.color = body.color

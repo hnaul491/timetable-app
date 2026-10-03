@@ -44,6 +44,12 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
     # A truncated feed (wrong group, Zeus hiccup) must not wipe the semester: still apply
     # new/changed classes, but keep the missing ones instead of cancelling them.
     keep_missing = len(upcoming) >= MIN_EVENTS_FOR_GUARD and would_cancel / len(upcoming) > MAX_CANCEL_RATIO
+    new_uids = feed_uids - set(existing)
+    if keep_missing and len(new_uids) >= would_cancel:
+        # Mostly unknown classes replacing the known ones: a different Zeus group, not a truncation.
+        raise InvalidFeedError(
+            f"feed looks like a different group: {len(new_uids)} unknown classes, "
+            f"{would_cancel} of {len(upcoming)} upcoming missing")
     result = SyncResult(fetched=len(feed.events), skipped=feed.skipped)
 
     for item in feed.events:

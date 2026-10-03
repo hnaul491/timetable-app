@@ -132,3 +132,45 @@ def test_merge_into_other_semester_rejected(client, session, semester):
     session.add(foreign)
     session.commit()
     assert client.post(f"/api/subjects/{db.id}/merge", headers=AUTH, json={"into_id": foreign.id}).status_code == 422
+
+
+def test_rename_keeps_old_name_as_alias_and_rename_back_restores(client, session, semester):
+    db, *_ = seed(session, semester)
+    r = client.patch(f"/api/subjects/{db.id}", headers=AUTH, json={"display_name": "Databases"}).json()
+    assert r["aliases"] == ["Relational Databases"]
+    r = client.patch(f"/api/subjects/{db.id}", headers=AUTH, json={"display_name": "Relational Databases"}).json()
+    assert r["display_name"] == "Relational Databases"
+    assert r["aliases"] == ["Databases"]
+
+
+def test_rename_to_another_subjects_alias_is_409(client, session, semester):
+    db, fr, *_ = seed(session, semester)
+    fr.aliases = ["Francais"]
+    session.commit()
+    assert client.patch(f"/api/subjects/{db.id}", headers=AUTH, json={"display_name": "FRANCAIS"}).status_code == 409
+
+
+def test_rename_then_sync_does_not_split_subject(client, session, semester):
+    from app.zeus.ics_parser import FeedEvent, ParsedFeed
+    from app.zeus.sync import apply_feed
+
+    db, *_ = seed(session, semester)
+    session.query(Event).filter(Event.subject_id != db.id).delete()
+    session.commit()
+    for sub in session.query(Subject).filter(Subject.id != db.id).all():
+        session.delete(sub)
+    session.commit()
+    first = datetime(2026, 11, 9, 12)
+    assert client.patch(f"/api/subjects/{db.id}", headers=AUTH, json={"display_name": "Databases"}).status_code == 200
+    items = [
+        FeedEvent("db2", "Relational Databases", first, first.replace(hour=14), "KB999", ""),
+        FeedEvent("brand-new", "Relational Databases", datetime(2026, 11, 23, 12), datetime(2026, 11, 23, 14),
+                  "KB602", ""),
+    ]
+    session.expire_all()
+    apply_feed(session, semester, ParsedFeed(events=items, skipped=0), T)
+    session.commit()
+    subjects = session.query(Subject).filter(Subject.semester_id == semester.id).all()
+    assert len(subjects) == 1
+    for uid in ("db2", "brand-new"):
+        assert session.query(Event).filter(Event.zeus_uid == uid).one().subject_id == db.id

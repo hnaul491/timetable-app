@@ -190,3 +190,31 @@ def test_small_cancellations_still_apply(session, semester):
     apply_feed(session, semester, feed(*events), NOW)
     result = apply_feed(session, semester, feed(*events[:18]), LATER)
     assert result.cancelled == 2
+
+
+def _other_group(n: int) -> list[FeedEvent]:
+    return [replace(e, uid=f"other{i}") for i, e in enumerate(many(n))]
+
+
+def test_wrong_group_feed_is_rejected_before_any_change(session, semester):
+    apply_feed(session, semester, feed(*many(20)), NOW)
+    session.commit()
+    with pytest.raises(InvalidFeedError, match="different group"):
+        apply_feed(session, semester, feed(*_other_group(20)), LATER)
+    session.rollback()
+    assert len(session.scalars(select(Event)).all()) == 20
+    assert {e.status for e in session.scalars(select(Event))} == {"normal"}
+
+
+def test_run_sync_wrong_group_feed_fails(session, semester):
+    apply_feed(session, semester, feed(*many(20)), NOW)
+    session.commit()
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//t//EN"]
+    for i in range(20):
+        lines += ["BEGIN:VEVENT", f"UID:x{i}", "SUMMARY:Other Subject",
+                  f"DTSTART:202611{i + 2:02d}T080000Z", f"DTEND:202611{i + 2:02d}T100000Z", "END:VEVENT"]
+    lines += ["END:VCALENDAR", ""]
+    run = run_sync(session, lambda sem: "\r\n".join(lines), LATER)
+    assert run.status == "failed"
+    assert run.error.startswith("invalid feed: feed looks like a different group")
+    assert len(session.scalars(select(Event)).all()) == 20
