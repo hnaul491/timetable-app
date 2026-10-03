@@ -79,3 +79,21 @@ def test_mark_week_reviewed(client, semester):
     assert client.post("/api/review/2026-10-19/done", headers=AUTH).status_code == 200
     assert client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()["reviewed_at"] == "2026-10-15T12:00:00Z"
     assert client.post("/api/review/2026-10-20/done", headers=AUTH).status_code == 422
+
+
+def test_important_notes_skip_hidden_subjects(client, session, semester):
+    hidden = Subject(semester_id=semester.id, display_name="GenAI 101", aliases=[], hidden=True)
+    session.add(hidden)
+    session.flush()
+    event = add(session, semester, "g", datetime(2026, 10, 20, 7), datetime(2026, 10, 20, 9), subject=hidden)
+    session.add(Note(event_id=event.id, tab="after", body="Secret", important=True, updated_at=T))
+    session.commit()
+    assert client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()["important"] == []
+
+
+def test_review_without_active_semester(client, session, semester):
+    semester.is_active = False
+    session.commit()
+    body = client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()
+    assert (body["week"], body["important"], body["without_notes"]) == ([], [], [])
+    assert body["hours"] == {"school": 0.0, "work": 0.0, "french_ext": 0.0, "other": 0.0}

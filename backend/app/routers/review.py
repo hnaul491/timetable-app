@@ -37,6 +37,8 @@ def get_review(week_start: date | None = None, session: Session = Depends(get_se
     last_week = week_events(session, semester.id, previous) if semester else []
     notes = important_notes(session, semester.id, paris_midnight_utc(previous),
                             paris_midnight_utc(start + timedelta(days=7))) if semester else []
+    visible_ids = {e.id for e in last_week + week}  # skip hidden subjects and groups not picked
+    notes = [row for row in notes if row[1].id in visible_ids]
     return ReviewOut(
         week_start=start,
         week_end=end,
