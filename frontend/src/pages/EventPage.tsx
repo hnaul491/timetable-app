@@ -65,8 +65,6 @@ function EventPageInner() {
   const detail = useQuery({ queryKey: ["event", id], queryFn: () => apiFetch<EventDetail>(`/api/events/${id}`) });
 
   const invalidateLists = () => {
-    queryClient.invalidateQueries({ queryKey: ["events"] });
-    queryClient.invalidateQueries({ queryKey: ["tasks"] });
     invalidateTaskViews(queryClient);
   };
   const save = useMutation({
