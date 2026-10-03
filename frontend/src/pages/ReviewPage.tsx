@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
@@ -37,7 +37,11 @@ export function ReviewPage() {
   const review = useQuery({
     queryKey: ["review", weekStart],
     queryFn: () => apiFetch<Review>(weekStart ? `/api/review?week_start=${weekStart}` : "/api/review"),
+    placeholderData: keepPreviousData,
+    refetchOnMount: "always",
   });
+  const lastShown = useRef<Review | undefined>(undefined);
+  if (review.data) lastShown.current = review.data;
   const tick = useMutation({
     mutationFn: (t: Task) => apiFetch(`/api/tasks/${t.id}`, { method: "PATCH", body: JSON.stringify({ status: "done" }) }),
     onSuccess: () => {
@@ -50,9 +54,10 @@ export function ReviewPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["review"] }),
   });
 
-  if (review.error) return <ErrorPanel error={review.error} onRetry={() => review.refetch()} />;
-  if (!review.data) return <p className="text-sm text-muted">Loading review…</p>;
-  const r = review.data;
+  const r = review.data ?? lastShown.current;
+  if (!r) {
+    return review.error ? <ErrorPanel error={review.error} onRetry={() => review.refetch()} /> : <p className="text-sm text-muted">Loading review…</p>;
+  }
   const days = Array.from({ length: 7 }, (_, i) => addDays(r.week_start, i));
   const error = (tick.error ?? mark.error) as Error | null;
 
@@ -81,6 +86,10 @@ export function ReviewPage() {
       </header>
       {error && <p className="text-sm text-[#8B1A1A]">{error.message}</p>}
 
+      {review.error && !review.data ? (
+        <ErrorPanel error={review.error} onRetry={() => review.refetch()} />
+      ) : (
+      <>
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Section title="Overdue" tone="error">
           {r.overdue.length === 0 ? <p className="text-sm text-muted">Nothing overdue.</p> : r.overdue.map((t) => <TaskLine key={t.id} task={t} onTick={() => tick.mutate(t)} />)}
@@ -161,6 +170,8 @@ export function ReviewPage() {
           })}
         </div>
       </section>
+      </>
+      )}
     </div>
   );
 }

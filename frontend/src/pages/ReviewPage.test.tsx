@@ -79,4 +79,15 @@ describe("ReviewPage", () => {
     expect(await screen.findByRole("heading", { name: /26 October – 1 November 2026/ })).toBeInTheDocument();
     expect(apiFetch).toHaveBeenCalledWith("/api/review?week_start=2026-10-26");
   });
+
+  it("keeps week navigation when the next week fails to load", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.includes("week_start=2026-10-26")) throw new Error("boom");
+      return review();
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Next week" }));
+    expect(await screen.findByText(/boom/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous week" })).toBeInTheDocument();
+  });
 });
