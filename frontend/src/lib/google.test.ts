@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CALENDAR_SCOPE, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken, watchProviderToken } from "./google";
+import { CALENDAR_SCOPE, forgetProviderToken, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken, watchProviderToken } from "./google";
 
-const supabase = vi.hoisted(() => ({ auth: { signInWithOAuth: vi.fn(), getSession: vi.fn(), onAuthStateChange: vi.fn() } }));
+const supabase = vi.hoisted(() => ({ auth: { signInWithOAuth: vi.fn(), getSession: vi.fn(), refreshSession: vi.fn(), onAuthStateChange: vi.fn() } }));
 vi.mock("./supabase", () => ({ supabase }));
 
 describe("google connect helpers", () => {
@@ -9,6 +9,7 @@ describe("google connect helpers", () => {
     sessionStorage.clear();
     supabase.auth.signInWithOAuth.mockReset();
     supabase.auth.getSession.mockReset();
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
   });
 
   it("asks Google for offline calendar access and comes back to Settings", async () => {
@@ -24,6 +25,20 @@ describe("google connect helpers", () => {
     });
     expect(takeConnectFlag()).toBe(true);
     expect(takeConnectFlag()).toBe(false);
+  });
+
+  it("hints the signed-in Google account", async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: { user: { email: "me@example.com" } } } });
+    await startGoogleConnect();
+    expect(supabase.auth.signInWithOAuth.mock.calls[0][0].options.queryParams).toEqual({
+      access_type: "offline", prompt: "consent", login_hint: "me@example.com",
+    });
+  });
+
+  it("forgets the provider token by refreshing the session, ignoring errors", async () => {
+    supabase.auth.refreshSession.mockRejectedValue(new Error("x"));
+    await expect(forgetProviderToken()).resolves.toBeUndefined();
+    expect(supabase.auth.refreshSession).toHaveBeenCalled();
   });
 
   it("reads the provider refresh token from the session", async () => {

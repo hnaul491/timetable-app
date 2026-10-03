@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
-import { startGoogleConnect, takeConnectFlag, takeProviderRefreshToken } from "../lib/google";
+import { forgetProviderToken, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken } from "../lib/google";
 import { formatTime, parisParts } from "../lib/time";
 import type { GoogleKind, GoogleStatus, PushResult } from "../types";
 
@@ -38,6 +38,7 @@ export function GoogleSettings() {
     mutationFn: (refresh_token: string) =>
       apiFetch<GoogleStatus>("/api/google/connect", { method: "POST", body: JSON.stringify({ refresh_token }) }),
     onSuccess: () => {
+      void forgetProviderToken();
       setNotice("Connected. Press “Push now” to fill your “My Timetable” calendar.");
       refresh();
     },
@@ -150,6 +151,9 @@ export function GoogleSettings() {
               {confirm ? "Click again to disconnect" : "Disconnect"}
             </button>
           </div>
+          <p className="text-xs text-muted">
+            Disconnecting stops updates. The “My Timetable” calendar stays in Google — delete it there if you don't need it.
+          </p>
           {progress && <p className="text-sm text-[#3A3F4B]">{progress}</p>}
         </>
       )}

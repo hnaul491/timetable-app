@@ -4,18 +4,24 @@ export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.crea
 const FLAG_KEY = "timetable:google-connect";
 
 /** Re-run the Google login asking for calendar access that keeps working offline. */
-export function startGoogleConnect() {
+export async function startGoogleConnect() {
   try {
     sessionStorage.setItem(FLAG_KEY, "1");
   } catch {
     // storage blocked: the token can't be picked up after the redirect; connecting again shows why
+  }
+  let email: string | undefined;
+  try {
+    email = (await supabase.auth.getSession()).data.session?.user?.email ?? undefined;
+  } catch {
+    // no hint: Google shows its account chooser
   }
   return supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: `${window.location.origin}/settings`,
       scopes: CALENDAR_SCOPE,
-      queryParams: { access_type: "offline", prompt: "consent" },
+      queryParams: { access_type: "offline", prompt: "consent", ...(email ? { login_hint: email } : {}) },
     },
   });
 }
@@ -49,4 +55,13 @@ export async function takeProviderRefreshToken(): Promise<string | null> {
   }
   const { data } = await supabase.auth.getSession();
   return data.session?.provider_refresh_token ?? null;
+}
+
+/** Drop the provider token from browser storage once the server has it: a refreshed session no longer carries it. */
+export async function forgetProviderToken(): Promise<void> {
+  try {
+    await supabase.auth.refreshSession();
+  } catch {
+    // best effort
+  }
 }

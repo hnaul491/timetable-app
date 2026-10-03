@@ -10,7 +10,7 @@ vi.mock("../lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/api")>()),
   apiFetch: (...args: unknown[]) => apiFetch(...args),
 }));
-const google = vi.hoisted(() => ({ startGoogleConnect: vi.fn(), takeConnectFlag: vi.fn(), takeProviderRefreshToken: vi.fn() }));
+const google = vi.hoisted(() => ({ startGoogleConnect: vi.fn(), takeConnectFlag: vi.fn(), takeProviderRefreshToken: vi.fn(), forgetProviderToken: vi.fn() }));
 vi.mock("../lib/google", () => google);
 
 const connected: GoogleStatus = {
@@ -37,6 +37,7 @@ describe("GoogleSettings", () => {
     google.startGoogleConnect.mockReset();
     google.takeConnectFlag.mockReset().mockReturnValue(false);
     google.takeProviderRefreshToken.mockReset();
+    google.forgetProviderToken.mockReset();
   });
 
   it("explains when the server is not set up", async () => {
@@ -58,6 +59,7 @@ describe("GoogleSettings", () => {
     await waitFor(() =>
       expect(apiFetch).toHaveBeenCalledWith("/api/google/connect", { method: "POST", body: JSON.stringify({ refresh_token: "1//tok" }) }),
     );
+    await waitFor(() => expect(google.forgetProviderToken).toHaveBeenCalled());
   });
 
   it("explains when Google gave no offline access", async () => {
@@ -93,6 +95,11 @@ describe("GoogleSettings", () => {
     expect(apiFetch).not.toHaveBeenCalledWith("/api/google", { method: "DELETE" });
     await userEvent.click(screen.getByRole("button", { name: "Click again to disconnect" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/google", { method: "DELETE" });
+  });
+
+  it("says the calendar stays in Google after disconnecting", async () => {
+    renderWith(connected);
+    expect(await screen.findByText(/stays in Google/)).toBeInTheDocument();
   });
 
   it("offers to reconnect when access was revoked", async () => {
