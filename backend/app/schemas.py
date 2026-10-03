@@ -183,3 +183,51 @@ class TaskPatch(BaseModel):
     due_date: date | None = None
     title: TaskTitle | None = None
     important: bool | None = None
+
+
+Color = Annotated[str, StringConstraints(pattern=r"^#[0-9A-Fa-f]{6}$")]
+
+
+class SubjectSummaryOut(BaseModel):
+    id: int
+    display_name: str
+    color: str
+    hidden: bool
+    aliases: list[str]
+    sessions: int
+    sessions_done: int
+    next_start: str | None
+    exam_start: str | None
+    exam_room: str | None
+    open_tasks: int
+    note_count: int
+
+
+class SessionOut(BaseModel):
+    id: int
+    start: str
+    end: str
+    room: str
+    kind: str
+    status: str
+    section: str | None
+    note_snippet: str | None
+    note_count: int
+    open_tasks: int
+    important: bool
+
+
+class SubjectDetailOut(BaseModel):
+    subject: SubjectSummaryOut
+    sessions: list[SessionOut]
+    tasks: list[TaskOut]
+
+
+class SubjectPatch(BaseModel):
+    display_name: Title | None = None
+    color: Color | None = None
+    hidden: bool | None = None
+
+
+class MergeIn(BaseModel):
+    into_id: int
