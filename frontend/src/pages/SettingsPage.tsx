@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ErrorPanel } from "../components/Banners";
+import { RecurringList } from "../components/RecurringList";
 import { apiFetch } from "../lib/api";
 import { formatTime, parisParts } from "../lib/time";
 import type { SectionChoice, SyncRun, SyncStatus } from "../types";
@@ -115,6 +116,7 @@ export function SettingsPage() {
           ))}
         </section>
       </div>
+      <RecurringList />
     </div>
   );
 }
