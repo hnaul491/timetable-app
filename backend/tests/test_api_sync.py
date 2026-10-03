@@ -70,3 +70,16 @@ def test_non_ascii_cron_secret_is_401_not_500(client, semester):
     use_feed(client)
     resp = client.post("/api/sync", headers={"X-Cron-Secret": "é".encode("latin-1")})
     assert resp.status_code == 401
+
+
+def test_partial_run_counts_as_last_success(client, session, semester):
+    from datetime import datetime
+    from app.models import SyncRun
+
+    session.add(SyncRun(started_at=datetime(2026, 10, 15, 4), finished_at=datetime(2026, 10, 15, 4),
+                        status="partial", fetched=5, inserted=0, updated=0, cancelled=0, skipped=0,
+                        error="kept 15 upcoming classes that disappeared from the feed"))
+    session.commit()
+    body = client.get("/api/sync/status", headers=AUTH).json()
+    assert body["last_run"]["status"] == "partial"
+    assert body["last_success_at"] == "2026-10-15T04:00:00Z"

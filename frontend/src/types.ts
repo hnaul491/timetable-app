@@ -29,7 +29,7 @@ export interface SectionChoice {
 }
 
 export interface SyncRun {
-  status: "running" | "ok" | "failed" | "auth_failed";
+  status: "running" | "ok" | "partial" | "failed" | "auth_failed";
   started_at: string;
   finished_at: string | null;
   fetched: number;

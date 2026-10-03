@@ -41,4 +41,14 @@ describe("banners", () => {
     expect(screen.getByText(/French for Fall 26 T1, Tutorat Fall 26 T1/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /choose your groups/i })).toHaveAttribute("href", "/settings");
   });
+
+  it("warns about a partial sync with the reason", () => {
+    wrap(
+      <SyncBanner
+        status={{ last_run: { ...run("ok"), status: "partial", error: "kept 15 upcoming classes that disappeared from the feed" }, last_success_at: "2026-10-15T04:00:02Z" }}
+        now={new Date("2026-10-15T10:00:00Z")}
+      />,
+    );
+    expect(screen.getByText(/kept 15 upcoming classes/)).toBeInTheDocument();
+  });
 });

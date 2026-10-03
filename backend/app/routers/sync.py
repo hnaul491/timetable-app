@@ -38,7 +38,7 @@ def trigger_sync(
 def sync_status(session: Session = Depends(get_session)) -> SyncStatusOut:
     last = session.scalar(select(SyncRun).order_by(SyncRun.id.desc()).limit(1))
     last_ok = session.scalar(
-        select(SyncRun).where(SyncRun.status == "ok").order_by(SyncRun.id.desc()).limit(1)
+        select(SyncRun).where(SyncRun.status.in_(("ok", "partial"))).order_by(SyncRun.id.desc()).limit(1)
     )
     return SyncStatusOut(
         last_run=to_out(last) if last else None,

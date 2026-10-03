@@ -164,22 +164,25 @@ def many(n: int) -> list[FeedEvent]:
                       base + timedelta(days=i, hours=2), "KB602", "") for i in range(n)]
 
 
-def test_partial_feed_guard_blocks_mass_cancellation(session, semester):
+def test_partial_feed_keeps_missing_events_but_applies_changes(session, semester):
     events = many(20)
     apply_feed(session, semester, feed(*events), NOW)
     session.commit()
-    with pytest.raises(InvalidFeedError, match="would cancel 15 of 20"):
-        apply_feed(session, semester, feed(*events[:5]), LATER)
-    statuses = {e.status for e in session.scalars(select(Event))}
-    assert statuses == {"normal"}
+    moved = replace(events[0], room="KB999")
+    result = apply_feed(session, semester, feed(moved, *events[1:5]), LATER)
+    assert (result.kept, result.cancelled, result.updated) == (15, 0, 1)
+    statuses = sorted(e.status for e in session.scalars(select(Event)))
+    assert statuses == ["changed"] + ["normal"] * 19
+    assert event_by_uid(session, "m0").room == "KB999"
 
     text = "\r\n".join(["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//t//EN",
                         "BEGIN:VEVENT", "UID:m0", "SUMMARY:Relational Databases",
-                        "DTSTART:20261102T080000Z", "DTEND:20261102T100000Z", "END:VEVENT",
+                        "DTSTART:20261102T080000Z", "DTEND:20261102T100000Z", "LOCATION:KB999", "END:VEVENT",
                         "END:VCALENDAR", ""])
     run = run_sync(session, lambda sem: text, LATER)
-    assert run.status == "failed"
-    assert "would cancel 19 of 20" in run.error
+    assert run.status == "partial"
+    assert run.error.startswith("kept 19 upcoming classes")
+    assert run.cancelled == 0
 
 
 def test_small_cancellations_still_apply(session, semester):
