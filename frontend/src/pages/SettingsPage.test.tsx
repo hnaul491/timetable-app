@@ -13,6 +13,8 @@ vi.mock("../lib/api", async (importOriginal) => {
       if (path === "/api/sync" && init?.method === "POST") throw new ApiError(500, "boom");
       if (path === "/api/settings/zeus-key") return { configured: true };
       if (path === "/api/sync/status") return { last_run: null, last_success_at: null };
+      if (path === "/api/settings/sections")
+        return [{ subject_id: 1, subject_name: "Adapting to a New Culture", sections: ["G1", "G2"], chosen: "ALL" }];
       return [];
     }),
   };
@@ -28,5 +30,17 @@ describe("SettingsPage", () => {
     );
     await userEvent.click(await screen.findByRole("button", { name: "Sync now" }));
     expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
+
+  it("offers an All groups choice for grouped subjects", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <SettingsPage />
+      </QueryClientProvider>,
+    );
+    const select = await screen.findByRole("combobox", { name: /Adapting to a New Culture/ });
+    expect(select).toHaveValue("ALL");
+    expect(screen.getByRole("option", { name: "All groups" })).toBeInTheDocument();
   });
 });

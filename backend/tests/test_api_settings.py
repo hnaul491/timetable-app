@@ -57,3 +57,12 @@ def test_put_zeus_key_accepts_full_link_and_never_returns_it(client, session, se
 def test_put_zeus_key_rejects_garbage(client, semester):
     resp = client.put("/api/settings/zeus-key", json={"value": "hello world"}, headers=AUTH)
     assert resp.status_code == 422
+
+
+def test_choose_all_groups(client, session, semester):
+    french = seed_sections(session, semester, ["G1", "G2"])
+    resp = client.put("/api/settings/sections", json={"subject_id": french.id, "section": "ALL"}, headers=AUTH)
+    assert resp.status_code == 200 and resp.json()["chosen"] == "ALL"
+    [choice] = client.get("/api/settings/sections", headers=AUTH).json()
+    assert choice["chosen"] == "ALL"
+    assert choice["sections"] == ["G1", "G2"]

@@ -32,6 +32,10 @@ class SectionChoice:
     chosen: str | None
 
 
+ALL_SECTIONS = "ALL"
+"""my_section value meaning: show every section of this subject."""
+
+
 def natural_key(value: str) -> list[int | str]:
     return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", value)]
 
@@ -70,7 +74,7 @@ def list_visible_events(
             if pick is None:
                 missing.add(subject.display_name if subject else event.title_raw)
                 continue
-            if pick != event.section:
+            if pick != ALL_SECTIONS and pick != event.section:
                 continue
         visible.append(VisibleEvent(
             id=event.id,

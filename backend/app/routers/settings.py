@@ -8,7 +8,7 @@ from app.db import get_session
 from app.models import MySection, Semester
 from app.schemas import SectionChoiceOut, SectionUpdate, SemesterOut, ZeusKeyStatus, ZeusKeyUpdate
 from app.secret_store import ZEUS_KEY_NAME, SecretStore, get_zeus_key
-from app.services.events_query import active_semester, section_choices
+from app.services.events_query import ALL_SECTIONS, active_semester, section_choices
 from app.zeus.ics_client import extract_key
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
@@ -33,7 +33,7 @@ def put_section(body: SectionUpdate, session: Session = Depends(get_session)) ->
     semester = active_semester(session)
     choices = {c.subject_id: c for c in section_choices(session, semester.id)} if semester else {}
     choice = choices.get(body.subject_id)
-    if choice is None or body.section not in choice.sections:
+    if choice is None or (body.section != ALL_SECTIONS and body.section not in choice.sections):
         raise HTTPException(status_code=422, detail="unknown subject or section")
     row = session.get(MySection, body.subject_id)
     if row is None:

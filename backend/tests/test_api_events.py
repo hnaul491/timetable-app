@@ -72,3 +72,11 @@ def test_holiday_uses_raw_title(client, session, semester):
 def test_rejects_bad_ranges(client, semester):
     assert client.get("/api/events?start=2026-10-20T00:00:00Z&end=2026-10-19T00:00:00Z", headers=AUTH).status_code == 400
     assert client.get("/api/events?start=2026-10-01T00:00:00Z&end=2026-12-01T00:00:00Z", headers=AUTH).status_code == 400
+
+
+def test_all_groups_choice_shows_every_section(client, session, semester):
+    seed_french(session, semester, choose="ALL")
+    body = client.get(f"/api/events?{WEEK}", headers=AUTH).json()
+    sections = sorted(str(e["section"]) for e in body["events"])
+    assert sections == ["GR1", "GR5", "None"]
+    assert body["missing_sections"] == []

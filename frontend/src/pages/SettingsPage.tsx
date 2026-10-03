@@ -88,7 +88,7 @@ export function SettingsPage() {
         </section>
         <section className={card}>
           <h2 className="text-base font-bold">My groups</h2>
-          <p className="text-sm text-muted">Zeus sends every parallel group. Pick yours; classes without a group are always shown.</p>
+          <p className="text-sm text-muted">Zeus sends every parallel group. Pick yours, or "All groups" if you attend every one; classes without a group are always shown.</p>
           {pick.error && <p className="text-sm text-[#8B1A1A]">{(pick.error as Error).message}</p>}
           {sections.data?.length === 0 && <p className="text-sm">No grouped classes yet. Sync first.</p>}
           {sections.data?.map((choice) => (
@@ -99,7 +99,12 @@ export function SettingsPage() {
                 onChange={(e) => pick.mutate({ subject_id: choice.subject_id, section: e.target.value })}
                 className="h-10 min-w-[120px] rounded-xl border border-[#D5D9E0] bg-white px-2.5 font-semibold"
               >
-                {choice.chosen === null && <option value="">Choose…</option>}
+                {choice.chosen === null && (
+                  <option value="" disabled>
+                    Choose…
+                  </option>
+                )}
+                <option value="ALL">All groups</option>
                 {choice.sections.map((s) => (
                   <option key={s} value={s}>
                     {s}
