@@ -1,0 +1,65 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.auth import require_user
+from app.config import Settings, get_settings
+from app.db import get_session
+from app.models import MySection, Semester
+from app.schemas import SectionChoiceOut, SectionUpdate, SemesterOut, ZeusKeyStatus, ZeusKeyUpdate
+from app.secret_store import ZEUS_KEY_NAME, SecretStore, get_zeus_key
+from app.services.events_query import active_semester, section_choices
+from app.zeus.ics_client import extract_key
+
+router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
+
+
+@router.get("/semesters", response_model=list[SemesterOut])
+def list_semesters(session: Session = Depends(get_session)) -> list[SemesterOut]:
+    rows = session.scalars(select(Semester).order_by(Semester.code))
+    return [SemesterOut.model_validate(row, from_attributes=True) for row in rows]
+
+
+@router.get("/settings/sections", response_model=list[SectionChoiceOut])
+def get_sections(session: Session = Depends(get_session)) -> list[SectionChoiceOut]:
+    semester = active_semester(session)
+    if semester is None:
+        return []
+    return [SectionChoiceOut(**vars(c)) for c in section_choices(session, semester.id)]
+
+
+@router.put("/settings/sections", response_model=SectionChoiceOut)
+def put_section(body: SectionUpdate, session: Session = Depends(get_session)) -> SectionChoiceOut:
+    semester = active_semester(session)
+    choices = {c.subject_id: c for c in section_choices(session, semester.id)} if semester else {}
+    choice = choices.get(body.subject_id)
+    if choice is None or body.section not in choice.sections:
+        raise HTTPException(status_code=422, detail="unknown subject or section")
+    row = session.get(MySection, body.subject_id)
+    if row is None:
+        session.add(MySection(subject_id=body.subject_id, section=body.section))
+    else:
+        row.section = body.section
+    session.commit()
+    return SectionChoiceOut(subject_id=choice.subject_id, subject_name=choice.subject_name,
+                            sections=choice.sections, chosen=body.section)
+
+
+@router.get("/settings/zeus-key", response_model=ZeusKeyStatus)
+def get_zeus_key_status(session: Session = Depends(get_session),
+                        settings: Settings = Depends(get_settings)) -> ZeusKeyStatus:
+    return ZeusKeyStatus(configured=get_zeus_key(session, settings) is not None)
+
+
+@router.put("/settings/zeus-key", response_model=ZeusKeyStatus)
+def put_zeus_key(body: ZeusKeyUpdate, session: Session = Depends(get_session),
+                 settings: Settings = Depends(get_settings)) -> ZeusKeyStatus:
+    try:
+        key = extract_key(body.value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Paste the Zeus ICS link (or its key)") from None
+    if not settings.token_encryption_key:
+        raise HTTPException(status_code=500, detail="server is missing TOKEN_ENCRYPTION_KEY")
+    SecretStore(session, settings.token_encryption_key).set(ZEUS_KEY_NAME, key)
+    session.commit()
+    return ZeusKeyStatus(configured=True)

@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 
-from app.routers import health
+from app.routers import events, health, settings, sync
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Timetable API")
-    app.include_router(health.router)
+    for module in (health, events, settings, sync):
+        app.include_router(module.router)
     return app
 
 
