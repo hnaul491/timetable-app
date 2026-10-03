@@ -35,10 +35,17 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
   const [name, setName] = useState(subject.display_name);
   const [into, setInto] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [color, setColor] = useState(subject.color.toLowerCase());
+  const [syncedColor, setSyncedColor] = useState(subject.color);
+  if (syncedColor !== subject.color) {
+    setSyncedColor(subject.color);
+    setColor(subject.color.toLowerCase());
+  }
+  const target = others.some((o) => String(o.id) === into) ? into : "";
   const label = subject.display_name;
   return (
     <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-[#F8F9FB] px-3 py-2.5">
-      <input type="color" aria-label={`Colour of ${label}`} value={subject.color.toLowerCase()} onChange={(e) => onPatch({ color: e.target.value })} className="size-8 rounded" />
+      <input type="color" aria-label={`Colour of ${label}`} value={color} onChange={(e) => setColor(e.target.value)} onBlur={() => color.toLowerCase() !== subject.color.toLowerCase() && onPatch({ color })} className="size-8 rounded" />
       <input aria-label={`Name of ${label}`} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} className="h-9 min-w-[200px] flex-1 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm" />
       <button type="button" aria-label={`Save name of ${label}`} disabled={!name.trim() || name.trim() === subject.display_name} onClick={() => onPatch({ display_name: name.trim() })} className="h-9 rounded-lg border border-line bg-white px-3 text-sm font-semibold disabled:opacity-50">
         Save
@@ -47,7 +54,7 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
         <input type="checkbox" aria-label={`Hide ${label}`} checked={subject.hidden} onChange={(e) => onPatch({ hidden: e.target.checked })} />
         Hide
       </label>
-      <select aria-label={`Merge ${label} into`} value={into} onChange={(e) => { setInto(e.target.value); setConfirm(false); }} className="h-9 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm">
+      <select aria-label={`Merge ${label} into`} value={target} onChange={(e) => { setInto(e.target.value); setConfirm(false); }} className="h-9 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm">
         <option value="">Merge into…</option>
         {others.map((o) => (
           <option key={o.id} value={o.id}>
@@ -58,8 +65,8 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
       <button
         type="button"
         aria-label={confirm ? `Click again to merge ${label}` : `Merge ${label}`}
-        disabled={!into}
-        onClick={() => (confirm ? onMerge(Number(into)) : setConfirm(true))}
+        disabled={!target}
+        onClick={() => (confirm ? onMerge(Number(target)) : setConfirm(true))}
         onBlur={() => setConfirm(false)}
         className="h-9 rounded-lg px-3 text-sm font-semibold text-[#8B1A1A] disabled:opacity-40"
       >

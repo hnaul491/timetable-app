@@ -38,6 +38,8 @@ describe("SubjectSettings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save name of French for Spring F26 T1" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/subjects/2", { method: "PATCH", body: JSON.stringify({ display_name: "French (spring)" }) });
     fireEvent.change(screen.getByLabelText("Colour of French for Spring F26 T1"), { target: { value: "#aa00ff" } });
+    expect(apiFetch).not.toHaveBeenCalledWith("/api/subjects/2", { method: "PATCH", body: JSON.stringify({ color: "#aa00ff" }) });
+    fireEvent.blur(screen.getByLabelText("Colour of French for Spring F26 T1"));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/subjects/2", { method: "PATCH", body: JSON.stringify({ color: "#aa00ff" }) }));
     await userEvent.click(screen.getByRole("checkbox", { name: "Hide French for Spring F26 T1" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/subjects/2", { method: "PATCH", body: JSON.stringify({ hidden: true }) });
