@@ -56,6 +56,9 @@ class Event(Base):
     kind: Mapped[str] = mapped_column(String(16))
     status: Mapped[str] = mapped_column(String(16), default="normal")
     changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recurring_rule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("recurring_rule.id", name="fk_event_recurring_rule"), nullable=True
+    )
 
 
 class SyncRun(Base):
@@ -78,3 +81,46 @@ class AppSecret(Base):
 
     name: Mapped[str] = mapped_column(String(64), primary_key=True)
     value_encrypted: Mapped[str] = mapped_column(Text)
+
+
+class RecurringRule(Base):
+    __tablename__ = "recurring_rule"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    semester_id: Mapped[int] = mapped_column(ForeignKey("semester.id"))
+    title: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(16))
+    weekdays: Mapped[list[int]] = mapped_column(JSON, default=list)
+    start_time: Mapped[str] = mapped_column(String(5))
+    end_time: Mapped[str] = mapped_column(String(5))
+    from_date: Mapped[date] = mapped_column(Date)
+    until_date: Mapped[date] = mapped_column(Date)
+    location: Mapped[str] = mapped_column(String(200), default="")
+
+
+class Note(Base):
+    __tablename__ = "note"
+    __table_args__ = (UniqueConstraint("event_id", "tab", name="uq_note_event_tab"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("event.id"))
+    tab: Mapped[str] = mapped_column(String(8))
+    body: Mapped[str] = mapped_column(Text, default="")
+    important: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Task(Base):
+    __tablename__ = "task"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    note_id: Mapped[int | None] = mapped_column(ForeignKey("note.id"), nullable=True)
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("event.id"), nullable=True)
+    subject_id: Mapped[int | None] = mapped_column(ForeignKey("subject.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(String(8), default="todo")
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    important: Mapped[bool] = mapped_column(Boolean, default=False)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[str] = mapped_column(String(8))
+    created_at: Mapped[datetime] = mapped_column(DateTime)

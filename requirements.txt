@@ -88,3 +88,4 @@ tzdata==2026.5
     # via
     #   icalendar
     #   psycopg
+    #   timetable-backend
