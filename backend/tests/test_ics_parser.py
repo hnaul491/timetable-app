@@ -32,7 +32,7 @@ def test_parses_basic_event():
 
 def test_unescapes_commas_in_location():
     feed = parse_ics(ics(vevent("u1", "Tutorat & French for Fall 26 T1", "20261020T123000Z",
-                                location="KB404\, KB604 B")))
+                                location="KB404\\, KB604 B")))
     assert feed.events[0].room == "KB404, KB604 B"
 
 
