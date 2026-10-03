@@ -1,11 +1,11 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Event, MySection, Semester, Subject
+from app.models import Event, MySection, Note, Semester, Subject, Task
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,9 @@ class VisibleEvent:
     kind: str
     status: str
     source: str
+    note_count: int = 0
+    open_tasks: int = 0
+    important: bool = False
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,61 @@ def _chosen(session: Session, subject_ids: list[int]) -> dict[int, str]:
     return {row.subject_id: row.section for row in rows}
 
 
+def _to_visible(event: Event, subject: Subject | None) -> VisibleEvent:
+    return VisibleEvent(
+        id=event.id,
+        title=subject.display_name if subject else event.title_raw,
+        subject_id=event.subject_id,
+        subject_name=subject.display_name if subject else None,
+        color=subject.color if subject else None,
+        section=event.section,
+        start_at=event.start_at,
+        end_at=event.end_at,
+        room=event.room,
+        kind=event.kind,
+        status=event.status,
+        source=event.source,
+    )
+
+
+def _with_counts(session: Session, events: list[VisibleEvent]) -> list[VisibleEvent]:
+    if not events:
+        return events
+    ids = [e.id for e in events]
+    note_counts: dict[int, int] = {}
+    important: set[int] = set()
+    for event_id, is_important in session.execute(
+        select(Note.event_id, Note.important).where(Note.event_id.in_(ids), Note.body != "")
+    ):
+        note_counts[event_id] = note_counts.get(event_id, 0) + 1
+        if is_important:
+            important.add(event_id)
+    open_tasks = dict(session.execute(
+        select(Task.event_id, func.count()).where(Task.event_id.in_(ids), Task.status != "done").group_by(Task.event_id)
+    ).all())
+    return [replace(e, note_count=note_counts.get(e.id, 0), open_tasks=open_tasks.get(e.id, 0),
+                    important=e.id in important) for e in events]
+
+
+def describe_event(session: Session, event: Event) -> VisibleEvent:
+    subject = session.get(Subject, event.subject_id) if event.subject_id is not None else None
+    return _with_counts(session, [_to_visible(event, subject)])[0]
+
+
+def next_event(session: Session, event: Event) -> Event | None:
+    if event.recurring_rule_id is not None:
+        query = select(Event).where(Event.recurring_rule_id == event.recurring_rule_id)
+    elif event.subject_id is not None:
+        query = select(Event).where(
+            Event.subject_id == event.subject_id,
+            or_(Event.section.is_(None), Event.section == event.section),
+        )
+    else:
+        return None
+    query = query.where(Event.start_at > event.start_at, Event.status != "cancelled")
+    return session.scalars(query.order_by(Event.start_at).limit(1)).first()
+
+
 def list_visible_events(
     session: Session, semester_id: int, start: datetime, end: datetime
 ) -> tuple[list[VisibleEvent], list[str]]:
@@ -76,21 +134,8 @@ def list_visible_events(
                 continue
             if pick != ALL_SECTIONS and pick != event.section:
                 continue
-        visible.append(VisibleEvent(
-            id=event.id,
-            title=subject.display_name if subject else event.title_raw,
-            subject_id=event.subject_id,
-            subject_name=subject.display_name if subject else None,
-            color=subject.color if subject else None,
-            section=event.section,
-            start_at=event.start_at,
-            end_at=event.end_at,
-            room=event.room,
-            kind=event.kind,
-            status=event.status,
-            source=event.source,
-        ))
-    return visible, sorted(missing)
+        visible.append(_to_visible(event, subject))
+    return _with_counts(session, visible), sorted(missing)
 
 
 def section_choices(session: Session, semester_id: int) -> list[SectionChoice]:

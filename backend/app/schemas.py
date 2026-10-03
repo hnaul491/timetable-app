@@ -1,6 +1,6 @@
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class EventOut(BaseModel):
@@ -16,6 +16,9 @@ class EventOut(BaseModel):
     kind: str
     status: str
     source: str
+    note_count: int = 0
+    open_tasks: int = 0
+    important: bool = False
 
 
 class EventsResponse(BaseModel):
@@ -68,3 +71,39 @@ class SyncRunOut(BaseModel):
 class SyncStatusOut(BaseModel):
     last_run: SyncRunOut | None
     last_success_at: str | None
+
+
+class NoteOut(BaseModel):
+    tab: str
+    body: str
+    important: bool
+    updated_at: str | None
+
+
+class TaskOut(BaseModel):
+    id: int
+    title: str
+    status: str
+    due_date: date | None
+    important: bool
+    source: str
+    note_id: int | None
+    event_id: int | None
+    subject_id: int | None
+    subject_name: str | None
+    event_start: str | None
+    position: int
+
+
+class EventDetailOut(BaseModel):
+    event: EventOut
+    notes: dict[str, NoteOut]
+    tasks: list[TaskOut]
+    next_event_id: int | None
+    next_event_start: str | None
+    recurring_rule_id: int | None
+
+
+class NoteUpdate(BaseModel):
+    body: str = Field(default="", max_length=20000)
+    important: bool = False
