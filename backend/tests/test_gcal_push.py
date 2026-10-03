@@ -225,3 +225,70 @@ def test_exam_summary_and_stable_hash():
     assert body["summary"] == "Exam: Relational Databases"
     assert body_hash(body) == body_hash(dict(reversed(list(body.items()))))
     assert body_hash(body) != body_hash({**body, "location": "KB003"})
+
+
+def test_old_copy_is_never_updated_but_removed_when_unwanted(session, world):
+    events, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)  # creates the calendar
+    old = events["old"]
+    fake.events["gold"] = event_body(visible(id=old.id), URL)
+    old.gcal_event_id, old.gcal_hash = "gold", "stale"
+    old.room = "KB999"
+    session.commit()
+    run(session, account, fake)
+    assert fake.events["gold"]["location"] == "KB602"
+    session.get(Subject, old.subject_id).hidden = True
+    session.commit()
+    result = run(session, account, fake)
+    assert result.status == "ok" and "gold" not in fake.events and old.gcal_event_id is None
+
+
+def settings(**changes):
+    from cryptography.fernet import Fernet
+    from app.config import Settings
+    values = dict(google_client_id="id", google_client_secret="secret", token_encryption_key=Fernet.generate_key().decode())
+    values.update(changes)
+    return Settings(**values)
+
+
+def test_run_push_skips_without_account_or_when_reconnect_needed(session, semester):
+    from app.gcal.push import run_push
+    cfg = settings()
+    assert run_push(session, cfg, lambda token: FakeCalendar(), NOW, NEVER).status == "skipped"
+    session.add(GoogleAccount(id=1, email="me@example.com", kinds=list(DEFAULT_KINDS), connected_at=NOW,
+                              needs_reconnect=True))
+    session.commit()
+    assert run_push(session, cfg, lambda token: FakeCalendar(), NOW, NEVER).status == "skipped"
+
+
+def test_run_push_without_stored_token_asks_to_reconnect(session, world):
+    from app.gcal.push import run_push
+    _, account = world
+    result = run_push(session, settings(), lambda token: FakeCalendar(), NOW, NEVER)
+    assert result.status == "failed" and account.needs_reconnect is True
+
+
+def test_run_push_never_raises(session, world):
+    from app.gcal.api import REFRESH_TOKEN_NAME
+    from app.gcal.push import run_push
+    from app.secret_store import SecretStore
+    _, account = world
+    cfg = settings()
+    SecretStore(session, cfg.token_encryption_key).set(REFRESH_TOKEN_NAME, "tok")
+    session.commit()
+
+    def boom(token):
+        raise RuntimeError("x")
+
+    result = run_push(session, cfg, boom, NOW, NEVER)
+    assert (result.status, result.error) == ("failed", "unexpected error (RuntimeError)")
+    assert account.last_push_error == "unexpected error (RuntimeError)"
+
+
+def test_calendar_create_error_is_reported_as_failed(session, world):
+    _, account = world
+    fake = FakeCalendar(fail={"create_calendar": [GoogleRateLimited("Google rate limit reached")]})
+    result = run(session, account, fake)
+    assert (result.status, result.error) == ("failed", "Google rate limit reached")
+    assert account.last_push_error == "Google rate limit reached" and account.last_push_at == NOW

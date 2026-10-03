@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -18,8 +19,11 @@ from app.services.events_query import VisibleEvent, active_semester, list_visibl
 from app.services.recurrence import PARIS
 from app.timeutil import iso_utc
 
+logger = logging.getLogger(__name__)
+
 KEEP_PAST = timedelta(days=7)
 FAR_FUTURE = datetime(2100, 1, 1)
+FAR_PAST = datetime(2000, 1, 1)
 CALENDAR_GONE = 'The "My Timetable" calendar is gone from Google; it will be recreated on the next push.'
 
 
@@ -83,11 +87,16 @@ def plan_ops(session: Session, account: GoogleAccount, now: datetime, app_url: s
     if semester is None:
         return ops
     since = now - KEEP_PAST
-    visible, _ = list_visible_events(session, semester.id, since, FAR_FUTURE)
+    # Only the active semester is reconciled; other semesters' rows (and their Google copies) are left untouched.
+    visible, _ = list_visible_events(session, semester.id, FAR_PAST, FAR_FUTURE)
     wanted = {e.id: e for e in visible if e.kind in account.kinds and e.status != "cancelled"}
-    rows = session.scalars(select(Event).where(Event.semester_id == semester.id, Event.end_at > since)
-                           .order_by(Event.start_at, Event.id))
+    rows = session.scalars(select(Event).where(Event.semester_id == semester.id).order_by(Event.start_at, Event.id))
     for row in rows:
+        if row.end_at <= since:
+            # Past the window: never sent or updated, but a stale Google copy is removed once no longer wanted.
+            if row.gcal_event_id is not None and row.id not in wanted:
+                ops.append(Op("delete", row.id, row.gcal_event_id, None, None))
+            continue
         if row.id in wanted:
             body = event_body(wanted[row.id], app_url)
             digest = body_hash(body)
@@ -120,6 +129,8 @@ def _apply(session: Session, gcal: GoogleCalendar, calendar_id: str, op: Op) -> 
         session.execute(delete(GcalTombstone).where(GcalTombstone.gcal_event_id == op.gcal_event_id))
         return
     event = session.get(Event, op.event_id)
+    if event is None:
+        return  # row deleted since planning
     if op.action == "delete":
         _delete_quietly(gcal, calendar_id, op.gcal_event_id)
         event.gcal_event_id = event.gcal_hash = None
@@ -140,7 +151,17 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
     result = PushResult(status="ok")
     try:
         if account.calendar_id is None:
-            account.calendar_id = gcal.create_calendar(CALENDAR_NAME, TIME_ZONE)
+            try:
+                account.calendar_id = gcal.create_calendar(CALENDAR_NAME, TIME_ZONE)
+            except GoogleAuthError:
+                raise
+            except GoogleError as exc:
+                session.rollback()
+                result.status, result.error = "failed", str(exc)
+                account.last_push_at = now
+                account.last_push_error = result.error
+                session.commit()
+                return result
             session.commit()
         ops = plan_ops(session, account, now, app_url)
         for index, op in enumerate(ops):
@@ -197,6 +218,7 @@ def run_push(session: Session, settings: Settings, factory: GcalFactory, now: da
             return PushResult(status="failed", error=account.last_push_error)
         return push(session, account, factory(token), now, settings.app_url, deadline, clock)
     except Exception as exc:  # noqa: BLE001 — record and move on
+        logger.exception("Google Calendar push failed")
         session.rollback()
         error = f"unexpected error ({type(exc).__name__})"
         account = session.get(GoogleAccount, ACCOUNT_ID)
