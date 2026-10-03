@@ -263,3 +263,33 @@ class ReviewOut(BaseModel):
 class ReviewMarkOut(BaseModel):
     week_start: date
     reviewed_at: str
+
+
+GoogleKind = Literal["class", "exam", "holiday", "work", "french_ext", "other"]
+
+
+class GoogleStatusOut(BaseModel):
+    configured: bool
+    connected: bool
+    email: str | None
+    kinds: list[str]
+    needs_reconnect: bool
+    last_push_at: str | None
+    last_push_error: str | None
+    pending: int
+
+
+class GoogleConnectIn(BaseModel):
+    refresh_token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=10, max_length=2048)]
+
+
+class GoogleKindsIn(BaseModel):
+    kinds: list[GoogleKind]
+
+
+class PushResultOut(BaseModel):
+    status: str
+    done: int
+    failed: int
+    remaining: int
+    error: str | None

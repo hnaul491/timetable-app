@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
@@ -5,14 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import require_cron_or_user, require_user
+from app.config import Settings, get_settings
 from app.db import get_session
-from app.deps import get_fetcher, get_now
+from app.deps import get_fetcher, get_gcal_factory, get_now
+from app.gcal.api import GcalFactory
+from app.gcal.push import run_push
 from app.models import SyncRun
 from app.schemas import SyncRunOut, SyncStatusOut
 from app.timeutil import iso_utc
 from app.zeus.sync import Fetcher, run_sync
 
 router = APIRouter(prefix="/api")
+
+SYNC_AND_PUSH_BUDGET_S = 50.0
 
 
 def to_out(run: SyncRun) -> SyncRunOut:
@@ -30,8 +36,13 @@ def trigger_sync(
     session: Session = Depends(get_session),
     fetch: Fetcher = Depends(get_fetcher),
     now: datetime = Depends(get_now),
+    settings: Settings = Depends(get_settings),
+    gcal_factory: GcalFactory = Depends(get_gcal_factory),
 ) -> SyncRunOut:
-    return to_out(run_sync(session, fetch, now))
+    started = time.monotonic()
+    out = to_out(run_sync(session, fetch, now))
+    run_push(session, settings, gcal_factory, now, started + SYNC_AND_PUSH_BUDGET_S)  # never raises
+    return out
 
 
 @router.get("/sync/status", response_model=SyncStatusOut, dependencies=[Depends(require_user)])
