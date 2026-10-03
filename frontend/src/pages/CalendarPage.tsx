@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { WeekGrid } from "../components/WeekGrid";
 import { apiFetch } from "../lib/api";
@@ -10,13 +9,28 @@ import type { EventsResponse, GoogleStatus, SyncStatus } from "../types";
 
 type View = "week" | "day";
 
+function parseView(value: string | null): View | null {
+  return value === "week" || value === "day" ? value : null;
+}
+
+function parseDate(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  return addDays(value, 0) === value ? value : null; // rejects 2026-13-45 and other impossible dates
+}
+
 const buttonClass = "h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold hover:bg-[#F8F9FB]";
 
 export function CalendarPage() {
   const navigate = useNavigate();
   const isPhone = useMediaQuery("(max-width: 767px)");
-  const [view, setView] = useState<View>(isPhone ? "day" : "week");
-  const [anchor, setAnchor] = useState(todayParis());
+  // The shown date and view live in the address, so coming back from an event keeps the same week.
+  const [params, setParams] = useSearchParams();
+  const view = parseView(params.get("view")) ?? (isPhone ? "day" : "week");
+  const anchor = parseDate(params.get("date")) ?? todayParis();
+  const show = (next: { date?: string; view?: View }) =>
+    setParams({ date: next.date ?? anchor, view: next.view ?? view }, { replace: true });
+  const setAnchor = (date: string) => show({ date });
+  const setView = (next: View) => show({ view: next });
 
   const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i)) : [anchor];
   const range = rangeUtc(days[0], days.length);
