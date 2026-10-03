@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
+      - name: requirements.txt matches uv.lock
+        run: uv export --no-dev --no-hashes --frozen --no-emit-project --no-header | diff - ../requirements.txt
       - run: uv run pytest -q
   frontend:
     runs-on: ubuntu-latest
