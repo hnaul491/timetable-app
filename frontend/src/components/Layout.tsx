@@ -11,6 +11,8 @@ interface Semester {
 const links = [
   { to: "/", label: "Calendar" },
   { to: "/board", label: "Board" },
+  { to: "/subjects", label: "Subjects" },
+  { to: "/review", label: "Review" },
   { to: "/settings", label: "Settings" },
 ];
 
@@ -32,7 +34,7 @@ export function Layout() {
         )}
         <div className="flex flex-col gap-0.5">
           {links.map((l) => (
-            <NavLink key={l.to} to={l.to} end className={navClass}>
+            <NavLink key={l.to} to={l.to} end={l.to === "/"} className={navClass}>
               {l.label}
             </NavLink>
           ))}
@@ -41,9 +43,9 @@ export function Layout() {
       <main className="min-w-0 flex-1 px-4 pt-5 pb-24 md:px-7 md:pb-8">
         <Outlet />
       </main>
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 grid grid-cols-3 border-t border-line bg-white px-2 pt-1.5 pb-3 md:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 grid grid-cols-5 border-t border-line bg-white px-2 pt-1.5 pb-3 md:hidden">
         {links.map((l) => (
-          <NavLink key={l.to} to={l.to} end className={({ isActive }) => `flex h-12 items-center justify-center text-sm ${isActive ? "font-semibold text-accent-strong" : "text-[#3A3F4B]"}`}>
+          <NavLink key={l.to} to={l.to} end={l.to === "/"} className={({ isActive }) => `flex h-12 items-center justify-center text-xs ${isActive ? "font-semibold text-accent-strong" : "text-[#3A3F4B]"}`}>
             {l.label}
           </NavLink>
         ))}

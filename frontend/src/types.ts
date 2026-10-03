@@ -92,3 +92,69 @@ export interface RecurringRule {
   location: string;
   occurrences: number;
 }
+
+export interface SubjectSummary {
+  id: number;
+  display_name: string;
+  color: string;
+  hidden: boolean;
+  aliases: string[];
+  sessions: number;
+  sessions_done: number;
+  next_start: string | null;
+  exam_start: string | null;
+  exam_room: string | null;
+  open_tasks: number;
+  note_count: number;
+}
+
+export interface SubjectSession {
+  id: number;
+  start: string;
+  end: string;
+  room: string;
+  kind: ApiEvent["kind"];
+  status: ApiEvent["status"];
+  section: string | null;
+  note_snippet: string | null;
+  note_count: number;
+  open_tasks: number;
+  important: boolean;
+}
+
+export interface SubjectDetail {
+  subject: SubjectSummary;
+  sessions: SubjectSession[];
+  tasks: Task[];
+}
+
+export interface Semester {
+  id: number;
+  code: string;
+  name: string;
+  zeus_group_id: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+}
+
+export interface ImportantNote {
+  event_id: number;
+  title: string;
+  start: string;
+  tab: NoteTab;
+  body: string;
+}
+
+export interface Review {
+  week_start: string;
+  week_end: string;
+  reviewed_at: string | null;
+  overdue: Task[];
+  due_this_week: Task[];
+  important: ImportantNote[];
+  without_notes: ApiEvent[];
+  changes: ApiEvent[];
+  week: ApiEvent[];
+  hours: Record<"school" | "work" | "french_ext" | "other", number>;
+}
