@@ -47,6 +47,21 @@ Repo → Settings → Secrets and variables → Actions: `APP_URL` = `https://<p
 3. Settings → My groups → choose your G / GR groups.
 4. GitHub → Actions → "Daily Zeus sync" → Run workflow → it must finish green.
 
+## 8. Google Calendar (optional)
+
+The app pushes your timetable into a calendar it creates, "My Timetable". It can only see and change that calendar.
+
+1. **Google Cloud Console** → the project whose OAuth client you use for the Supabase Google login.
+   - APIs & Services → Library → enable **Google Calendar API**.
+   - Google Auth Platform → **Data access** → Add or remove scopes → add `https://www.googleapis.com/auth/calendar.app.created` → Save.
+   - Google Auth Platform → **Audience** → **Publish app** (status "In production"). In "Testing", Google expires the access after 7 days. You'll see a "Google hasn't verified this app" screen when connecting: Advanced → Go to … (it's your own app).
+2. **Supabase** → Authentication → URL Configuration → Redirect URLs must include `https://timetable-app-lake.vercel.app/**` (and `http://localhost:5173/**` for local).
+3. **Vercel** → Project → Settings → Environment Variables (Production): `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` = the same values as Supabase → Authentication → Sign In / Providers → Google; `APP_URL` = `https://timetable-app-lake.vercel.app`. Redeploy. Never paste the secret anywhere else.
+4. **App** → Settings → Google Calendar → **Connect Google Calendar** → accept → back in Settings press **Push now** (it repeats until everything is sent).
+5. **Google Calendar** → Settings → "My Timetable" → Event notifications: choose your reminder (e.g. 15 minutes before).
+
+After that, every daily sync also updates Google. Disconnect in Settings stops it (the calendar stays in Google; delete it there if you want).
+
 ## Local development
 ```bash
 cd backend && cp .env.example .env    # fill SUPABASE_URL, ALLOWED_EMAILS, TOKEN_ENCRYPTION_KEY
