@@ -38,24 +38,29 @@ def parse_ics(text: str) -> ParsedFeed:
     seen: set[str] = set()
     skipped = 0
     for component in calendar.walk("VEVENT"):
-        uid = str(component.get("UID", "")).strip()
-        dtstart = component.get("DTSTART")
-        dtend = component.get("DTEND")
-        if not uid or uid in seen or dtstart is None or dtend is None:
-            skipped += 1
-            continue
-        start = to_naive_utc(dtstart.dt)
-        end = to_naive_utc(dtend.dt)
-        if end <= start:
+        try:
+            uid = str(component.get("UID", "")).strip()
+            dtstart = component.get("DTSTART")
+            dtend = component.get("DTEND")
+            if not uid or uid in seen or dtstart is None or dtend is None:
+                skipped += 1
+                continue
+            start = to_naive_utc(dtstart.dt)
+            end = to_naive_utc(dtend.dt)
+            if end <= start:
+                skipped += 1
+                continue
+            event = FeedEvent(
+                uid=uid,
+                title=str(component.get("SUMMARY", "")).strip(),
+                start=start,
+                end=end,
+                room=str(component.get("LOCATION", "")).strip(),
+                description=str(component.get("DESCRIPTION", "")).strip(),
+            )
+        except ValueError:
             skipped += 1
             continue
         seen.add(uid)
-        events.append(FeedEvent(
-            uid=uid,
-            title=str(component.get("SUMMARY", "")).strip(),
-            start=start,
-            end=end,
-            room=str(component.get("LOCATION", "")).strip(),
-            description=str(component.get("DESCRIPTION", "")).strip(),
-        ))
+        events.append(event)
     return ParsedFeed(events=events, skipped=skipped)

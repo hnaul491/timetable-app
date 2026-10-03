@@ -67,6 +67,8 @@ def require_cron_or_user(
     settings: Settings = Depends(get_settings),
     verifier: TokenVerifier = Depends(get_verifier),
 ) -> str:
-    if x_cron_secret and settings.cron_secret and hmac.compare_digest(x_cron_secret, settings.cron_secret):
+    if x_cron_secret and settings.cron_secret and hmac.compare_digest(
+        x_cron_secret.encode(), settings.cron_secret.encode()
+    ):
         return "cron"
     return require_user(authorization, verifier).email

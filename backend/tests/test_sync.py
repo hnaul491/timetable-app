@@ -131,3 +131,25 @@ def test_run_sync_without_active_semester(session):
     run = run_sync(session, lambda sem: "", NOW)
     assert run.status == "failed"
     assert run.error == "no active semester"
+
+
+def test_unexpected_error_is_persisted_as_failed_without_leaking_secret(session, semester, monkeypatch):
+    apply_feed(session, semester, feed(FRENCH), NOW)
+    session.commit()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom https://zeus.ionis-it.com/api/group/802/ics/SECRETKEY99")
+
+    monkeypatch.setattr("app.zeus.sync.apply_feed", boom)
+    text = ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nDTSTART:20261020T123000Z\r\n"
+            "DTEND:20261020T143000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    run = run_sync(session, lambda sem: text, LATER)
+    assert run.status == "failed"
+    assert run.error == "unexpected error (RuntimeError)"
+    assert "SECRETKEY99" not in run.error
+    session.expire_all()
+    [stored] = session.scalars(select(SyncRun)).all()
+    assert (stored.status, stored.error) == ("failed", "unexpected error (RuntimeError)")
+    assert stored.finished_at == LATER
+    assert event_by_uid(session, "u-fr").status == "normal"
+    assert len(session.scalars(select(Event)).all()) == 1

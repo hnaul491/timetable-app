@@ -86,6 +86,12 @@ def run_sync(session: Session, fetch: Fetcher, now: datetime) -> SyncRun:
     except InvalidFeedError as exc:
         run.status = "failed"
         run.error = f"invalid feed: {exc}"
+    except Exception as exc:
+        # Never store str(exc): it may contain the Zeus ICS URL (which embeds the key).
+        session.rollback()
+        run = SyncRun(started_at=now, status="failed", fetched=0, inserted=0, updated=0,
+                      cancelled=0, skipped=0, error=f"unexpected error ({type(exc).__name__})")
+        session.add(run)
     else:
         run.status = "ok"
         run.fetched, run.inserted, run.updated = result.fetched, result.inserted, result.updated

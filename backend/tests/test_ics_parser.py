@@ -65,3 +65,11 @@ def test_empty_calendar_returns_no_events():
 def test_html_body_is_invalid_feed():
     with pytest.raises(InvalidFeedError):
         parse_ics("<html><body>Maintenance</body></html>")
+
+
+def test_malformed_dtstart_skips_only_that_event():
+    bad = vevent("bad", "Broken", "2026-garbage")
+    good = vevent("ok", "Relational Databases", "20261020T123000Z")
+    feed = parse_ics(ics(bad, good))
+    assert [e.uid for e in feed.events] == ["ok"]
+    assert feed.skipped == 1

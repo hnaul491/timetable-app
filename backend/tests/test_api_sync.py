@@ -64,3 +64,9 @@ def test_sync_then_pick_section_then_see_week(client, session, semester):
     events = client.get("/api/events?start=2026-10-18T22:00:00Z&end=2026-10-25T23:00:00Z", headers=AUTH).json()["events"]
     assert [(e["section"], e["room"]) for e in events] == [("GR5", "KB605")]
     assert session.query(MySection).count() == 1
+
+
+def test_non_ascii_cron_secret_is_401_not_500(client, semester):
+    use_feed(client)
+    resp = client.post("/api/sync", headers={"X-Cron-Secret": "é".encode("latin-1")})
+    assert resp.status_code == 401
