@@ -58,8 +58,19 @@ def update_line(body: str, title: str, done: bool, due: date | None, occurrence:
         if parsed is None or parsed.title != title:
             continue
         if seen == occurrence:
-            indent = LINE_RE.match(line).group(1)
-            lines[index] = indent + render_line(title, done, due) + carriage
+            match = LINE_RE.match(line)
+            indent, text = match.group(1), match.group(3)
+            due_match = DUE_RE.search(text)
+            if due_match:
+                try:
+                    date.fromisoformat(due_match.group(1))
+                    text = text[: due_match.start()].rstrip()
+                except ValueError:
+                    pass  # not a real date: it is part of the text
+            rewritten = f"{indent}[{'x' if done else ' '}] {text}"
+            if due:
+                rewritten += f" @{due.isoformat()}"
+            lines[index] = rewritten + carriage
             return "\n".join(lines)
         seen += 1
     return body

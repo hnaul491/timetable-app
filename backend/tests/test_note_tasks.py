@@ -100,3 +100,23 @@ def test_parse_and_update_agree_on_exotic_separators():
     first, second = parse_task_lines(body)
     assert (first.title, second.title) == ("A\x0cB", "C")
     assert update_line(body, first.title, True, None) == "[x] A\x0cB\n[ ] C"
+
+
+def test_update_line_keeps_full_text_of_long_lines():
+    long_text = "Read " + "x" * 400
+    body = f"intro\n[ ] {long_text}\nend"
+    title = parse_task_lines(body)[0].title
+    assert len(title) == 300
+    updated = update_line(body, title, True, None)
+    assert updated == f"intro\n[x] {long_text}\nend"
+
+
+def test_update_line_keeps_inner_spacing_and_replaces_due():
+    body = "  [ ] Read   chapter 4 @2026-10-22"
+    assert update_line(body, "Read   chapter 4", False, date(2026, 10, 30)) == "  [ ] Read   chapter 4 @2026-10-30"
+    assert update_line(body, "Read   chapter 4", True, None) == "  [x] Read   chapter 4"
+
+
+def test_update_line_keeps_invalid_date_text():
+    body = "[ ] Bad date stays @2026-13-40"
+    assert update_line(body, "Bad date stays @2026-13-40", True, None) == "[x] Bad date stays @2026-13-40"

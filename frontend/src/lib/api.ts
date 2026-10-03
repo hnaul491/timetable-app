@@ -20,6 +20,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     try {
       const body = await response.json();
       if (typeof body.detail === "string") message = body.detail;
+      else if (Array.isArray(body.detail))
+        message = body.detail
+          .map((d: { msg?: unknown }) => String(d?.msg ?? "").replace(/^Value error, /, ""))
+          .filter(Boolean)
+          .join("; ");
     } catch {
       // error body was not JSON; keep the status text
     }

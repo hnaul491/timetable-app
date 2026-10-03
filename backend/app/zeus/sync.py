@@ -23,6 +23,7 @@ class SyncResult:
     updated: int = 0
     cancelled: int = 0
     skipped: int = 0
+    kept: int = 0
 
 
 def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: datetime) -> SyncResult:
@@ -40,9 +41,9 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
     feed_uids = {item.uid for item in feed.events}
     upcoming = [e for e in existing.values() if e.start_at >= now and e.status != "cancelled"]
     would_cancel = sum(1 for e in upcoming if e.zeus_uid not in feed_uids)
-    if len(upcoming) >= MIN_EVENTS_FOR_GUARD and would_cancel / len(upcoming) > MAX_CANCEL_RATIO:
-        # A truncated feed (wrong group, Zeus hiccup) must not wipe the semester.
-        raise InvalidFeedError(f"feed would cancel {would_cancel} of {len(upcoming)} upcoming events")
+    # A truncated feed (wrong group, Zeus hiccup) must not wipe the semester: still apply
+    # new/changed classes, but keep the missing ones instead of cancelling them.
+    keep_missing = len(upcoming) >= MIN_EVENTS_FOR_GUARD and would_cancel / len(upcoming) > MAX_CANCEL_RATIO
     result = SyncResult(fetched=len(feed.events), skipped=feed.skipped)
 
     for item in feed.events:
@@ -72,6 +73,9 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
 
     for event in existing.values():
         if event.start_at >= now and event.status != "cancelled":
+            if keep_missing:
+                result.kept += 1
+                continue
             event.status, event.changed_at = "cancelled", now
             result.cancelled += 1
 
@@ -101,9 +105,14 @@ def run_sync(session: Session, fetch: Fetcher, now: datetime) -> SyncRun:
                       cancelled=0, skipped=0, error=f"unexpected error ({type(exc).__name__})")
         session.add(run)
     else:
-        run.status = "ok"
         run.fetched, run.inserted, run.updated = result.fetched, result.inserted, result.updated
         run.cancelled, run.skipped = result.cancelled, result.skipped
+        if result.kept:
+            run.status = "partial"
+            run.error = (f"kept {result.kept} upcoming classes that disappeared from the feed "
+                         "(guard: more than 30% would be cancelled)")
+        else:
+            run.status = "ok"
     run.finished_at = now
     session.commit()
     return run

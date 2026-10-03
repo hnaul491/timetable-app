@@ -44,7 +44,7 @@ export function BoardPage() {
     if (title.trim()) add.mutate();
   };
 
-  if (tasks.error) return <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />;
+  if (tasks.error && !tasks.data) return <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />;
   if (!tasks.data) return <p className="text-sm text-muted">Loading tasks…</p>;
   const all = tasks.data;
   const subjects = [...new Set(all.map((t) => t.subject_name).filter((s): s is string => Boolean(s)))].sort();
@@ -85,6 +85,7 @@ export function BoardPage() {
         </button>
       </form>
       {mutationError && <p className="text-sm text-[#8B1A1A]">{mutationError.message}</p>}
+      {tasks.error && tasks.data && <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />}
 
       <div className="grid items-start gap-4 md:grid-cols-3">
         {COLUMNS.map((col) => {
@@ -97,7 +98,7 @@ export function BoardPage() {
                 <span className="rounded-full bg-white px-2 text-xs font-semibold text-[#3A3F4B]">{cards.length}</span>
               </h2>
               {cards.map((t) => (
-                <TaskCard key={t.id} task={t} onMove={(status) => move.mutate({ id: t.id, status })} onDelete={() => remove.mutate(t.id)} />
+                <TaskCard key={t.id} task={t} pending={move.isPending && move.variables?.id === t.id} onMove={(status) => move.mutate({ id: t.id, status })} onDelete={() => remove.mutate(t.id)} />
               ))}
             </section>
           );
@@ -107,7 +108,7 @@ export function BoardPage() {
   );
 }
 
-function TaskCard({ task, onMove, onDelete }: { task: Task; onMove: (s: TaskStatus) => void; onDelete: () => void }) {
+function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: boolean; onMove: (s: TaskStatus) => void; onDelete: () => void }) {
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-[#E1E4EA] bg-white p-3">
@@ -128,6 +129,7 @@ function TaskCard({ task, onMove, onDelete }: { task: Task; onMove: (s: TaskStat
         <select
           aria-label={`Status for ${task.title}`}
           value={task.status}
+          disabled={pending}
           onChange={(e) => onMove(e.target.value as TaskStatus)}
           className="h-9 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm"
         >
@@ -138,7 +140,13 @@ function TaskCard({ task, onMove, onDelete }: { task: Task; onMove: (s: TaskStat
           ))}
         </select>
         {task.source === "manual" && (
-          <button type="button" onClick={() => (confirm ? onDelete() : setConfirm(true))} className="h-9 rounded-lg px-2 text-sm font-semibold text-[#8B1A1A]">
+          <button
+            type="button"
+            aria-label={confirm ? `Click again to delete ${task.title}` : `Delete ${task.title}`}
+            onClick={() => (confirm ? onDelete() : setConfirm(true))}
+            onBlur={() => setConfirm(false)}
+            className="h-9 rounded-lg px-2 text-sm font-semibold text-[#8B1A1A]"
+          >
             {confirm ? "Click again to delete" : "Delete"}
           </button>
         )}

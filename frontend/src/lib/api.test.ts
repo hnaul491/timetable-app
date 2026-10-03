@@ -36,4 +36,17 @@ describe("apiFetch", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
     await expect(apiFetch("/api/x", { method: "DELETE" })).resolves.toBeUndefined();
   });
+
+  it("joins FastAPI validation messages", async () => {
+    const detail = [
+      { loc: ["body", "until_date"], msg: "Value error, a repeating event can span at most 400 days", type: "value_error" },
+      { loc: ["body", "title"], msg: "String should have at least 1 character", type: "string_too_short" },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail }), { status: 422 })));
+    const error = await apiFetch("/api/x").catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      status: 422,
+      message: "a repeating event can span at most 400 days; String should have at least 1 character",
+    });
+  });
 });

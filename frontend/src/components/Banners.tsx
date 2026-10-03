@@ -38,6 +38,13 @@ export function SyncBanner({ status, now = new Date() }: { status: SyncStatus | 
   if (run.status === "failed") {
     return <Banner tone="warn">School sync failed. Showing data from {since(status.last_success_at)}.</Banner>;
   }
+  if (run.status === "partial") {
+    return (
+      <Banner tone="warn">
+        School sync: {run.error}. Check Zeus — if those classes were really removed, they will be cancelled once the feed is complete.
+      </Banner>
+    );
+  }
   if (status.last_success_at && now.getTime() - new Date(status.last_success_at).getTime() > STALE_AFTER_MS) {
     return (
       <Banner tone="warn">
