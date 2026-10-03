@@ -57,7 +57,7 @@ describe("WeekGrid", () => {
     render(<WeekGrid days={WEEK} events={[event({ note_count: 1, open_tasks: 2, important: true })]} />);
     expect(screen.getByText("Note")).toBeInTheDocument();
     expect(screen.getByText("2 tasks")).toBeInTheDocument();
-    expect(screen.getByText("Important")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Important" })).toBeInTheDocument();
   });
 
   it("marks external French with a dashed outline", () => {

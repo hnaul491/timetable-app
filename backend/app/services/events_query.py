@@ -79,11 +79,12 @@ def _with_counts(session: Session, events: list[VisibleEvent]) -> list[VisibleEv
     ids = [e.id for e in events]
     note_counts: dict[int, int] = {}
     important: set[int] = set()
-    for event_id, is_important in session.execute(
-        select(Note.event_id, Note.important).where(Note.event_id.in_(ids), Note.body != "")
+    for event_id, is_important, body in session.execute(
+        select(Note.event_id, Note.important, Note.body).where(Note.event_id.in_(ids))
     ):
-        note_counts[event_id] = note_counts.get(event_id, 0) + 1
-        if is_important:
+        if body:
+            note_counts[event_id] = note_counts.get(event_id, 0) + 1
+        if is_important:  # a starred class is important even when its notes are empty
             important.add(event_id)
     open_tasks = dict(session.execute(
         select(Task.event_id, func.count()).where(Task.event_id.in_(ids), Task.status != "done").group_by(Task.event_id)

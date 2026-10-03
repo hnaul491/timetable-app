@@ -81,3 +81,22 @@ def test_next_class_respects_section(client, session, semester):
     session.add_all([mine, other, next_mine, MySection(subject_id=french.id, section="GR5")])
     session.commit()
     assert client.get(f"/api/events/{mine.id}", headers=AUTH).json()["next_event_id"] == next_mine.id
+
+
+def test_star_marks_a_class_important_without_any_note_text(client, session, semester):
+    first, _ = seed(session, semester)
+    detail = client.put(f"/api/events/{first.id}/important", headers=AUTH, json={"important": True}).json()
+    assert detail["event"]["important"] is True
+    assert detail["notes"]["after"]["body"] == ""
+    week = client.get(f"/api/events?{WEEK}", headers=AUTH).json()["events"]
+    assert [(e["id"], e["important"], e["note_count"]) for e in week] == [(first.id, True, 0)]
+    cleared = client.put(f"/api/events/{first.id}/important", headers=AUTH, json={"important": False}).json()
+    assert cleared["event"]["important"] is False
+    assert client.put("/api/events/999/important", headers=AUTH, json={"important": True}).status_code == 404
+
+
+def test_saving_a_note_keeps_the_star(client, session, semester):
+    first, _ = seed(session, semester)
+    client.put(f"/api/events/{first.id}/important", headers=AUTH, json={"important": True})
+    detail = client.put(f"/api/events/{first.id}/notes/after", headers=AUTH, json={"body": "Covered ER"}).json()
+    assert (detail["event"]["important"], detail["notes"]["after"]["body"]) == (True, "Covered ER")

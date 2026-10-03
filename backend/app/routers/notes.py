@@ -10,7 +10,7 @@ from app.db import get_session
 from app.deps import get_now
 from app.models import Event, Note, Task
 from app.routers.events import event_out
-from app.schemas import EventDetailOut, NoteOut, NoteUpdate
+from app.schemas import EventDetailOut, ImportantIn, NoteOut, NoteUpdate
 from app.services.events_query import describe_event, next_event
 from app.services.note_tasks import sync_note_tasks
 from app.services.task_query import task_out_list
@@ -63,7 +63,28 @@ def put_note(event_id: int, tab: Literal["after", "before"], body: NoteUpdate,
         note = Note(event_id=event.id, tab=tab, body="", important=False, updated_at=now)
         session.add(note)
         session.flush()
-    note.body, note.important, note.updated_at = body.body, body.important, now
+    note.body, note.updated_at = body.body, now
+    if body.important is not None:
+        note.important = body.important
     sync_note_tasks(session, note, event, now)
+    session.commit()
+    return build_detail(session, event)
+
+
+@router.put("/events/{event_id}/important", response_model=EventDetailOut)
+def set_important(event_id: int, body: ImportantIn, session: Session = Depends(get_session),
+                  now: datetime = Depends(get_now)) -> EventDetailOut:
+    """The class-level star: kept on the after-class note, cleared from every note when removed."""
+    event = load_event(session, event_id)
+    notes = {n.tab: n for n in session.scalars(select(Note).where(Note.event_id == event.id))}
+    if body.important:
+        note = notes.get("after")
+        if note is None:
+            note = Note(event_id=event.id, tab="after", body="", important=True, updated_at=now)
+            session.add(note)
+        note.important = True
+    else:
+        for note in notes.values():
+            note.important = False
     session.commit()
     return build_detail(session, event)

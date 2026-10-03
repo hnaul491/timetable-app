@@ -70,7 +70,7 @@ function EventPageInner() {
   };
   const save = useMutation({
     mutationFn: (v: { tab: NoteTab; draft: Draft }) =>
-      apiFetch<EventDetail>(`/api/events/${id}/notes/${v.tab}`, { method: "PUT", body: JSON.stringify(v.draft) }),
+      apiFetch<EventDetail>(`/api/events/${id}/notes/${v.tab}`, { method: "PUT", body: JSON.stringify({ body: v.draft.body }) }),
     onSuccess: (data, v) => {
       queryClient.setQueryData(["event", id], data);
       setDrafts((d) => {
@@ -80,6 +80,16 @@ function EventPageInner() {
         delete next[v.tab];
         return next;
       });
+      invalidateLists();
+    },
+  });
+  const [starNotice, setStarNotice] = useState("");
+  const star = useMutation({
+    mutationFn: (important: boolean) =>
+      apiFetch<EventDetail>(`/api/events/${id}/important`, { method: "PUT", body: JSON.stringify({ important }) }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["event", id], data);
+      setStarNotice(data.event.important ? "Marked important" : "No longer important");
       invalidateLists();
     },
   });
@@ -144,7 +154,22 @@ function EventPageInner() {
             {event.subject_name && <span className={chip}>{event.subject_name}</span>}
             <span className={chip}>{event.source === "zeus" ? "School timetable" : KIND_LABEL[event.kind]}</span>
             {event.status !== "normal" && <span className={chip}>{event.status === "changed" ? "Changed" : "Cancelled"}</span>}
+            <button
+              type="button"
+              aria-pressed={event.important}
+              onClick={() => star.mutate(!event.important)}
+              disabled={star.isPending}
+              className={`ml-auto flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold disabled:opacity-60 ${
+                event.important ? "border-[#F5D9B8] bg-[#FFF1E0] text-[#9A3412]" : "border-line bg-white text-[#3A3F4B]"
+              }`}
+            >
+              <span aria-hidden="true" className="text-base leading-none">{event.important ? "★" : "☆"}</span>
+              {event.important ? "Important" : "Mark important"}
+            </button>
           </div>
+          <p role="status" className="min-h-0 text-sm text-muted empty:hidden">
+            {starNotice || (star.error ? (star.error as Error).message : "")}
+          </p>
           <h1 className="text-2xl font-bold tracking-tight">
             {event.title}
             {event.section ? ` · ${event.section}` : ""}
@@ -192,10 +217,6 @@ function EventPageInner() {
           <code>@2026-10-22</code> at the end of a task line for a due date.
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" checked={current.important} onChange={(e) => setCurrent({ important: e.target.checked })} />
-            Important
-          </label>
           <button
             type="button"
             disabled={!dirty || save.isPending}

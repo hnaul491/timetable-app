@@ -57,7 +57,7 @@ def important_notes(session: Session, semester_id: int, start: datetime, end: da
         select(Note, Event, Subject.display_name)
         .join(Event, Note.event_id == Event.id)
         .outerjoin(Subject, Event.subject_id == Subject.id)
-        .where(Event.semester_id == semester_id, Note.important.is_(True), Note.body != "",
+        .where(Event.semester_id == semester_id, Note.important.is_(True),
                Event.start_at >= start, Event.start_at < end)
         .order_by(Event.start_at, Note.tab)
     ).all()

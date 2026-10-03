@@ -107,7 +107,11 @@ class EventDetailOut(BaseModel):
 
 class NoteUpdate(BaseModel):
     body: str = Field(default="", max_length=20000)
-    important: bool = False
+    important: bool | None = None  # None keeps the current star
+
+
+class ImportantIn(BaseModel):
+    important: bool
 
 
 CustomKind = Literal["work", "french_ext", "other"]

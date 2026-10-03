@@ -105,7 +105,7 @@ export function ReviewPage() {
           ) : (
             r.important.map((n) => (
               <Link key={`${n.event_id}-${n.tab}`} to={`/events/${n.event_id}`} className="flex flex-col gap-0.5 text-sm">
-                <span className="font-semibold text-ink">{n.body.split("\n")[0]}</span>
+                <span className="font-semibold text-ink">{n.body ? n.body.split("\n")[0] : "★ Marked important"}</span>
                 <span className="text-xs text-muted">
                   {n.title} · {formatLongDate(parisParts(n.start).date)}
                 </span>

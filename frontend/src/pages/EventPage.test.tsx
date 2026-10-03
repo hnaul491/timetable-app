@@ -59,19 +59,31 @@ describe("EventPage", () => {
     expect(screen.getByRole("textbox", { name: "Before next class note" })).toHaveValue("Bring laptop");
   });
 
-  it("saves the edited note with the Important flag", async () => {
+  it("saves the edited note text", async () => {
     apiFetch.mockResolvedValue(detail());
     renderPage();
     const box = await screen.findByRole("textbox", { name: "After class note" });
     const save = screen.getByRole("button", { name: "Save note" });
     expect(save).toBeDisabled();
     fireEvent.change(box, { target: { value: "[ ] Redo ex 3\n[ ] Read ch. 4" } });
-    await userEvent.click(screen.getByRole("checkbox", { name: "Important" }));
     await userEvent.click(save);
     expect(apiFetch).toHaveBeenCalledWith("/api/events/7/notes/after", {
       method: "PUT",
-      body: JSON.stringify({ body: "[ ] Redo ex 3\n[ ] Read ch. 4", important: true }),
+      body: JSON.stringify({ body: "[ ] Redo ex 3\n[ ] Read ch. 4" }),
     });
+  });
+
+  it("stars the class as important right away", async () => {
+    let starred = false; // the server remembers the star, so the refetch after saving sees it too
+    apiFetch.mockImplementation(async (_path: string, init?: RequestInit) => {
+      if (init?.method === "PUT") starred = true;
+      return detail({ important: starred });
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Mark important" }));
+    expect(apiFetch).toHaveBeenCalledWith("/api/events/7/important", { method: "PUT", body: JSON.stringify({ important: true }) });
+    expect(await screen.findByRole("button", { name: "Important" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Marked important");
   });
 
   it("ticks a task", async () => {

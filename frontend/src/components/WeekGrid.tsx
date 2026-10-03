@@ -132,7 +132,7 @@ function EventBlock({
       data-columns={columns}
       data-kind={ev.kind}
       className={`absolute flex flex-col gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-xs ${ev.status === "cancelled" ? "line-through opacity-60" : ""}`}
-      style={{ ...style, ...outline }}
+      style={{ ...style, ...outline, ...(ev.important ? { boxShadow: "inset 3px 0 0 #EA580C" } : {}) }}
     >
       {onSelect && (
         <button
@@ -144,6 +144,11 @@ function EventBlock({
       )}
       <span className="flex items-center gap-1.5 leading-tight font-bold">
         <span className="size-2 shrink-0 rounded-full" style={{ background: color }} />
+        {ev.important && (
+          <span role="img" aria-label="Important" className="shrink-0 text-[13px] leading-none text-[#EA580C]">
+            ★
+          </span>
+        )}
         {ev.title}
         {ev.section ? ` · ${ev.section}` : ""}
       </span>
@@ -154,7 +159,6 @@ function EventBlock({
       <span className="flex flex-wrap gap-1">
         {ev.kind === "exam" && <span className="rounded-full bg-[#8B1A1A] px-1.5 text-[10.5px] font-bold text-white">Exam</span>}
         {ev.status === "changed" && <span className="rounded-full bg-[#9A3412] px-1.5 text-[10.5px] font-bold text-white">Changed</span>}
-        {ev.important && <span className="rounded-full bg-[#FFF1E0] px-1.5 text-[10.5px] font-bold text-[#7C2D12]">Important</span>}
         {ev.note_count > 0 && <span className="rounded-full bg-white px-1.5 text-[10.5px] font-semibold">Note</span>}
         {ev.open_tasks > 0 && (
           <span className="rounded-full bg-white px-1.5 text-[10.5px] font-semibold">

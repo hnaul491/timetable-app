@@ -97,3 +97,14 @@ def test_review_without_active_semester(client, session, semester):
     body = client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()
     assert (body["week"], body["important"], body["without_notes"]) == ([], [], [])
     assert body["hours"] == {"school": 0.0, "work": 0.0, "french_ext": 0.0, "other": 0.0}
+
+
+def test_starred_class_without_text_is_in_important(client, session, semester):
+    db = Subject(semester_id=semester.id, display_name="Relational Databases", aliases=[])
+    session.add(db)
+    session.flush()
+    starred = add(session, semester, "s", datetime(2026, 10, 20, 7), datetime(2026, 10, 20, 9), subject=db)
+    session.commit()
+    client.put(f"/api/events/{starred.id}/important", headers=AUTH, json={"important": True})
+    body = client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()
+    assert [(n["event_id"], n["body"]) for n in body["important"]] == [(starred.id, "")]
