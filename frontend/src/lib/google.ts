@@ -31,7 +31,22 @@ export function takeConnectFlag(): boolean {
   }
 }
 
+let captured: string | null = null;
+
+/** supabase-js only exposes provider_refresh_token right after sign-in, so grab it as it is emitted. */
+export function watchProviderToken(): () => void {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.provider_refresh_token) captured = session.provider_refresh_token;
+  });
+  return () => data.subscription.unsubscribe();
+}
+
 export async function takeProviderRefreshToken(): Promise<string | null> {
+  if (captured) {
+    const token = captured;
+    captured = null;
+    return token;
+  }
   const { data } = await supabase.auth.getSession();
   return data.session?.provider_refresh_token ?? null;
 }

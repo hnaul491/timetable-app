@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CALENDAR_SCOPE, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken } from "./google";
+import { CALENDAR_SCOPE, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken, watchProviderToken } from "./google";
 
-const supabase = vi.hoisted(() => ({ auth: { signInWithOAuth: vi.fn(), getSession: vi.fn() } }));
+const supabase = vi.hoisted(() => ({ auth: { signInWithOAuth: vi.fn(), getSession: vi.fn(), onAuthStateChange: vi.fn() } }));
 vi.mock("./supabase", () => ({ supabase }));
 
 describe("google connect helpers", () => {
@@ -31,5 +31,19 @@ describe("google connect helpers", () => {
     expect(await takeProviderRefreshToken()).toBe("1//tok");
     supabase.auth.getSession.mockResolvedValue({ data: { session: null } });
     expect(await takeProviderRefreshToken()).toBeNull();
+  });
+
+  it("captures the provider token emitted at sign-in, once, then falls back to the session", async () => {
+    const unsubscribe = vi.fn();
+    supabase.auth.onAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
+      cb("SIGNED_IN", { provider_refresh_token: "1//fresh" });
+      return { data: { subscription: { unsubscribe } } };
+    });
+    const stop = watchProviderToken();
+    supabase.auth.getSession.mockResolvedValue({ data: { session: { provider_refresh_token: "1//stored" } } });
+    expect(await takeProviderRefreshToken()).toBe("1//fresh");
+    expect(await takeProviderRefreshToken()).toBe("1//stored");
+    stop();
+    expect(unsubscribe).toHaveBeenCalled();
   });
 });

@@ -102,4 +102,28 @@ describe("GoogleSettings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reconnect Google" }));
     expect(google.startGoogleConnect).toHaveBeenCalled();
   });
+
+  it("stops pushing when a round makes no progress and shows the rate limit", async () => {
+    const msg = "Google rate limit reached; the rest is sent on the next push";
+    renderWith(connected, [
+      { status: "partial", done: 0, failed: 0, remaining: 5, error: msg },
+      { status: "ok", done: 5, failed: 0, remaining: 0, error: null },
+    ]);
+    await userEvent.click(await screen.findByRole("button", { name: "Push now" }));
+    expect(await screen.findByText(`0 changes sent. ${msg}`)).toBeInTheDocument();
+    expect(apiFetch.mock.calls.filter(([path]) => path === "/api/google/push")).toHaveLength(1);
+  });
+
+  it("shows a failed push", async () => {
+    renderWith(connected, [{ status: "failed", done: 0, failed: 3, remaining: 3, error: "boom" }]);
+    await userEvent.click(await screen.findByRole("button", { name: "Push now" }));
+    expect(await screen.findByText("Push failed: boom")).toBeInTheDocument();
+  });
+
+  it("shows when Google rejects the consent start", async () => {
+    google.startGoogleConnect.mockResolvedValue({ error: { message: "popup blocked" } });
+    renderWith({ ...connected, connected: false, email: null });
+    await userEvent.click(await screen.findByRole("button", { name: "Connect Google Calendar" }));
+    expect(await screen.findByText("popup blocked")).toBeInTheDocument();
+  });
 });

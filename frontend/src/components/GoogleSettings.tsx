@@ -18,6 +18,13 @@ const card = "flex flex-col gap-3 rounded-2xl border border-line bg-white p-5";
 const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-60";
 const secondary = "h-10 rounded-xl border border-line bg-white px-4 text-sm font-semibold disabled:opacity-60";
 
+function summary(sent: number, r: PushResult): string {
+  if (r.status === "failed") return `Push failed: ${r.error ?? "unknown error"}`;
+  if (r.status === "skipped") return "Nothing was sent — Google needs to be reconnected.";
+  if (r.error) return `${sent} changes sent. ${r.error}`;
+  return r.remaining > 0 ? `${sent} changes sent, ${r.remaining} left…` : `${sent} changes sent`;
+}
+
 export function GoogleSettings() {
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
@@ -42,10 +49,10 @@ export function GoogleSettings() {
   const disconnect = useMutation({
     mutationFn: () => apiFetch("/api/google", { method: "DELETE" }),
     onSuccess: () => {
-      setConfirm(false);
       setProgress(null);
       refresh();
     },
+    onSettled: () => setConfirm(false),
   });
   const push = useMutation({
     mutationFn: async () => {
@@ -53,8 +60,8 @@ export function GoogleSettings() {
       for (let round = 0; round < MAX_ROUNDS; round += 1) {
         const result = await apiFetch<PushResult>("/api/google/push", { method: "POST" });
         sent += result.done;
-        setProgress(result.remaining > 0 ? `${sent} changes sent, ${result.remaining} left…` : `${sent} changes sent`);
-        if (result.status !== "partial" || result.remaining === 0) return result;
+        setProgress(summary(sent, result));
+        if (result.status !== "partial" || result.remaining === 0 || result.done === 0) return result;
       }
       return null;
     },
@@ -70,6 +77,11 @@ export function GoogleSettings() {
       else setNotice("Google didn't give offline access. Remove “Timetable” at myaccount.google.com/permissions, then connect again.");
     });
   }, [connect]);
+
+  const startConnect = async () => {
+    const res = await startGoogleConnect();
+    if (res?.error) setNotice(res.error.message);
+  };
 
   const s = status.data;
   const error = (connect.error ?? kinds.error ?? disconnect.error ?? push.error) as Error | null;
@@ -88,7 +100,7 @@ export function GoogleSettings() {
             Creates a calendar called “My Timetable” in your Google account and keeps it up to date. Notes are never sent. Reminders come from Google
             Calendar — set them on that calendar.
           </p>
-          <button type="button" className={primary} onClick={() => startGoogleConnect()} disabled={connect.isPending}>
+          <button type="button" className={primary} onClick={startConnect} disabled={connect.isPending}>
             Connect Google Calendar
           </button>
         </>
@@ -100,7 +112,7 @@ export function GoogleSettings() {
           {s.needs_reconnect && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#F3C4C4] bg-[#FDECEC] px-4 py-3 text-sm text-[#8B1A1A]">
               <span>{s.last_push_error ?? "Google access stopped working."}</span>
-              <button type="button" className={primary} onClick={() => startGoogleConnect()}>
+              <button type="button" className={primary} onClick={startConnect}>
                 Reconnect Google
               </button>
             </div>
@@ -133,6 +145,7 @@ export function GoogleSettings() {
               className={secondary}
               onClick={() => (confirm ? disconnect.mutate() : setConfirm(true))}
               onBlur={() => setConfirm(false)}
+              disabled={disconnect.isPending}
             >
               {confirm ? "Click again to disconnect" : "Disconnect"}
             </button>
