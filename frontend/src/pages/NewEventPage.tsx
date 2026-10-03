@@ -63,9 +63,12 @@ export function NewEventPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) return setError("Give the event a title.");
+    if (!form.date || !form.start || !form.end) return setError("Pick a date, a start time and an end time.");
+    if (form.repeat && !form.until) return setError("Pick an 'Until' date.");
     if (form.start === form.end) return setError("Start and end time must differ.");
     if (form.repeat && form.weekdays.length === 0) return setError("Pick at least one weekday.");
     if (form.repeat && form.until < form.date) return setError("'Until' must be on or after the date.");
+    if (form.repeat && form.until > addDays(form.date, 400)) return setError("A repeating event can last at most 400 days.");
     setError(null);
     create.mutate();
   };
@@ -95,7 +98,7 @@ export function NewEventPage() {
         <div className="grid grid-cols-3 gap-3">
           <label className={labelCls}>
             Date
-            <input type="date" className={field} value={form.date} onChange={(e) => set({ date: e.target.value, weekdays: [weekdayIndex(e.target.value)] })} />
+            <input type="date" className={field} value={form.date} onChange={(e) => set(e.target.value ? { date: e.target.value, weekdays: [weekdayIndex(e.target.value)] } : { date: "" })} />
           </label>
           <label className={labelCls}>
             Start

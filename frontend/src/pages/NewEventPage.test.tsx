@@ -72,4 +72,23 @@ describe("NewEventPage", () => {
     expect(screen.getByText("Give the event a title.")).toBeInTheDocument();
     expect(apiFetch).not.toHaveBeenCalled();
   });
+
+  it("rejects a cleared start time", async () => {
+    renderPage();
+    await fillCommon();
+    fireEvent.change(screen.getByLabelText("Start"), { target: { value: "" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save event" }));
+    expect(screen.getByText("Pick a date, a start time and an end time.")).toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a weekly rule longer than 400 days", async () => {
+    renderPage();
+    await fillCommon();
+    await userEvent.click(screen.getByLabelText("Repeat weekly"));
+    fireEvent.change(screen.getByLabelText("Until"), { target: { value: "2028-01-01" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save event" }));
+    expect(screen.getByText("A repeating event can last at most 400 days.")).toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
 });
