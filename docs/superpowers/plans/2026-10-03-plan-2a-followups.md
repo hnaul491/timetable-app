@@ -3,12 +3,12 @@
 Collected from the per-task and final whole-branch reviews of plan 2A. None blocks use.
 
 ## Worth doing in Plan 2B
-- Sync guard: apply inserts/updates and skip only the cancellations (today a tripped guard blocks every change until the feed recovers); show the reason in the banner.
-- `update_line` should only flip the checkbox / due suffix instead of re-rendering the whole line (long lines lose their tail).
+- Sync guard: apply inserts/updates and skip only the cancellations (today a tripped guard blocks every change until the feed recovers); show the reason in the banner. — DONE in plan 2B (wrong-group feeds still rejected)
+- `update_line` should only flip the checkbox / due suffix instead of re-rendering the whole line (long lines lose their tail). — DONE in plan 2B
 - Rule/occurrence editing UI, plus handling of edited (detached) or deleted occurrences when a rule is edited.
-- Restored local draft can be stale vs. a note changed elsewhere: add "Discard draft" or compare with the note's updated_at.
-- Parametrised 401 tests for every new route; a formatter for array-shaped 422 details.
-- Board: per-task aria-label on Delete, reset two-click confirms, disable status select while pending, keep the board visible on background refetch errors.
+- Restored local draft can be stale vs. a note changed elsewhere: add "Discard draft" or compare with the note's updated_at. — PARTLY DONE in plan 2B ("Discard changes" button; no updated_at comparison)
+- Parametrised 401 tests for every new route; a formatter for array-shaped 422 details. — 422 formatter DONE in plan 2B; parametrised 401 tests still open
+- Board: per-task aria-label on Delete, reset two-click confirms, disable status select while pending, keep the board visible on background refetch errors. — DONE in plan 2B
 
 ## Raw deferred minors (from the execution ledger)
 - Task 1: minor (deferred): mid-file timedelta import; no boundary tests (exactly 10 / ratio 0.3) or past/cancelled-exclusion test; legit large schedule change blocks every sync with no user override (banner does not show reason) — consider "apply anyway" in Plan 2B
@@ -26,3 +26,11 @@ Collected from the per-task and final whole-branch reviews of plan 2A. None bloc
 - Task 11: minor (deferred): changing Date overwrites chosen weekdays; apiFetch ignores array-shaped 422 detail (generic message); test gaps (overnight rollover, start=end, until<date, API error display)
 - Task 11: minor (deferred): no tests for cleared Until/Date
 - Task 12: minor (deferred): board Delete button lacks per-task aria-label; stale mutation errors linger; two-click confirm never resets (board + recurring); status select not optimistic/disabled while pending; refetch failure hides populated board; test gaps (board delete, loading/error, nav link)
+
+## Plan 2B follow-ups (open)
+- Subjects/Review pages: tasks of hidden subjects still appear on Board/Review/open_tasks counts (spec only hides events).
+- Semester switcher lives in the desktop sidebar only; phones use Settings → "Make active".
+- Clearing a semester's Zeus group (empty Save) has no confirmation; daily sync then fails until set again.
+- `GET /subjects/{id}` computes visible events twice (fine at ~400 events).
+- A legitimate Zeus group change mid-semester is now rejected as "looks like a different group"; needs a one-off "accept new group" path if it ever happens.
+- Review marks (`week_review`) are global, not per semester.
