@@ -4,3 +4,9 @@ node_modules/
 __pycache__/
 .venv/
 *.ics
+
+backend/dev.db
+backend/.env
+frontend/.env
+frontend/dist/
+.vercel/
