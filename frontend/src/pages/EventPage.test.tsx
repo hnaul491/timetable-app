@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -88,5 +88,37 @@ describe("EventPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Click again to delete" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/events/7", { method: "DELETE" });
     expect(await screen.findByText("Calendar home")).toBeInTheDocument();
+  });
+
+  it("does not leak drafts or delete confirmation into the next class", async () => {
+    apiFetch.mockImplementation(async (path: string) =>
+      path === "/api/events/8"
+        ? { ...detail({ id: 8, source: "custom", kind: "work" }), notes: { after: { tab: "after", body: "Event 8 note", important: false, updated_at: null }, before: { tab: "before", body: "", important: false, updated_at: null } }, next_event_id: null, next_event_start: null }
+        : detail(),
+    );
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "After class note" });
+    fireEvent.change(box, { target: { value: "draft for 7" } });
+    await userEvent.click(screen.getByRole("tab", { name: "Before next class" }));
+    await userEvent.click(screen.getByRole("link", { name: /Next class/ }));
+    const box8 = await screen.findByDisplayValue("Event 8 note");
+    expect(box8).toHaveAccessibleName("After class note");
+    expect(screen.getByRole("tab", { name: "After class" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Save note" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete event" })).toBeInTheDocument();
+  });
+
+  it("blocks ticking tasks while a note has unsaved changes", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "After class note" });
+    const task = screen.getByRole("checkbox", { name: "Redo ex 3" });
+    expect(task).toBeEnabled();
+    fireEvent.change(box, { target: { value: "edited" } });
+    expect(task).toBeDisabled();
+    expect(screen.getByText("Save your note first to tick tasks.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Redo ex 3" })).toBeEnabled());
+    expect(screen.queryByText("Save your note first to tick tasks.")).not.toBeInTheDocument();
   });
 });

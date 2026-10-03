@@ -20,6 +20,11 @@ interface Draft {
 
 export function EventPage() {
   const { id } = useParams();
+  return <EventPageInner key={id} />;
+}
+
+function EventPageInner() {
+  const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<NoteTab>("after");
@@ -38,6 +43,8 @@ export function EventPage() {
     onSuccess: (data, v) => {
       queryClient.setQueryData(["event", id], data);
       setDrafts((d) => {
+        const cur = d[v.tab];
+        if (cur && (cur.body !== v.draft.body || cur.important !== v.draft.important)) return d;
         const next = { ...d };
         delete next[v.tab];
         return next;
@@ -72,6 +79,10 @@ export function EventPage() {
   const current: Draft = drafts[tab] ?? { body: saved.body, important: saved.important };
   const setCurrent = (patch: Partial<Draft>) => setDrafts((d) => ({ ...d, [tab]: { ...current, ...patch } }));
   const dirty = current.body !== saved.body || current.important !== saved.important;
+  const anyDirty = TABS.some((t) => {
+    const d = drafts[t.id];
+    return d !== undefined && (d.body !== notes[t.id].body || d.important !== notes[t.id].important);
+  });
   const start = parisParts(event.start);
   const nextStart = detail.data.next_event_start;
   const tabLabel = TABS.find((t) => t.id === tab)!.label;
@@ -153,9 +164,10 @@ export function EventPage() {
         {tasks.length > 0 && (
           <section aria-label="Tasks from this class" className="flex flex-col gap-2 border-t border-line pt-4">
             <h2 className="text-sm font-bold">Tasks from this class</h2>
+            {anyDirty && <p className="text-xs text-muted">Save your note first to tick tasks.</p>}
             {tasks.map((task) => (
               <label key={task.id} className="flex items-center gap-2.5 text-sm">
-                <input type="checkbox" checked={task.status === "done"} onChange={() => toggleTask.mutate(task)} />
+                <input type="checkbox" disabled={anyDirty} checked={task.status === "done"} onChange={() => toggleTask.mutate(task)} />
                 <span className={task.status === "done" ? "text-muted line-through" : ""}>{task.title}</span>
                 {task.status === "doing" && <span className={chip}>Doing</span>}
                 {task.due_date && <span className="font-mono text-xs text-muted">due {task.due_date}</span>}
