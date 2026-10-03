@@ -84,10 +84,12 @@ export function SettingsPage() {
               {syncNow.isPending ? "Syncing…" : "Sync now"}
             </button>
           </div>
+          {syncNow.error && <p className="text-sm text-[#8B1A1A]">{(syncNow.error as Error).message}</p>}
         </section>
         <section className={card}>
           <h2 className="text-base font-bold">My groups</h2>
           <p className="text-sm text-muted">Zeus sends every parallel group. Pick yours; classes without a group are always shown.</p>
+          {pick.error && <p className="text-sm text-[#8B1A1A]">{(pick.error as Error).message}</p>}
           {sections.data?.length === 0 && <p className="text-sm">No grouped classes yet. Sync first.</p>}
           {sections.data?.map((choice) => (
             <label key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">
