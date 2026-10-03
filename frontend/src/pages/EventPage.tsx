@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
@@ -18,6 +18,35 @@ interface Draft {
   important: boolean;
 }
 
+const draftKey = (eventId: string | undefined, tab: NoteTab) => `timetable:draft:${eventId}:${tab}`;
+
+function loadDrafts(eventId: string | undefined): Partial<Record<NoteTab, Draft>> {
+  const out: Partial<Record<NoteTab, Draft>> = {};
+  for (const t of TABS) {
+    try {
+      const raw = localStorage.getItem(draftKey(eventId, t.id));
+      if (!raw) continue;
+      const v = JSON.parse(raw) as Partial<Draft>;
+      if (typeof v.body === "string" && typeof v.important === "boolean") out[t.id] = { body: v.body, important: v.important };
+    } catch {
+      /* storage unavailable or corrupt: ignore */
+    }
+  }
+  return out;
+}
+
+function storeDrafts(eventId: string | undefined, drafts: Partial<Record<NoteTab, Draft>>) {
+  for (const t of TABS) {
+    try {
+      const d = drafts[t.id];
+      if (d) localStorage.setItem(draftKey(eventId, t.id), JSON.stringify(d));
+      else localStorage.removeItem(draftKey(eventId, t.id));
+    } catch {
+      /* storage unavailable: drafts stay in memory only */
+    }
+  }
+}
+
 export function EventPage() {
   const { id } = useParams();
   return <EventPageInner key={id} />;
@@ -28,7 +57,8 @@ function EventPageInner() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<NoteTab>("after");
-  const [drafts, setDrafts] = useState<Partial<Record<NoteTab, Draft>>>({});
+  const [drafts, setDrafts] = useState<Partial<Record<NoteTab, Draft>>>(() => loadDrafts(id));
+  useEffect(() => storeDrafts(id, drafts), [id, drafts]);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const detail = useQuery({ queryKey: ["event", id], queryFn: () => apiFetch<EventDetail>(`/api/events/${id}`) });
@@ -77,7 +107,16 @@ function EventPageInner() {
   const { event, tasks, notes } = detail.data;
   const saved = notes[tab];
   const current: Draft = drafts[tab] ?? { body: saved.body, important: saved.important };
-  const setCurrent = (patch: Partial<Draft>) => setDrafts((d) => ({ ...d, [tab]: { ...current, ...patch } }));
+  const setCurrent = (patch: Partial<Draft>) => {
+    const next = { ...current, ...patch };
+    const reverted = next.body === saved.body && next.important === saved.important;
+    setDrafts((d) => {
+      const out = { ...d };
+      if (reverted) delete out[tab];
+      else out[tab] = next;
+      return out;
+    });
+  };
   const dirty = current.body !== saved.body || current.important !== saved.important;
   const anyDirty = TABS.some((t) => {
     const d = drafts[t.id];
@@ -137,6 +176,7 @@ function EventPageInner() {
           value={current.body}
           onChange={(e) => setCurrent({ body: e.target.value })}
           rows={10}
+          maxLength={20000}
           className="w-full rounded-xl border border-line p-4 font-sans text-[15px] leading-relaxed"
           placeholder="What was covered? Homework? Write [ ] at the start of a line to make it a task."
         />
@@ -184,7 +224,13 @@ function EventPageInner() {
               onClick={() => (confirmDelete ? remove.mutate() : setConfirmDelete(true))}
               className="h-10 rounded-xl border border-[#F3C4C4] px-4 text-sm font-semibold text-[#8B1A1A]"
             >
-              {confirmDelete ? "Click again to delete" : "Delete event"}
+              {event.note_count > 0
+                ? confirmDelete
+                  ? "Click again to delete event and notes"
+                  : "Delete event and its notes"
+                : confirmDelete
+                  ? "Click again to delete"
+                  : "Delete event"}
             </button>
             {remove.error && <p className="text-sm text-[#8B1A1A]">{(remove.error as Error).message}</p>}
           </div>

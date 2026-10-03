@@ -44,7 +44,10 @@ function renderPage() {
 }
 
 describe("EventPage", () => {
-  beforeEach(() => apiFetch.mockReset());
+  beforeEach(() => {
+    apiFetch.mockReset();
+    localStorage.clear();
+  });
 
   it("shows the class, its notes per tab and the next class", async () => {
     apiFetch.mockResolvedValue(detail());
@@ -83,9 +86,9 @@ describe("EventPage", () => {
       init?.method === "DELETE" ? { deleted: true } : detail({ source: "custom", kind: "work", subject_name: null, subject_id: null, title: "Work shift" }),
     );
     renderPage();
-    await userEvent.click(await screen.findByRole("button", { name: "Delete event" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete event and its notes" }));
     expect(apiFetch).not.toHaveBeenCalledWith("/api/events/7", { method: "DELETE" });
-    await userEvent.click(screen.getByRole("button", { name: "Click again to delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Click again to delete event and notes" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/events/7", { method: "DELETE" });
     expect(await screen.findByText("Calendar home")).toBeInTheDocument();
   });
@@ -105,7 +108,7 @@ describe("EventPage", () => {
     expect(box8).toHaveAccessibleName("After class note");
     expect(screen.getByRole("tab", { name: "After class" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("button", { name: "Save note" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete event" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete event and its notes" })).toBeInTheDocument();
   });
 
   it("blocks ticking tasks while a note has unsaved changes", async () => {
@@ -120,5 +123,71 @@ describe("EventPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save note" }));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: "Redo ex 3" })).toBeEnabled());
     expect(screen.queryByText("Save your note first to tick tasks.")).not.toBeInTheDocument();
+  });
+
+  it("drops a reverted draft so a tick is allowed and the refetched body shows", async () => {
+    let body = "[ ] Redo ex 3";
+    apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        body = "[x] Redo ex 3";
+        return {};
+      }
+      const d = detail();
+      d.notes.after.body = body;
+      return d;
+    });
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "After class note" });
+    fireEvent.change(box, { target: { value: "[ ] Redo ex 3x" } });
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    fireEvent.change(box, { target: { value: "[ ] Redo ex 3" } });
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    const task = screen.getByRole("checkbox", { name: "Redo ex 3" });
+    expect(task).toBeEnabled();
+    await userEvent.click(task);
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "After class note" })).toHaveValue("[x] Redo ex 3"));
+  });
+
+  it("keeps text typed while a save is pending", async () => {
+    let resolvePut: (v: EventDetail) => void = () => {};
+    apiFetch.mockImplementation((path: string, init?: RequestInit) =>
+      init?.method === "PUT" ? new Promise<EventDetail>((r) => { resolvePut = r; }) : Promise.resolve(detail()),
+    );
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "After class note" });
+    fireEvent.change(box, { target: { value: "first" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+    fireEvent.change(box, { target: { value: "first and more" } });
+    const saved = detail();
+    saved.notes.after.body = "first";
+    resolvePut(saved);
+    await waitFor(() => expect(localStorage.getItem("timetable:draft:7:after")).toContain("first and more"));
+    expect(screen.getByRole("textbox", { name: "After class note" })).toHaveValue("first and more");
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("restores an unsaved draft after unmount and remount", async () => {
+    apiFetch.mockResolvedValue(detail());
+    const first = renderPage();
+    fireEvent.change(await screen.findByRole("textbox", { name: "After class note" }), { target: { value: "half-written" } });
+    first.unmount();
+    renderPage();
+    expect(await screen.findByDisplayValue("half-written")).toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  });
+
+  it("removes the stored draft after a successful save", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    fireEvent.change(await screen.findByRole("textbox", { name: "After class note" }), { target: { value: "to save" } });
+    expect(localStorage.getItem("timetable:draft:7:after")).not.toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(localStorage.getItem("timetable:draft:7:after")).toBeNull());
+  });
+
+  it("limits the note length", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    expect(await screen.findByRole("textbox", { name: "After class note" })).toHaveAttribute("maxlength", "20000");
   });
 });
