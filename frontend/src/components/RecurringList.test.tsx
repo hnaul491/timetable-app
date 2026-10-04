@@ -43,3 +43,43 @@ describe("RecurringList", () => {
     expect(await screen.findByText("Repeating event deleted")).toBeInTheDocument();
   });
 });
+
+describe("RecurringList edit", () => {
+  it("edits a rule in a dialog prefilled from the list and saves with PUT", async () => {
+    apiFetch.mockReset();
+    apiFetch.mockImplementation(async (_p: string, init?: RequestInit) => (init?.method === "PUT" ? { ...RULE } : [RULE]));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ToastProvider>
+          <ConfirmProvider>
+            <RecurringList />
+          </ConfirmProvider>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Edit French (external)" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByLabelText("Title")).toHaveValue("French (external)");
+    expect(within(dialog).getByLabelText("Type")).toHaveValue("french_ext");
+    expect(within(dialog).getByLabelText("Start")).toHaveValue("19:30");
+    expect(within(dialog).getByLabelText("End")).toHaveValue("21:00");
+    expect(within(dialog).getByLabelText("From")).toHaveValue("2026-10-19");
+    expect(within(dialog).getByLabelText("Until")).toHaveValue("2026-12-17");
+    expect(within(dialog).getByLabelText("Place")).toHaveValue("Alliance");
+    expect(within(dialog).getByRole("checkbox", { name: "Mon" })).toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: "Tue" })).not.toBeChecked();
+    expect(within(dialog).getByText("Changes apply to future occurrences without notes.")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Tue" }));
+    await userEvent.clear(within(dialog).getByLabelText("Place"));
+    await userEvent.type(within(dialog).getByLabelText("Place"), "Online");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save event" }));
+    const put = apiFetch.mock.calls.find((c) => c[0] === "/api/recurring/5" && c[1]?.method === "PUT");
+    expect(JSON.parse(put![1].body)).toEqual({
+      title: "French (external)", kind: "french_ext", weekdays: [0, 1, 3], start_time: "19:30", end_time: "21:00",
+      from_date: "2026-10-19", until_date: "2026-12-17", location: "Online",
+    });
+    expect(await screen.findByText("Repeating event updated")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});

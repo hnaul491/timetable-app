@@ -46,6 +46,17 @@ describe("WeekGrid", () => {
     expect(screen.queryAllByRole("group")).toHaveLength(0);
   });
 
+  it("shows a multi-day holiday on every day it covers, end exclusive at midnight", () => {
+    // Sat 24 Oct 00:00 Paris (22:00Z) to Tue 27 Oct 00:00 Paris (23:00Z): covers 24, 25, 26.
+    const holiday = event({ id: 9, title: "Toussaint", kind: "holiday", subject_id: null, section: null, start: "2026-10-23T22:00:00Z", end: "2026-10-26T23:00:00Z" });
+    const { unmount } = render(<WeekGrid days={WEEK} events={[holiday]} />);
+    expect(screen.getAllByText("Toussaint")).toHaveLength(2);
+    unmount();
+    const nextWeek = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"];
+    render(<WeekGrid days={nextWeek} events={[holiday]} />);
+    expect(screen.getAllByText("Toussaint")).toHaveLength(1);
+  });
+
   it("extends the grid for early classes", () => {
     render(<WeekGrid days={WEEK} events={[event({ start: "2026-10-26T07:00:00Z", end: "2026-10-26T09:00:00Z" })]} />);
     expect(screen.queryByText("07:00")).not.toBeInTheDocument();

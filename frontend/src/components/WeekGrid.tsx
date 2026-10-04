@@ -1,7 +1,7 @@
 import { useMemo, type CSSProperties } from "react";
 import { useLocale, useT } from "../i18n";
 import { layoutDay, type Span } from "../lib/layout";
-import { dayLabel, formatTime, parisParts, todayParis } from "../lib/time";
+import { addDays, dayLabel, formatTime, parisParts, todayParis } from "../lib/time";
 import type { ApiEvent } from "../types";
 
 interface Props {
@@ -36,7 +36,14 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect, onCreateAt }
     for (const ev of events) {
       const start = parisParts(ev.start);
       if (ev.kind === "holiday") {
-        holidays.set(start.date, [...(holidays.get(start.date) ?? []), ev.title]);
+        const end = parisParts(ev.end);
+        // End is exclusive: an end at exactly midnight does not cover that day.
+        const last = end.date > start.date && end.minutes === 0 ? addDays(end.date, -1) : end.date;
+        let date = start.date;
+        for (let guard = 0; date <= last && guard < 400; guard++) {
+          holidays.set(date, [...(holidays.get(date) ?? []), ev.title]);
+          date = addDays(date, 1);
+        }
         continue;
       }
       const end = parisParts(ev.end);

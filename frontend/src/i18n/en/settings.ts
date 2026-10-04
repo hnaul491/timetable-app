@@ -35,6 +35,7 @@ export const settings = {
     help: 'Add new ones with "Add event" on the calendar. Deleting keeps any occurrence that has a note.',
     none: "None yet.",
     occurrences: "{count} events",
+    editAria: "Edit {title}",
     deleteAria: "Delete {title}",
     deleteTitle: "Delete “{title}”?",
     deleteBody: "Occurrences that have a note are kept.",
