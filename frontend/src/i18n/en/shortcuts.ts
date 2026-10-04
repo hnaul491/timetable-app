@@ -1,1 +1,21 @@
-export const shortcuts = {};
+export const shortcuts = {
+  title: "Keyboard shortcuts",
+  newEvent: "New event",
+  previous: "Previous week or day",
+  next: "Next week or day",
+  today: "Go to today",
+  weekView: "Week view",
+  dayView: "Day view",
+  fullScreen: "Full-screen calendar",
+  exitFullScreen: "Exit full screen",
+  toggleSidebar: "Collapse or expand the sidebar",
+  goCalendar: "Go to Calendar",
+  goBoard: "Go to Board",
+  goSubjects: "Go to Subjects",
+  goReview: "Go to Review",
+  goSettings: "Go to Settings",
+  save: "Save",
+  delete: "Delete",
+  help: "Show shortcuts",
+  then: "then",
+};

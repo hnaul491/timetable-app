@@ -7,4 +7,6 @@ export const nav = {
   settings: "Settings",
   semester: "Semester",
   selectSemester: "Select semester",
+  collapse: "Collapse sidebar",
+  expand: "Expand sidebar",
 };

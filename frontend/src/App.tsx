@@ -8,7 +8,9 @@ import { ConfirmProvider } from "./components/ui/Confirm";
 import { ToastProvider } from "./components/ui/Toast";
 import { TopProgress } from "./components/ui/TopProgress";
 import { ApiError } from "./lib/api";
+import { ChromeProvider } from "./lib/chrome";
 import { initialLanguage } from "./lib/language";
+import { ShortcutProvider } from "./lib/shortcuts";
 import { BoardPage } from "./pages/BoardPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
@@ -36,20 +38,24 @@ export default function App() {
             <ToastProvider>
               <ConfirmProvider>
                 <TopProgress />
-                <BrowserRouter>
-                  <Routes>
-                    <Route element={<Layout />}>
-                      <Route index element={<CalendarPage />} />
-                      <Route path="board" element={<BoardPage />} />
-                      <Route path="settings" element={<SettingsPage />} />
-                      <Route path="review" element={<ReviewPage />} />
-                      <Route path="subjects" element={<SubjectsPage />} />
-                      <Route path="subjects/:id" element={<SubjectPage />} />
-                      <Route path="events/new" element={<NewEventPage />} />
-                      <Route path="events/:id" element={<EventPage />} />
-                    </Route>
-                  </Routes>
-                </BrowserRouter>
+                <ShortcutProvider>
+                  <ChromeProvider>
+                    <BrowserRouter>
+                      <Routes>
+                        <Route element={<Layout />}>
+                          <Route index element={<CalendarPage />} />
+                          <Route path="board" element={<BoardPage />} />
+                          <Route path="settings" element={<SettingsPage />} />
+                          <Route path="review" element={<ReviewPage />} />
+                          <Route path="subjects" element={<SubjectsPage />} />
+                          <Route path="subjects/:id" element={<SubjectPage />} />
+                          <Route path="events/new" element={<NewEventPage />} />
+                          <Route path="events/:id" element={<EventPage />} />
+                        </Route>
+                      </Routes>
+                    </BrowserRouter>
+                  </ChromeProvider>
+                </ShortcutProvider>
               </ConfirmProvider>
             </ToastProvider>
           </LanguageRoot>

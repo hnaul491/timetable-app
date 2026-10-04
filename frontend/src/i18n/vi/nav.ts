@@ -9,4 +9,6 @@ export const nav: Messages["nav"] = {
   settings: "Cài đặt",
   semester: "Học kỳ",
   selectSemester: "Chọn học kỳ",
+  collapse: "Thu gọn thanh bên",
+  expand: "Mở rộng thanh bên",
 };
