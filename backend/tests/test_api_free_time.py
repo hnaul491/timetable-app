@@ -1,11 +1,22 @@
 from datetime import date, datetime, time
 
 from app.ai.tools import execute_tool
-from app.models import Event, MySection, Subject
+import pytest
+
+from app.models import Event, MySection, Semester, Subject
 from app.services.free_time import BusyItem, FreeTimeParams, compute_free_time
 from tests.conftest import AUTH, NOW
 
 BASE = "from=06:00&to=08:00&start=2026-10-05&end=2026-10-09"  # Mon 5 .. Fri 9 Oct 2026 (CEST, UTC+2)
+
+
+@pytest.fixture
+def semester(session) -> Semester:
+    sem = Semester(code="S1", name="SE S1 2026", zeus_group_id=802, start_date=date(2026, 1, 1),
+                   end_date=date(2027, 1, 31), is_active=True)
+    session.add(sem)
+    session.commit()
+    return sem
 
 
 def add(session, semester, uid, start, end, subject=None, section=None, kind="class", status="normal", source="zeus"):
@@ -182,8 +193,53 @@ def test_validation_errors(client):
     assert get(client, BASE + "&buffer=240&min_free=1440&weekdays=6,0").status_code == 200
 
 
-def test_no_active_semester_is_all_free(client):
-    assert get(client).json()["free_days"] == 5
+def test_no_active_semester_is_unknown_not_free(client):
+    body = get(client).json()
+    assert (body["semester"], body["uncovered_days"], body["free_days"], body["counted_days"]) == (None, 5, 0, 5)
+    assert [d["status"] for d in body["days"]] == ["unknown"] * 5
+    assert all(d["counts"] is False and d["blockers"] == [] for d in body["days"])
+    assert body["missing_sections"] == []
+    assert body["by_weekday"][0] == {"weekday": 0, "free": 0, "total": 0}
+
+
+def test_days_outside_semester_are_unknown(client, session, semester):
+    semester.start_date, semester.end_date = date(2026, 10, 7), date(2026, 10, 8)
+    session.commit()
+    body = get(client).json()
+    assert [d["status"] for d in body["days"]] == ["unknown", "unknown", "free", "free", "unknown"]
+    assert (body["uncovered_days"], body["free_days"], body["counted_days"]) == (3, 2, 5)
+    assert body["semester"] == {"id": semester.id, "name": "SE S1 2026", "start": "2026-10-07", "end": "2026-10-08"}
+    assert get(client, BASE + "&weekdays=0").json()["uncovered_days"] == 1  # off days are not uncovered
+
+
+def test_semester_without_dates_covers_everything(client, session, semester):
+    semester.start_date = semester.end_date = None
+    session.commit()
+    body = get(client).json()
+    assert (body["uncovered_days"], body["free_days"]) == (0, 5)
+    assert body["semester"]["start"] is None and body["semester"]["end"] is None
+
+
+def test_missing_sections_are_reported(client, session, semester):
+    french = Subject(semester_id=semester.id, display_name="French", aliases=[])
+    session.add(french)
+    session.flush()
+    add(session, semester, "fr1", datetime(2026, 10, 6, 4, 0), datetime(2026, 10, 6, 5, 0), french, "GR1")
+    add(session, semester, "fr2", datetime(2026, 10, 7, 4, 0), datetime(2026, 10, 7, 5, 0), french, "GR2")
+    body = get(client).json()
+    assert body["missing_sections"] == [{"subject_id": french.id, "name": "French"}]
+    assert day(body, "2026-10-06")["status"] == "free"
+    assert "note" in execute_tool(session, "count_free_days",
+                                  {"from": "06:00", "to": "08:00", "start": "2026-10-05", "end": "2026-10-09"}, NOW)
+
+
+def test_class_after_period_end_blocks_last_day_via_buffer(client, session, semester):
+    # 01:00 local on Sat 10 Oct is 23:00Z on the 9th; 180 min of travel makes 22:00-23:00 on Friday busy
+    add(session, semester, "night", datetime(2026, 10, 9, 23, 0), datetime(2026, 10, 10, 0, 0))
+    query = "from=20:00&to=23:00&start=2026-10-05&end=2026-10-09&buffer=180"
+    friday = day(get(client, query).json(), "2026-10-09")
+    assert (friday["status"], friday["free_minutes"], friday["longest_free"]) == ("partial", 120, 120)
+    assert day(get(client, query.replace("buffer=180", "buffer=120")).json(), "2026-10-09")["status"] == "free"
 
 
 def test_pure_function():
@@ -202,6 +258,7 @@ def test_ai_tool_count_free_days(session, semester):
     assert (out["free_days"], out["counted_days"]) == (4, 5)
     assert out["blocked_days"] == [{"date": "2026-10-06", "status": "partial", "blockers": ["Databases 07:30-09:00"]}]
     assert len(out["by_weekday"]) == 7
+    assert out["uncovered_days"] == 0 and "note" not in out
     assert execute_tool(session, "count_free_days", {**args, "min_free": 60}, NOW)["blocked_days"] == []
     assert execute_tool(session, "count_free_days", {**args, "weekdays": [1], "buffer": 25.0}, NOW)["counted_days"] == 1
     for broken in ({**args, "from": "9:99"}, {**args, "to": "05:00"}, {**args, "weekdays": [9]}, {**args, "buffer": 500},

@@ -280,8 +280,21 @@ def _count_free_days(session: Session, args: dict) -> dict:
     blocked = [{"date": d["date"], "status": d["status"],
                 "blockers": [f"{b['title']} {_local_hm(b['start'])}-{_local_hm(b['end'])}" for b in d["blockers"]]}
                for d in result["days"] if d["status"] in ("partial", "busy") and not d["counts"]]
-    return {"free_days": result["free_days"], "counted_days": result["counted_days"],
-            "by_weekday": result["by_weekday"], "blocked_days": blocked[:10]}
+    out = {"free_days": result["free_days"], "counted_days": result["counted_days"],
+           "uncovered_days": result["uncovered_days"],
+           "by_weekday": result["by_weekday"], "blocked_days": blocked[:10]}
+    notes = []
+    if result["uncovered_days"]:
+        notes.append(f"{result['uncovered_days']} of the counted days are outside the active semester "
+                     "(or there is no active semester), so they have no timetable data and are NOT counted as free. "
+                     "Tell the user.")
+    if result["missing_sections"]:
+        names = ", ".join(m["name"] for m in result["missing_sections"][:10])
+        notes.append(f"Classes of these subjects are ignored because the student has not chosen a section: {names}. "
+                     "The result may be too optimistic. Tell the user to choose sections in Settings.")
+    if notes:
+        out["note"] = " ".join(notes)
+    return out
 
 
 # ---- propose tools --------------------------------------------------------------------------------------

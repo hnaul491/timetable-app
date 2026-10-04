@@ -133,9 +133,10 @@ def invisible_event_ids(session: Session, semester_id: int) -> set[int]:
             if visibility(e, subjects.get(e.subject_id) if e.subject_id is not None else None, chosen) != "show"}
 
 
-def list_visible_events(
+def scan_visible_events(
     session: Session, semester_id: int, start: datetime, end: datetime, with_counts: bool = True
-) -> tuple[list[VisibleEvent], list[str]]:
+) -> tuple[list[VisibleEvent], dict[str, int | None]]:
+    """Visible events plus the classes hidden because no section is chosen: name -> subject id (None: no subject)."""
     subjects = _subjects(session, semester_id)
     chosen = _chosen(session, list(subjects))
     rows = session.scalars(
@@ -144,15 +145,22 @@ def list_visible_events(
         .order_by(Event.start_at, Event.id)
     )
     visible: list[VisibleEvent] = []
-    missing: set[str] = set()
+    missing: dict[str, int | None] = {}
     for event in rows:
         subject = subjects.get(event.subject_id) if event.subject_id is not None else None
         verdict = visibility(event, subject, chosen)
         if verdict == "missing":
-            missing.add(subject.display_name if subject else event.title_raw)
+            missing[subject.display_name if subject else event.title_raw] = subject.id if subject else None
         elif verdict == "show":
             visible.append(_to_visible(event, subject))
-    return (_with_counts(session, visible) if with_counts else visible), sorted(missing)
+    return (_with_counts(session, visible) if with_counts else visible), missing
+
+
+def list_visible_events(
+    session: Session, semester_id: int, start: datetime, end: datetime, with_counts: bool = True
+) -> tuple[list[VisibleEvent], list[str]]:
+    visible, missing = scan_visible_events(session, semester_id, start, end, with_counts)
+    return visible, sorted(missing)
 
 
 def section_choices(session: Session, semester_id: int) -> list[SectionChoice]:

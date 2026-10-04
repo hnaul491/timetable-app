@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.ai.provider import AIRateLimited, AIUnavailable, FunctionCall, LLMReply
+from app.ai import tools
 from app.ai.tools import PROPOSE_TOOLS, READ_TOOLS, execute_tool
 from app.deps import get_llm
 from app.models import ChatMessage, Event, Note, PendingAction, Subject, Task
@@ -127,9 +128,12 @@ def test_bad_arguments_and_unknown_tool_are_error_results(session, semester):
 
 def test_model_cannot_write(session, semester):
     seed(session, semester)
-    names = {t.name for t in READ_TOOLS + PROPOSE_TOOLS}
-    assert all(n.startswith(("get_", "find_", "count_", "propose_")) for n in names)
+    assert all(t.name.startswith(("get_", "find_", "count_")) for t in READ_TOOLS)
+    assert all(t.name.startswith("propose_") for t in PROPOSE_TOOLS)
+    assert set(tools._READ) == {t.name for t in READ_TOOLS}
     before = counts(session)
+    free = {"from": "06:00", "to": "08:00", "start": "2026-10-21", "end": "2026-10-23"}
+    assert "free_days" in execute_tool(session, "count_free_days", free, NOW)
     for name, args in [("propose_task", {"title": "Revise joins", "due_date": "2026-10-22"}),
                        ("propose_event", {"title": "Gym", "date": "2026-10-21", "start": "18:00", "end": "19:00",
                                           "kind": "other"}),

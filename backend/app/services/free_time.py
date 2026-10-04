@@ -4,11 +4,12 @@
 `free_time_for_session` loads the items the calendar shows and calls it.
 """
 from dataclasses import dataclass
+from collections.abc import Callable
 from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.services.events_query import active_semester, list_visible_events
+from app.services.events_query import active_semester, scan_visible_events
 from app.services.recurrence import PARIS
 
 MAX_DAYS = 200
@@ -50,10 +51,13 @@ def blocks(item: BusyItem) -> bool:
     return item.status != "cancelled" and item.kind != "holiday"
 
 
-def _day_result(day: date, params: FreeTimeParams, items: list[BusyItem]) -> dict:
+def _day_result(day: date, params: FreeTimeParams, items: list[BusyItem], covered: Callable[[date], bool]) -> dict:
     weekday = day.weekday()
     if weekday not in params.weekdays:
         return {"date": day.isoformat(), "weekday": weekday, "status": "off", "counts": False,
+                "free_minutes": 0, "longest_free": 0, "blockers": []}
+    if not covered(day):  # no timetable data for this day: not free, not busy
+        return {"date": day.isoformat(), "weekday": weekday, "status": "unknown", "counts": False,
                 "free_minutes": 0, "longest_free": 0, "blockers": []}
     w_start, w_end = _utc(day, params.window_from), _utc(day, params.window_to)
     buffer = timedelta(minutes=params.buffer)
@@ -78,18 +82,21 @@ def _day_result(day: date, params: FreeTimeParams, items: list[BusyItem]) -> dic
                           "end": _iso(i.end_at), "kind": i.kind} for i in hits]}
 
 
-def compute_free_time(items: list[BusyItem], params: FreeTimeParams) -> dict:
+def compute_free_time(items: list[BusyItem], params: FreeTimeParams,
+                      covered: Callable[[date], bool] = lambda day: True) -> dict:
     days = []
     day = params.start
     while day <= params.end:
-        days.append(_day_result(day, params, items))
+        days.append(_day_result(day, params, items, covered))
         day += timedelta(days=1)
+    known = ("free", "partial", "busy")
     by_weekday = [{"weekday": w, "free": sum(1 for d in days if d["weekday"] == w and d["counts"]),
-                   "total": sum(1 for d in days if d["weekday"] == w and d["status"] != "off")} for w in range(7)]
+                   "total": sum(1 for d in days if d["weekday"] == w and d["status"] in known)} for w in range(7)]
     return {"window": {"from": params.window_from.strftime("%H:%M"), "to": params.window_to.strftime("%H:%M")},
             "start": params.start.isoformat(), "end": params.end.isoformat(),
             "buffer": params.buffer, "min_free": params.min_free,
             "counted_days": sum(1 for d in days if d["status"] != "off"),
+            "uncovered_days": sum(1 for d in days if d["status"] == "unknown"),
             "free_days": sum(1 for d in days if d["counts"]),
             "by_weekday": by_weekday, "days": days}
 
@@ -97,9 +104,24 @@ def compute_free_time(items: list[BusyItem], params: FreeTimeParams) -> dict:
 def free_time_for_session(session: Session, params: FreeTimeParams) -> dict:
     semester = active_semester(session)
     items: list[BusyItem] = []
+    missing: list[dict] = []
+    semester_info = None
+
+    def covered(day: date) -> bool:
+        if semester is None:
+            return False
+        return ((semester.start_date is None or day >= semester.start_date)
+                and (semester.end_date is None or day <= semester.end_date))
+
     if semester is not None:
-        lo = _utc(params.start, time(0)) - timedelta(minutes=params.buffer)
-        hi = _utc(params.end + timedelta(days=1), time(0))
-        visible, _ = list_visible_events(session, semester.id, lo, hi, with_counts=False)
+        semester_info = {"id": semester.id, "name": semester.name,
+                         "start": semester.start_date.isoformat() if semester.start_date else None,
+                         "end": semester.end_date.isoformat() if semester.end_date else None}
+        # busy time only reaches back before an event's start, so later events matter and earlier ones need no buffer
+        lo = _utc(params.start, time(0))
+        hi = _utc(params.end + timedelta(days=1), time(0)) + timedelta(minutes=params.buffer)
+        visible, missing_names = scan_visible_events(session, semester.id, lo, hi, with_counts=False)
         items = [BusyItem(e.id, e.title, e.start_at, e.end_at, e.kind, e.status) for e in visible]
-    return compute_free_time(items, params)
+        missing = [{"subject_id": sid, "name": name} for name, sid in sorted(missing_names.items())]
+    result = compute_free_time(items, params, covered)
+    return {**result, "semester": semester_info, "missing_sections": missing}
