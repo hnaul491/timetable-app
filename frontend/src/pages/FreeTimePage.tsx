@@ -7,15 +7,14 @@ import { useLocale, useT, type MessageKey } from "../i18n";
 import { INTL_LOCALE } from "../i18n/locale";
 import { apiFetch } from "../lib/api";
 import {
-  BUFFER_PRESETS, buildQuery, computeRange, loadForm, saveForm, validate,
-  type FreeDay, type FreeTimeForm, type FreeTimeResult, type Period, type Range,
+  BUFFER_PRESETS, PERIOD_PRESETS, buildQuery, computeRange, isStepping, loadForm, samePeriod, saveForm, validate,
+  type FreeDay, type FreeTimeForm, type FreeTimeResult, type Period, type PeriodUnit, type Range,
 } from "../lib/freeTime";
 import { useShortcut } from "../lib/shortcuts";
 import { formatTime, todayParis } from "../lib/time";
 import type { Semester } from "../types";
 
 const DEBOUNCE_MS = 300;
-const PERIODS: Period[] = ["week", "nextWeek", "month", "nextMonth", "semester", "custom"];
 const MONDAY = "2024-01-01"; // a Monday, used only to get localized weekday names
 
 const fieldClass = "h-9 rounded-[9px] border border-line bg-surface px-2.5 text-[13px] font-semibold text-ink tabular-nums";
@@ -39,6 +38,23 @@ function weekdayName(index: number, locale: "en" | "vi", style: "short" | "long"
   return date.toLocaleDateString(INTL_LOCALE[locale], { weekday: style, timeZone: "UTC" });
 }
 
+/** Short, locale-aware label of a day / week / month range ("Thu 15 Oct", "19–25 Oct 2026", "November 2026"). */
+function rangeLabel(unit: PeriodUnit, range: Range, intl: string): string {
+  const fmt = (date: string, o: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00:00Z`).toLocaleDateString(intl, { ...o, timeZone: "UTC" });
+  if (unit === "day") return fmt(range.start, { weekday: "short", day: "numeric", month: "short" });
+  if (unit === "month") return fmt(range.start, { month: "long", year: "numeric" });
+  const full = { day: "numeric", month: "short", year: "numeric" } as const;
+  if (range.start.slice(0, 4) !== range.end.slice(0, 4)) return `${fmt(range.start, full)} – ${fmt(range.end, full)}`;
+  const noYear = { day: "numeric", month: "short" } as const;
+  const year = range.start.slice(0, 4);
+  if (range.start.slice(5, 7) === range.end.slice(5, 7)) return `${Number(range.start.slice(8))}–${fmt(range.end, noYear)} ${year}`;
+  return `${fmt(range.start, noYear)} – ${fmt(range.end, noYear)} ${year}`;
+}
+
+const STEP_KEY = {
+  day: ["prevDay", "nextDay"], week: ["prevWeek", "nextWeek"], month: ["prevMonth", "nextMonth"],
+} as const;
+
 function Field({ label, error, children }: { label: string; error?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
@@ -59,21 +75,28 @@ export function FreeTimePage() {
   const [form, setForm] = useState<FreeTimeForm>(() => loadForm(today));
   const [focused, setFocused] = useState<string | null>(null);
   const set = (patch: Partial<FreeTimeForm>) => setForm((f) => ({ ...f, ...patch }));
+  const setPeriod = (period: Period) => set({ period });
+  const step = (delta: number) =>
+    setForm((f) => (isStepping(f.period) ? { ...f, period: { ...f.period, offset: f.period.offset + delta } } : f));
   const customStart = useRef<HTMLInputElement>(null);
   const bufferInput = useRef<HTMLInputElement>(null);
   const focusStartNext = useRef(false);
   const toggleDay = (i: number) =>
     setForm((f) => ({ ...f, weekdays: f.weekdays.includes(i) ? f.weekdays.filter((d) => d !== i) : [...f.weekdays, i] }));
-  useShortcut("free-week", "w", () => set({ period: "week" }), { label: "shortcuts.freeWeek" });
-  useShortcut("free-month", "m", () => set({ period: "month" }), { label: "shortcuts.freeMonth" });
-  useShortcut("free-next-week", "Shift+w", () => set({ period: "nextWeek" }), { label: "shortcuts.freeNextWeek" });
-  useShortcut("free-next-month", "Shift+m", () => set({ period: "nextMonth" }), { label: "shortcuts.freeNextMonth" });
-  useShortcut("free-semester", "s", () => set({ period: "semester" }), { label: "shortcuts.freeSemester" });
+  useShortcut("free-today", "t", () => setPeriod({ unit: "day", offset: 0 }), { label: "shortcuts.freeToday" });
+  useShortcut("free-tomorrow", "Shift+t", () => setPeriod({ unit: "day", offset: 1 }), { label: "shortcuts.freeTomorrow" });
+  useShortcut("free-prev", "ArrowLeft", () => step(-1), { label: "shortcuts.freePrev" });
+  useShortcut("free-next", "ArrowRight", () => step(1), { label: "shortcuts.freeNext" });
+  useShortcut("free-week", "w", () => setPeriod({ unit: "week", offset: 0 }), { label: "shortcuts.freeWeek" });
+  useShortcut("free-month", "m", () => setPeriod({ unit: "month", offset: 0 }), { label: "shortcuts.freeMonth" });
+  useShortcut("free-next-week", "Shift+w", () => setPeriod({ unit: "week", offset: 1 }), { label: "shortcuts.freeNextWeek" });
+  useShortcut("free-next-month", "Shift+m", () => setPeriod({ unit: "month", offset: 1 }), { label: "shortcuts.freeNextMonth" });
+  useShortcut("free-semester", "s", () => setPeriod({ unit: "semester", offset: 0 }), { label: "shortcuts.freeSemester" });
   useShortcut("free-custom", "c", () => {
     if (customStart.current) customStart.current.focus();
     else {
       focusStartNext.current = true;
-      set({ period: "custom" });
+      setPeriod({ unit: "custom", offset: 0 });
     }
   }, { label: "shortcuts.freeCustom" });
   useShortcut("free-buffer", "b", () => bufferInput.current?.focus(), { label: "shortcuts.freeBuffer" });
@@ -85,16 +108,18 @@ export function FreeTimePage() {
   useShortcut("free-day-6", "6", () => toggleDay(5), { label: "shortcuts.freeDay6" });
   useShortcut("free-day-7", "7", () => toggleDay(6), { label: "shortcuts.freeDay7" });
   useEffect(() => {
-    if (form.period === "custom" && focusStartNext.current) customStart.current?.focus();
+    if (form.period.unit === "custom" && focusStartNext.current) customStart.current?.focus();
     focusStartNext.current = false;
-  }, [form.period]);
+  }, [form.period.unit]);
 
   const semesters = useQuery({ queryKey: ["semesters"], queryFn: () => apiFetch<Semester[]>("/api/semesters") });
   const activeSemester = semesters.data?.find((s) => s.is_active);
   const semesterEnd = activeSemester?.end_date ?? null;
-  const semesterPending = form.period === "semester" && semesters.isPending;
+  const semesterPending = form.period.unit === "semester" && semesters.isPending;
 
   const range = computeRange(form, today, semesterEnd);
+  const stepping = isStepping(form.period);
+  const stepKeys = STEP_KEY[stepping ? (form.period.unit as keyof typeof STEP_KEY) : "day"];
   const errors = validate(form, range, activeSemester ? "semesterEnded" : "noSemester");
   const valid = Object.keys(errors).length === 0 && !semesterPending && range !== null;
   const queryString = valid ? buildQuery(form, range as Range) : null;
@@ -149,14 +174,42 @@ export function FreeTimePage() {
         <Field label={t("freeTime.to")}>
           <input type="time" value={form.to} onChange={(e) => set({ to: e.target.value })} className={fieldClass} />
         </Field>
-        <Field label={t("freeTime.period")} error={form.period === "custom" ? null : err("range")}>
-          <select value={form.period} onChange={(e) => set({ period: e.target.value as Period })} className={fieldClass}>
-            {PERIODS.map((p) => (
-              <option key={p} value={p}>{t(`freeTime.periods.${p}` as MessageKey)}</option>
-            ))}
-          </select>
-        </Field>
-        {form.period === "custom" && (
+        <div className={`${labelClass} min-w-0 max-w-full`} role="group" aria-label={t("freeTime.period")}>
+          {t("freeTime.period")}
+          <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
+              {PERIOD_PRESETS.map((p) => {
+                const on = samePeriod(form.period, p.period);
+                return (
+                  <button key={p.key} type="button" aria-pressed={on} onClick={() => setPeriod({ ...p.period })} className={`shrink-0 whitespace-nowrap ${chipClass(on)}`}>
+                    {t(`freeTime.periods.${p.key}` as MessageKey)}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button" disabled={!stepping} onClick={() => step(-1)}
+                aria-label={t(`freeTime.step.${stepKeys[0]}` as MessageKey)}
+                className={`w-9 text-base disabled:opacity-40 ${chipClass(false)}`}
+              >
+                ‹
+              </button>
+              <span aria-live="polite" data-testid="period-label" className="min-w-28 text-center text-[13px] font-semibold tabular-nums text-ink-2">
+                {stepping && range ? rangeLabel(form.period.unit, range, INTL_LOCALE[locale]) : ""}
+              </span>
+              <button
+                type="button" disabled={!stepping} onClick={() => step(1)}
+                aria-label={t(`freeTime.step.${stepKeys[1]}` as MessageKey)}
+                className={`w-9 text-base disabled:opacity-40 ${chipClass(false)}`}
+              >
+                ›
+              </button>
+            </div>
+          </div>
+          {form.period.unit === "custom" ? null : err("range")}
+        </div>
+        {form.period.unit === "custom" && (
           <>
             <Field label={t("freeTime.customStart")}>
               <input ref={customStart} type="date" value={form.customStart} onChange={(e) => set({ customStart: e.target.value })} className={fieldClass} />
@@ -255,10 +308,13 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
   const monthName = new Date(`${data.start}T12:00:00Z`).toLocaleDateString(intl, { month: "long", year: "numeric", timeZone: "UTC" });
 
   // The sentence describes the response; the form may already have moved on while a new answer loads.
-  const samePeriod = data.start === range.start && data.end === range.end;
+  const current = data.start === range.start && data.end === range.end;
+  const { unit, offset } = form.period;
+  const periodKey = !current ? "custom" : unit === "week" ? (offset === 0 ? "week" : offset === 1 ? "nextWeek" : "custom") : unit;
+  const dayName = `${new Date(`${data.start}T12:00:00Z`).toLocaleDateString(intl, { weekday: "long", timeZone: "UTC" })} ${longDate(data.start)}`;
   const summary =
     t("freeTime.summaryWindow", { from: data.window.from, to: data.window.to }) +
-    t(`freeTime.summaryPeriod.${samePeriod ? form.period : "custom"}` as MessageKey, { month: monthName, start: longDate(data.start), end: longDate(data.end) }) +
+    t(`freeTime.summaryPeriod.${periodKey}` as MessageKey, { month: monthName, date: dayName, start: longDate(data.start), end: longDate(data.end) }) +
     (data.buffer > 0 ? t("freeTime.summaryBuffer", { minutes: data.buffer }) : "") +
     (data.min_free ? t("freeTime.summaryMinFree", { minutes: data.min_free }) : "") +
     ".";

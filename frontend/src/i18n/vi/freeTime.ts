@@ -6,7 +6,8 @@ export const freeTime: Messages["freeTime"] = {
   from: "Từ",
   to: "Đến",
   period: "Khoảng thời gian",
-  periods: { week: "Tuần này", nextWeek: "Tuần sau", month: "Tháng này", nextMonth: "Tháng sau", semester: "Phần còn lại của học kỳ", custom: "Tùy chọn" },
+  periods: { today: "Hôm nay", tomorrow: "Ngày mai", week: "Tuần này", nextWeek: "Tuần sau", month: "Tháng này", nextMonth: "Tháng sau", semester: "Phần còn lại của học kỳ", custom: "Tùy chọn" },
+  step: { prevDay: "Ngày trước", nextDay: "Ngày sau", prevWeek: "Tuần trước", nextWeek: "Tuần sau", prevMonth: "Tháng trước", nextMonth: "Tháng sau" },
   customStart: "Ngày đầu",
   customEnd: "Ngày cuối",
   weekdays: "Các thứ trong tuần",
@@ -31,6 +32,7 @@ export const freeTime: Messages["freeTime"] = {
   daysOf: "trên {total} ngày",
   summaryWindow: "rảnh từ {from} đến {to}",
   summaryPeriod: {
+    day: " vào {date}",
     week: " trong tuần này",
     nextWeek: " trong tuần sau",
     month: " trong {month}",

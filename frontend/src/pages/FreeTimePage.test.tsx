@@ -60,6 +60,11 @@ function renderPage(locale: "en" | "vi" = "en", help = false, path = "/free-time
   );
 }
 
+/** The period chip (it has aria-pressed); the step buttons can share a name such as "Next week". */
+const chip = (name: string) => screen.getAllByRole("button", { name }).find((b) => b.hasAttribute("aria-pressed"))!;
+const stepButton = (name: string) => screen.getAllByRole("button", { name }).find((b) => !b.hasAttribute("aria-pressed"))!;
+const pressedChips = () => within(screen.getByRole("group", { name: "Period" })).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
+
 const freeCalls = () => apiFetch.mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/api/free-time"));
 const lastParams = () => new URLSearchParams(freeCalls().at(-1)!.split("?")[1]);
 
@@ -154,17 +159,17 @@ describe("FreeTimePage", () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByTestId("free-big");
-    await user.selectOptions(screen.getByLabelText("Period"), "week");
+    await user.click(chip("This week"));
     await waitFor(() => {
       const p = lastParams();
       expect(new Date(`${p.get("end")}T00:00:00Z`).getTime() - new Date(`${p.get("start")}T00:00:00Z`).getTime()).toBe(6 * 86_400_000);
     });
-    await user.selectOptions(screen.getByLabelText("Period"), "semester");
+    await user.click(chip("Rest of semester"));
     await waitFor(() => {
       expect(lastParams().get("end")).toBe(addDays(todayParis(), 60));
       expect(lastParams().get("start")).toBe(todayParis());
     });
-    await user.selectOptions(screen.getByLabelText("Period"), "custom");
+    await user.click(chip("Custom"));
     const first = screen.getByLabelText("First day");
     await user.clear(first);
     await user.type(first, "2026-11-02");
@@ -179,7 +184,7 @@ describe("FreeTimePage", () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByTestId("free-big");
-    await user.selectOptions(screen.getByLabelText("Period"), "custom");
+    await user.click(chip("Custom"));
     const first = screen.getByLabelText("First day");
     await user.clear(first);
     await user.type(first, "2026-01-01");
@@ -254,7 +259,7 @@ describe("FreeTimePage", () => {
     await screen.findByTestId("free-big");
     expect(screen.getByText(/free from 06:00 to 08:00 in October 2026/)).toBeInTheDocument();
     pending = true;
-    await user.selectOptions(screen.getByLabelText("Period"), "week");
+    await user.click(chip("This week"));
     // the form moved on, the old response is still on screen: the sentence keeps its own dates
     expect(screen.getByText(/free from 06:00 to 08:00 from 1 October 2026 to 31 October 2026/)).toBeInTheDocument();
   });
@@ -336,26 +341,24 @@ describe("FreeTimePage", () => {
       const user = userEvent.setup();
       renderPage();
       await screen.findByTestId("free-big");
-      const period = screen.getByRole("combobox", { name: "Period" });
       await user.keyboard("w");
-      expect(period).toHaveValue("week");
+      expect(pressedChips()).toEqual(["This week"]);
       await user.keyboard("s");
-      expect(period).toHaveValue("semester");
+      expect(pressedChips()).toEqual(["Rest of semester"]);
       await user.keyboard("m");
-      expect(period).toHaveValue("month");
+      expect(pressedChips()).toEqual(["This month"]);
     });
 
     it("Shift+W and Shift+M pick next week and next month", async () => {
       const user = userEvent.setup();
       renderPage();
       await screen.findByTestId("free-big");
-      const period = screen.getByRole("combobox", { name: "Period" });
       await user.keyboard("{Shift>}W{/Shift}");
-      expect(period).toHaveValue("nextWeek");
+      expect(pressedChips()).toEqual(["Next week"]);
       await user.keyboard("{Shift>}M{/Shift}");
-      expect(period).toHaveValue("nextMonth");
+      expect(pressedChips()).toEqual(["Next month"]);
       await user.keyboard("w");
-      expect(period).toHaveValue("week");
+      expect(pressedChips()).toEqual(["This week"]);
     });
 
     it("c switches to custom dates and focuses the first day, even from another period", async () => {
@@ -363,7 +366,7 @@ describe("FreeTimePage", () => {
       renderPage();
       await screen.findByTestId("free-big");
       await user.keyboard("c");
-      expect(screen.getByRole("combobox", { name: "Period" })).toHaveValue("custom");
+      expect(pressedChips()).toEqual(["Custom"]);
       const start = await screen.findByLabelText("First day");
       expect(start).toHaveFocus();
       (document.activeElement as HTMLElement).blur();
@@ -404,7 +407,7 @@ describe("FreeTimePage", () => {
       await user.type(buffer, "15");
       expect(buffer).toHaveValue(15);
       expect(screen.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("combobox", { name: "Period" })).toHaveValue("month");
+      expect(pressedChips()).toEqual(["This month"]);
     });
 
     it("do nothing on other pages", async () => {
@@ -437,7 +440,7 @@ describe("FreeTimePage", () => {
       renderPage("en", true);
       const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
       expect(within(dialog).getByRole("heading", { name: "Free time" })).toBeInTheDocument();
-      for (const label of ["This week", "This month", "Rest of semester", "Custom dates", "Travel buffer", "Toggle Monday", "Toggle Sunday"]) {
+      for (const label of ["Today", "Tomorrow", "Previous day, week or month", "Next day, week or month", "This week", "This month", "Rest of semester", "Custom dates", "Travel buffer", "Toggle Monday", "Toggle Sunday"]) {
         expect(within(dialog).getByText(label)).toBeInTheDocument();
       }
     });
@@ -448,6 +451,139 @@ describe("FreeTimePage", () => {
       expect(within(dialog).getByRole("heading", { name: "Thời gian rảnh" })).toBeInTheDocument();
       expect(within(dialog).getByText("Bật/tắt thứ Hai")).toBeInTheDocument();
       expect(within(dialog).getByText("Chọn ngày")).toBeInTheDocument();
+      expect(within(dialog).getByText("Hôm nay")).toBeInTheDocument();
+    });
+  });
+
+  describe("period chips and stepping", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-14T12:00:00Z") }); // a Wednesday
+      apiFetch.mockImplementation(async (path: string) => {
+        if (path.startsWith("/api/semesters")) return [{ id: 1, code: "S1", name: "S1", zeus_group_id: null, start_date: "2026-09-01", end_date: "2027-01-30", is_active: true }];
+        const q = new URLSearchParams(path.split("?")[1]);
+        return result({ start: q.get("start")!, end: q.get("end")!, days: [] });
+      });
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("shows all chips, with exactly the matching one pressed", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      const group = screen.getByRole("group", { name: "Period" });
+      expect(within(group).getAllByRole("button", { pressed: false }).concat(within(group).getAllByRole("button", { pressed: true })).map((b) => b.textContent))
+        .toEqual(expect.arrayContaining(["Today", "Tomorrow", "This week", "Next week", "This month", "Next month", "Rest of semester", "Custom"]));
+      expect(pressedChips()).toEqual(["This month"]);
+      await user.click(chip("Tomorrow"));
+      expect(pressedChips()).toEqual(["Tomorrow"]);
+      await waitFor(() => expect(lastParams().get("start")).toBe("2026-10-15"));
+      expect(lastParams().get("end")).toBe("2026-10-15");
+      await user.click(chip("Today"));
+      expect(pressedChips()).toEqual(["Today"]);
+      await user.click(chip("Next month"));
+      await waitFor(() => expect(lastParams().get("start")).toBe("2026-11-01"));
+      expect(lastParams().get("end")).toBe("2026-11-30");
+    });
+
+    it("steps with the arrow buttons and shows the range between them", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      expect(screen.getByTestId("period-label")).toHaveTextContent("October 2026");
+      await user.click(stepButton("Next month"));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("November 2026");
+      expect(pressedChips()).toEqual(["Next month"]);
+      await user.click(stepButton("Next month"));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("December 2026");
+      expect(pressedChips()).toEqual([]);
+      await user.click(stepButton("Previous month"));
+      await user.click(stepButton("Previous month"));
+      expect(pressedChips()).toEqual(["This month"]);
+
+      await user.click(chip("This week"));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("12–18 Oct 2026");
+      await user.click(stepButton("Next week"));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("19–25 Oct 2026");
+      expect(pressedChips()).toEqual(["Next week"]);
+      await user.click(stepButton("Next week"));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("26 Oct – 1 Nov 2026");
+      expect(pressedChips()).toEqual([]);
+      await waitFor(() => expect(lastParams().get("start")).toBe("2026-10-26"));
+      expect(lastParams().get("end")).toBe("2026-11-01");
+
+      await user.click(chip("Today"));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("Wed 14 Oct");
+      await user.click(screen.getByRole("button", { name: "Previous day" }));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("Tue 13 Oct");
+      expect(pressedChips()).toEqual([]);
+      await waitFor(() => expect(lastParams().get("start")).toBe("2026-10-13"));
+    });
+
+    it("disables the arrows for rest of semester and custom", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      await user.click(chip("Rest of semester"));
+      expect(screen.getByRole("button", { name: /^Previous/ })).toBeDisabled();
+      expect(stepButton("Next day")).toBeDisabled();
+      expect(screen.getByTestId("period-label")).toBeEmptyDOMElement();
+      await user.click(chip("Custom"));
+      expect(screen.getByRole("button", { name: /^Previous/ })).toBeDisabled();
+      expect(stepButton("Next day")).toBeDisabled();
+      await user.click(chip("This week"));
+      expect(screen.getByRole("button", { name: "Previous week" })).toBeEnabled();
+    });
+
+    it("t, Shift+T, left and right arrows", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      await user.keyboard("{ArrowRight}");
+      expect(screen.getByTestId("period-label")).toHaveTextContent("November 2026");
+      await user.keyboard("{ArrowLeft}{ArrowLeft}");
+      expect(screen.getByTestId("period-label")).toHaveTextContent("September 2026");
+      await user.keyboard("t");
+      expect(pressedChips()).toEqual(["Today"]);
+      await user.keyboard("{Shift>}T{/Shift}");
+      expect(pressedChips()).toEqual(["Tomorrow"]);
+      await user.keyboard("{ArrowRight}");
+      expect(screen.getByTestId("period-label")).toHaveTextContent("Fri 16 Oct");
+      await user.keyboard("s{ArrowRight}");
+      expect(pressedChips()).toEqual(["Rest of semester"]);
+      await user.keyboard("c{ArrowRight}");
+      expect(pressedChips()).toEqual(["Custom"]);
+    });
+
+    it("describes a single day and a stepped week in the summary", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      await user.click(chip("Tomorrow"));
+      expect(await screen.findByText(/free from 06:00 to 08:00 on Thursday 15 October 2026/)).toBeInTheDocument();
+      await user.click(chip("This week"));
+      await user.click(stepButton("Next week"));
+      await user.click(stepButton("Next week"));
+      expect(await screen.findByText(/free from 06:00 to 08:00 from 26 October 2026 to 1 November 2026/)).toBeInTheDocument();
+      await user.click(chip("Next week"));
+      expect(await screen.findByText(/free from 06:00 to 08:00 next week/)).toBeInTheDocument();
+    });
+
+    it("is translated to Vietnamese", async () => {
+      const user = userEvent.setup();
+      renderPage("vi");
+      await screen.findByTestId("free-big");
+      expect(screen.getByRole("group", { name: "Khoảng thời gian" })).toBeInTheDocument();
+      for (const label of ["Hôm nay", "Ngày mai", "Tuần này", "Tuần sau", "Tháng này", "Tháng sau", "Phần còn lại của học kỳ", "Tùy chọn"]) {
+        expect(chip(label)).toBeInTheDocument();
+      }
+      await user.click(chip("Hôm nay"));
+      await user.click(screen.getByRole("button", { name: "Ngày sau" }));
+      expect(screen.getByTestId("period-label")).toHaveTextContent("15");
+      expect(await screen.findByText(/rảnh từ 06:00 đến 08:00 vào .*15/)).toBeInTheDocument();
+      await user.click(chip("Tuần này"));
+      expect(screen.getByRole("button", { name: "Tuần trước" })).toBeInTheDocument();
+      await user.click(chip("Tháng này"));
+      expect(screen.getByRole("button", { name: "Tháng trước" })).toBeInTheDocument();
     });
   });
 
