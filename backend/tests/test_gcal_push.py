@@ -122,15 +122,18 @@ def test_deleted_events_are_removed_from_google(session, world):
     assert session.scalars(select(GcalTombstone)).all() == []
 
 
-def test_time_budget_leaves_the_rest_for_next_time(session, world):
-    _, account = world
+def test_time_budget_is_checked_before_each_batch(session, semester, world):
+    events, account = world
     fake = FakeCalendar()
     ticks = iter(range(100))
-    first = run(session, account, fake, deadline=2, clock=lambda: next(ticks))
-    assert (first.status, first.done, first.remaining) == ("partial", 2, 2)
+    for n in range(10):
+        ev(session, semester, f"extra{n}", datetime(2026, 11, 2 + n, 8), subject=session.get(Subject, events["class"].subject_id))
+    session.commit()  # 14 ops: a batch of 8, then a batch of 6
+    first = run(session, account, fake, deadline=1, clock=lambda: next(ticks))
+    assert (first.status, first.done, first.remaining) == ("partial", 8, 6)
     second = run(session, account, fake)
-    assert (second.status, second.done, second.remaining) == ("ok", 2, 0)
-    assert len(fake.events) == 4
+    assert (second.status, second.done, second.remaining) == ("ok", 6, 0)
+    assert len(fake.events) == 14
 
 
 def test_revoked_access_asks_to_reconnect(session, world):
@@ -186,8 +189,11 @@ def test_rate_limit_stops_and_resumes(session, world):
     _, account = world
     fake = FakeCalendar(fail={"insert_event": [None, GoogleRateLimited("Google rate limit reached")]})
     result = run(session, account, fake)
-    assert (result.status, result.done, result.remaining) == ("partial", 1, 3)
-    assert (run(session, account, fake).done, len(fake.events)) == (3, 4)
+    assert result.status == "partial" and result.error == "Google rate limit reached"
+    assert result.remaining >= 1 and result.done + result.remaining == 4  # calls already in flight still count
+    assert len(fake.events) == result.done
+    again = run(session, account, fake)
+    assert (again.status, again.done, len(fake.events)) == ("ok", result.remaining, 4)
 
 
 def visible(**changes) -> VisibleEvent:
@@ -321,7 +327,8 @@ def test_push_lease_released_after_run_and_expired_lease_does_not_block(session,
     _stored(session, cfg)
     account.push_lock_until = NOW - timedelta(minutes=1)
     session.commit()
-    assert run_push(session, cfg, lambda token: FakeCalendar(), NOW, NEVER).status == "ok"
+    fake = FakeCalendar()
+    assert run_push(session, cfg, lambda token: fake, NOW, NEVER).status == "ok"
     session.refresh(account)
     assert account.push_lock_until is None
 
@@ -345,8 +352,14 @@ def test_run_push_closes_the_client(session, world):
     fake = FakeCalendar()
     closed = []
     fake.close = lambda: closed.append(True)
-    run_push(session, cfg, lambda token: fake, NOW, NEVER)
-    assert closed == [True]
+    built = []
+
+    def factory(token):
+        built.append(token)
+        return fake
+
+    run_push(session, cfg, factory, NOW, NEVER)
+    assert len(built) >= 2 and len(closed) == len(built)  # the main client and every worker client
 
 
 def test_three_identical_failures_in_a_row_stop_the_run(session, world):
@@ -354,7 +367,7 @@ def test_three_identical_failures_in_a_row_stop_the_run(session, world):
     err = GoogleError("Google Calendar returned 500 (backendError)")
     fake = FakeCalendar(fail={"insert_event": [err, err, err]})
     result = run(session, account, fake)
-    assert (result.failed, result.done, result.remaining) == (3, 0, 1)
+    assert (result.failed, result.done, result.remaining) == (3, 1, 0)  # the batch runs in parallel
     assert result.status == "partial" and result.error == str(err)
 
 
@@ -362,15 +375,90 @@ def test_stale_data_error_counts_as_failed_and_continues(session, world, monkeyp
     from sqlalchemy.orm.exc import StaleDataError
     from app.gcal import push as push_module
     _, account = world
-    real = push_module._apply
+    real = push_module._record
     state = {"n": 0}
 
-    def flaky(session_, gcal, calendar_id, op):
+    def flaky(session_, op, new_id):
         state["n"] += 1
         if state["n"] == 1:
             raise StaleDataError("gone")
-        return real(session_, gcal, calendar_id, op)
+        return real(session_, op, new_id)
 
-    monkeypatch.setattr(push_module, "_apply", flaky)
+    monkeypatch.setattr(push_module, "_record", flaky)
     result = run(session, account, FakeCalendar())
     assert (result.failed, result.done, result.status) == (1, 3, "partial")
+
+
+def test_inserts_run_in_parallel(session, world):
+    import threading
+    _, account = world
+    barrier = threading.Barrier(2, timeout=5)  # two inserts must be in flight together or the barrier breaks
+    fake = FakeCalendar(before_insert=barrier.wait)
+    result = run(session, account, fake)
+    assert (result.status, result.done, result.failed) == ("ok", 4, 0)
+
+
+def test_parallel_push_reaches_the_same_state_as_one_by_one(session, semester, world, monkeypatch):
+    from app.gcal import push as push_module
+    events, account = world
+    parallel = FakeCalendar()
+    run(session, account, parallel)
+    state = {name: (e.gcal_event_id, e.gcal_hash) for name, e in events.items()}
+    for e in events.values():
+        e.gcal_event_id = e.gcal_hash = None
+    account.calendar_id = None
+    session.commit()
+    monkeypatch.setattr(push_module, "WORKERS", 1)
+    sequential = FakeCalendar()
+    run(session, account, sequential)
+    assert {n: e.gcal_hash for n, e in events.items()} == {n: h for n, (_, h) in state.items()}
+    assert sorted(b["summary"] for b in sequential.events.values()) == summaries(parallel)
+    assert len(sequential.events) == len(parallel.events) == 4
+
+
+def test_a_failure_in_a_batch_keeps_the_other_results(session, world):
+    events, account = world
+    fake = FakeCalendar(fail={"insert_event": [None, GoogleError("Google Calendar returned 500 (backendError)"), None]})
+    result = run(session, account, fake)
+    assert (result.status, result.done, result.failed, result.remaining) == ("partial", 3, 1, 0)
+    assert sum(1 for e in events.values() if e.gcal_event_id) == 3 == len(fake.events)
+
+
+def test_updates_run_in_parallel_too_and_deletes_follow(session, world):
+    events, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    for key in ("class", "exam", "mine"):
+        events[key].room = "KB999"
+    events["work"].status = "cancelled"
+    session.commit()
+    result = run(session, account, fake)
+    assert (result.status, result.done) == ("ok", 4)
+    assert len(fake.events) == 3 and all(b["location"] == "KB999" for b in fake.events.values())
+
+
+def test_run_push_gives_every_worker_its_own_client(session, world):
+    import threading
+    from app.gcal.push import run_push
+    cfg = settings()
+    _stored(session, cfg)
+    shared = FakeCalendar()
+    handles = []
+
+    class Handle:
+        def __init__(self):
+            self.threads = set()
+            handles.append(self)
+
+        def __getattr__(self, name):
+            target = getattr(shared, name)
+            if name.endswith("_event"):
+                def call(*args):
+                    self.threads.add(threading.get_ident())
+                    return target(*args)
+                return call
+            return target
+
+    assert run_push(session, cfg, lambda token: Handle(), NOW, NEVER).status == "ok"
+    assert len(handles) >= 2 and all(len(h.threads) <= 1 for h in handles)
+    assert len(shared.events) == 4

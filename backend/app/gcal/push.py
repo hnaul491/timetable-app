@@ -1,8 +1,10 @@
 import hashlib
 import json
 import logging
+import threading
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -126,32 +128,127 @@ def _delete_quietly(gcal: GoogleCalendar, calendar_id: str, gcal_event_id: str) 
         pass  # already gone in Google
 
 
-def _apply(session: Session, gcal: GoogleCalendar, calendar_id: str, op: Op) -> None:
-    if op.action == "remove":
+BATCH_SIZE = 8
+WORKERS = 4
+PARALLEL = ("insert", "update")
+
+
+class _Skipped(Exception):
+    """A parallel call that was not made because the run was already stopping."""
+
+
+Outcome = tuple[str | None, Exception | None]
+
+
+def _google(gcal: GoogleCalendar, calendar_id: str, op: Op) -> str | None:
+    """Do the Google call of one op (no database access: this runs in worker threads).
+
+    Returns the Google event id to store for an insert (or an update that had to insert again).
+    """
+    if op.action in ("remove", "delete"):
         _delete_quietly(gcal, calendar_id, op.gcal_event_id)
+        return None
+    if op.action == "update":
+        try:
+            gcal.update_event(calendar_id, op.gcal_event_id, op.body)
+            return None
+        except GoogleNotFound:
+            pass  # deleted by hand in Google: create it again below
+    return gcal.insert_event(calendar_id, op.body)
+
+
+def _record(session: Session, op: Op, new_id: str | None) -> None:
+    """Store the outcome of a successful Google call (main thread)."""
+    if op.action == "remove":
         session.execute(delete(GcalTombstone).where(GcalTombstone.gcal_event_id == op.gcal_event_id))
         return
     event = session.get(Event, op.event_id)
     if event is None:
         return  # row deleted since planning
     if op.action == "delete":
-        _delete_quietly(gcal, calendar_id, op.gcal_event_id)
         event.gcal_event_id = event.gcal_hash = None
         return
-    if op.action == "update":
-        try:
-            gcal.update_event(calendar_id, op.gcal_event_id, op.body)
-            event.gcal_hash = op.digest
-            return
-        except GoogleNotFound:
-            pass  # deleted by hand in Google: create it again below
-    event.gcal_event_id = gcal.insert_event(calendar_id, op.body)
+    if new_id is not None:
+        event.gcal_event_id = new_id
     event.gcal_hash = op.digest
 
 
+class _Workers:
+    """Thread pool for parallel Google calls; every worker thread owns a client (never shared across threads)."""
+
+    def __init__(self, gcal: GoogleCalendar, factory: Callable[[], GoogleCalendar] | None) -> None:
+        self._gcal = gcal
+        self._factory = factory
+        self._local = threading.local()
+        self._clients: list[GoogleCalendar] = []
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._pool = ThreadPoolExecutor(max_workers=WORKERS)
+
+    def _client(self) -> GoogleCalendar:
+        if self._factory is None:
+            return self._gcal
+        client = getattr(self._local, "client", None)
+        if client is None:
+            client = self._factory()
+            self._local.client = client
+            with self._lock:
+                self._clients.append(client)
+        return client
+
+    def _run(self, calendar_id: str, op: Op) -> str | None:
+        if self._stop.is_set():
+            raise _Skipped()
+        try:
+            return _google(self._client(), calendar_id, op)
+        except (GoogleRateLimited, GoogleAuthError, GoogleNotFound):
+            self._stop.set()  # the run is over: do not start more calls
+            raise
+
+    def map(self, calendar_id: str, ops: list[Op]) -> list[Outcome]:
+        futures = [self._pool.submit(self._run, calendar_id, op) for op in ops]
+        out: list[Outcome] = []
+        for future in futures:
+            try:
+                out.append((future.result(), None))
+            except Exception as exc:  # noqa: BLE001 - classified by the caller
+                out.append((None, exc))
+        return out
+
+    def close(self) -> None:
+        self._pool.shutdown(wait=True)
+        for client in self._clients:
+            _close(client)
+
+
+def _batches(ops: list[Op]) -> list[list[Op]]:
+    """Consecutive inserts/updates are grouped (up to BATCH_SIZE) to run in parallel; other ops go alone."""
+    units: list[list[Op]] = []
+    for op in ops:
+        if op.action in PARALLEL and units and len(units[-1]) < BATCH_SIZE and units[-1][0].action in PARALLEL:
+            units[-1].append(op)
+        else:
+            units.append([op])
+    return units
+
+
+def _inline(gcal: GoogleCalendar, calendar_id: str, op: Op) -> Outcome:
+    try:
+        return _google(gcal, calendar_id, op), None
+    except Exception as exc:  # noqa: BLE001 - classified by the caller
+        return None, exc
+
+
 def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: datetime, app_url: str,
-         deadline: float, clock: Callable[[], float] = time.monotonic) -> PushResult:
+         deadline: float, clock: Callable[[], float] = time.monotonic,
+         worker_factory: Callable[[], GoogleCalendar] | None = None) -> PushResult:
+    """Reconcile Google with the timetable.
+
+    `worker_factory` builds one client per worker thread; without it the workers share `gcal`, which must then be
+    thread-safe (tests only).
+    """
     result = PushResult(status="ok")
+    workers: _Workers | None = None
     try:
         if account.calendar_id is None:
             try:
@@ -167,40 +264,59 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
                 return result
             session.commit()
         ops = plan_ops(session, account, now, app_url)
+        calendar_id = account.calendar_id
+        workers = _Workers(gcal, worker_factory)
         streak, last_error = 0, None
-        for index, op in enumerate(ops):
+        consumed = 0
+        for unit in _batches(ops):
             if clock() >= deadline:
-                result.remaining = len(ops) - index
                 break
-            try:
-                _apply(session, gcal, account.calendar_id, op)
-            except GoogleNotFound:
-                raise _CalendarMissing() from None  # inserting failed: the calendar itself is gone
-            except GoogleRateLimited as exc:
-                session.rollback()
-                result.remaining = len(ops) - index
-                result.error = str(exc)
+            consumed += len(unit)
+            live = [op for op in unit if op.action == "remove" or session.get(Event, op.event_id) is not None]
+            if live and live[0].action in PARALLEL:
+                outcomes = workers.map(calendar_id, live)
+            else:
+                outcomes = [_inline(gcal, calendar_id, op) for op in live]
+            stop_run = False
+            fatal: Exception | None = None
+            for op, (new_id, error) in zip(live, outcomes):
+                if error is None:
+                    try:
+                        _record(session, op, new_id)
+                        session.commit()
+                    except StaleDataError:
+                        session.rollback()
+                        result.failed += 1
+                        result.error = "A timetable row changed while pushing; it is retried on the next push"
+                        continue
+                    result.done += 1
+                    streak, last_error = 0, None
+                elif isinstance(error, _Skipped):
+                    result.remaining += 1
+                elif isinstance(error, GoogleRateLimited):
+                    result.remaining += 1
+                    result.error = str(error)
+                    stop_run = True
+                elif isinstance(error, (GoogleNotFound, GoogleAuthError)):
+                    # NotFound here means inserting failed: the calendar itself is gone. Auth wins when both occur.
+                    if fatal is None or isinstance(error, GoogleAuthError):
+                        fatal = error
+                elif isinstance(error, GoogleError):
+                    result.failed += 1
+                    result.error = str(error)
+                    streak = streak + 1 if result.error == last_error else 1
+                    last_error = result.error
+                    if streak >= SAME_ERROR_LIMIT:  # persistent error: stop hammering Google
+                        stop_run = True
+                else:
+                    raise error
+            if isinstance(fatal, GoogleAuthError):
+                raise fatal
+            if fatal is not None:
+                raise _CalendarMissing()
+            if stop_run:
                 break
-            except GoogleAuthError:
-                raise
-            except StaleDataError:
-                session.rollback()
-                result.failed += 1
-                result.error = "A timetable row changed while pushing; it is retried on the next push"
-                continue
-            except GoogleError as exc:
-                session.rollback()
-                result.failed += 1
-                result.error = str(exc)
-                streak = streak + 1 if result.error == last_error else 1
-                last_error = result.error
-                if streak >= SAME_ERROR_LIMIT:  # persistent error: stop hammering Google
-                    result.remaining = len(ops) - index - 1
-                    break
-                continue
-            session.commit()
-            result.done += 1
-            streak, last_error = 0, None
+        result.remaining += len(ops) - consumed
     except GoogleAuthError as exc:
         session.rollback()
         account.needs_reconnect = True
@@ -212,6 +328,9 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
     else:
         if result.remaining or result.failed:
             result.status = "partial"
+    finally:
+        if workers is not None:
+            workers.close()
     account.last_push_at = now
     account.last_push_error = result.error
     session.commit()
@@ -267,7 +386,8 @@ def run_push(session: Session, settings: Settings, factory: GcalFactory, now: da
         leased = True
         gcal = factory(token)
         try:
-            return push(session, account, gcal, now, settings.app_url, deadline, clock)
+            return push(session, account, gcal, now, settings.app_url, deadline, clock,
+                        worker_factory=lambda: factory(token))
         finally:
             _close(gcal)
     except Exception as exc:  # noqa: BLE001 - record and move on
