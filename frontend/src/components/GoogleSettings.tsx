@@ -1,31 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useT, type Locale, type Vars, type MessageKey } from "../i18n";
+import { translateServerMessage } from "../i18n/serverMessages";
 import { apiFetch } from "../lib/api";
 import { forgetProviderToken, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken } from "../lib/google";
 import { formatTime, parisParts } from "../lib/time";
 import type { GoogleKind, GoogleStatus, PushResult } from "../types";
 
-const KINDS: [GoogleKind, string][] = [
-  ["class", "Classes"],
-  ["exam", "Exams"],
-  ["holiday", "Holidays"],
-  ["work", "Work shifts"],
-  ["french_ext", "External French"],
-  ["other", "Other events"],
-];
+const KINDS: GoogleKind[] = ["class", "exam", "holiday", "work", "french_ext", "other"];
 const MAX_ROUNDS = 15;
 const card = "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5";
 const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60";
 const secondary = "h-10 rounded-xl border border-line bg-surface px-4 text-sm font-semibold disabled:opacity-60";
 
-function summary(sent: number, r: PushResult): string {
-  if (r.status === "failed") return `Push failed: ${r.error ?? "unknown error"}`;
-  if (r.status === "skipped") return "Nothing was sent — Google needs to be reconnected.";
-  if (r.error) return `${sent} changes sent. ${r.error}`;
-  return r.remaining > 0 ? `${sent} changes sent, ${r.remaining} left…` : `${sent} changes sent`;
+type T = (key: MessageKey, vars?: Vars) => string;
+
+function summary(t: T, locale: Locale, sent: number, r: PushResult): string {
+  const error = r.error ? translateServerMessage(r.error, locale) : null;
+  if (r.status === "failed") return t("google.pushFailed", { error: error ?? t("google.unknownError") });
+  if (r.status === "skipped") return t("google.skipped");
+  if (error) return t("google.sentWithError", { sent, error });
+  return r.remaining > 0 ? t("google.sentLeft", { sent, remaining: r.remaining }) : t("google.sent", { sent });
 }
 
 export function GoogleSettings() {
+  const t = useT();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [notice, setNotice] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function GoogleSettings() {
       apiFetch<GoogleStatus>("/api/google/connect", { method: "POST", body: JSON.stringify({ refresh_token }) }),
     onSuccess: () => {
       void forgetProviderToken();
-      setNotice("Connected. Press “Push now” to fill your “My Timetable” calendar.");
+      setNotice(t("google.connected"));
       refresh();
     },
   });
@@ -61,7 +61,7 @@ export function GoogleSettings() {
       for (let round = 0; round < MAX_ROUNDS; round += 1) {
         const result = await apiFetch<PushResult>("/api/google/push", { method: "POST" });
         sent += result.done;
-        setProgress(summary(sent, result));
+        setProgress(summary(t, locale, sent, result));
         if (result.status !== "partial" || result.remaining === 0 || result.done === 0) return result;
       }
       return null;
@@ -75,9 +75,9 @@ export function GoogleSettings() {
     if (!takeConnectFlag()) return;
     takeProviderRefreshToken().then((token) => {
       if (token) connect.mutate(token);
-      else setNotice("Google didn't give offline access. Remove “Timetable” at myaccount.google.com/permissions, then connect again.");
+      else setNotice(t("google.noOffline"));
     });
-  }, [connect]);
+  }, [connect, t]);
 
   const startConnect = async () => {
     const res = await startGoogleConnect();
@@ -89,38 +89,35 @@ export function GoogleSettings() {
   return (
     <section className={card} aria-labelledby="google-heading">
       <h2 id="google-heading" className="text-base font-bold">
-        Google Calendar
+        {t("google.title")}
       </h2>
       {!s ? (
-        <p className="text-sm text-muted">Loading…</p>
+        <p className="text-sm text-muted">{t("common.loading")}</p>
       ) : !s.configured ? (
-        <p className="text-sm text-muted">Google Calendar push isn't set up on the server yet — follow “Google Calendar” in docs/SETUP.md.</p>
+        <p className="text-sm text-muted">{t("google.notConfigured")}</p>
       ) : !s.connected ? (
         <>
-          <p className="text-sm text-ink-2">
-            Creates a calendar called “My Timetable” in your Google account and keeps it up to date. Notes are never sent. Reminders come from Google
-            Calendar — set them on that calendar.
-          </p>
+          <p className="text-sm text-ink-2">{t("google.intro")}</p>
           <button type="button" className={primary} onClick={startConnect} disabled={connect.isPending}>
-            Connect Google Calendar
+            {t("google.connect")}
           </button>
         </>
       ) : (
         <>
           <p className="text-sm">
-            Connected as <span className="font-semibold">{s.email}</span>
+            {t("google.connectedAs")} <span className="font-semibold">{s.email}</span>
           </p>
           {s.needs_reconnect && (
             <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">
-              <span>{s.last_push_error ?? "Google access stopped working."}</span>
+              <span>{s.last_push_error ? translateServerMessage(s.last_push_error, locale) : t("google.accessStopped")}</span>
               <button type="button" className={primary} onClick={startConnect}>
-                Reconnect Google
+                {t("google.reconnect")}
               </button>
             </div>
           )}
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1 text-sm font-semibold text-ink-2">Send to Google</legend>
-            {KINDS.map(([kind, label]) => (
+            <legend className="mb-1 text-sm font-semibold text-ink-2">{t("google.sendToGoogle")}</legend>
+            {KINDS.map((kind) => (
               <label key={kind} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -128,18 +125,22 @@ export function GoogleSettings() {
                   disabled={kinds.isPending}
                   onChange={(e) => kinds.mutate(e.target.checked ? [...s.kinds, kind] : s.kinds.filter((k) => k !== kind))}
                 />
-                {label}
+                {t(`google.kinds.${kind}`)}
               </label>
             ))}
           </fieldset>
           <p className="text-sm text-muted">
-            {s.pending === 0 ? "Everything is up to date." : `${s.pending} ${s.pending === 1 ? "change" : "changes"} waiting to be sent.`} Last push:{" "}
-            {s.last_push_at ? `${parisParts(s.last_push_at).date} ${formatTime(s.last_push_at)}` : "never"}.
+            {s.pending === 0 ? t("google.upToDate") : t("google.waiting", { count: s.pending })}{" "}
+            {t("google.lastPush", {
+              value: s.last_push_at ? `${parisParts(s.last_push_at).date} ${formatTime(s.last_push_at)}` : t("common.never"),
+            })}
           </p>
-          {s.last_push_error && !s.needs_reconnect && <p className="text-sm text-danger">Last push: {s.last_push_error}</p>}
+          {s.last_push_error && !s.needs_reconnect && (
+            <p className="text-sm text-danger">{t("google.lastPushError", { error: translateServerMessage(s.last_push_error, locale) })}</p>
+          )}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={primary} onClick={() => push.mutate()} disabled={push.isPending || s.needs_reconnect}>
-              {push.isPending ? "Pushing…" : "Push now"}
+              {push.isPending ? t("google.pushing") : t("google.pushNow")}
             </button>
             <button
               type="button"
@@ -148,12 +149,10 @@ export function GoogleSettings() {
               onBlur={() => setConfirm(false)}
               disabled={disconnect.isPending}
             >
-              {confirm ? "Click again to disconnect" : "Disconnect"}
+              {confirm ? t("google.disconnectConfirm") : t("google.disconnect")}
             </button>
           </div>
-          <p className="text-xs text-muted">
-            Disconnecting stops updates. The “My Timetable” calendar stays in Google — delete it there if you don't need it.
-          </p>
+          <p className="text-xs text-muted">{t("google.disconnectHelp")}</p>
           {progress && <p className="text-sm text-ink-2">{progress}</p>}
         </>
       )}

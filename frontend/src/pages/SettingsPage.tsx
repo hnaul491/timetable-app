@@ -2,9 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ErrorPanel } from "../components/Banners";
 import { GoogleSettings } from "../components/GoogleSettings";
+import { AppearanceSettings } from "../components/AppearanceSettings";
 import { RecurringList } from "../components/RecurringList";
 import { SemesterSettings } from "../components/SemesterSettings";
 import { SubjectSettings } from "../components/SubjectSettings";
+import { useLocale, useT } from "../i18n";
+import { translateServerMessage } from "../i18n/serverMessages";
 import { apiFetch } from "../lib/api";
 import { formatTime, parisParts } from "../lib/time";
 import type { SectionChoice, SyncRun, SyncStatus } from "../types";
@@ -12,11 +15,9 @@ import type { SectionChoice, SyncRun, SyncStatus } from "../types";
 const card = "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5";
 const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60";
 
-function when(iso: string | null | undefined): string {
-  return iso ? `${parisParts(iso).date} ${formatTime(iso)}` : "never";
-}
-
 export function SettingsPage() {
+  const t = useT();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const keyStatus = useQuery({ queryKey: ["zeus-key"], queryFn: () => apiFetch<{ configured: boolean }>("/api/settings/zeus-key") });
   const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
@@ -46,17 +47,19 @@ export function SettingsPage() {
   };
 
   const lastRun = sync.data?.last_run;
+  const when = (iso: string | null | undefined) => (iso ? `${parisParts(iso).date} ${formatTime(iso)}` : t("common.never"));
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{t("settings.title")}</h1>
       {keyStatus.error && <ErrorPanel error={keyStatus.error} />}
+      <AppearanceSettings />
       <div className="grid gap-4 lg:grid-cols-2">
         <section className={card}>
-          <h2 className="text-base font-bold">School timetable (Zeus)</h2>
+          <h2 className="text-base font-bold">{t("settings.zeus.title")}</h2>
           <form onSubmit={submit} className="flex flex-col gap-2">
             <label htmlFor="zeus-link" className="text-sm font-semibold text-ink-2">
-              Zeus ICS subscription link
+              {t("settings.zeus.linkLabel")}
             </label>
             <div className="flex gap-2">
               <input
@@ -65,36 +68,37 @@ export function SettingsPage() {
                 autoComplete="off"
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
-                placeholder={keyStatus.data?.configured ? "Saved. Paste a new link to replace it." : "https://zeus.ionis-it.com/api/group/…/ics/…"}
+                placeholder={keyStatus.data?.configured ? t("settings.zeus.placeholderSaved") : "https://zeus.ionis-it.com/api/group/…/ics/…"}
                 className="h-10 min-w-0 flex-1 rounded-xl border border-line-strong px-3 text-sm"
               />
               <button type="submit" className={primary} disabled={saveKey.isPending}>
-                Save
+                {t("common.save")}
               </button>
             </div>
             <p className="text-xs text-muted">
-              In Zeus, generate the calendar link for your group and paste it here. It is stored on the server only and never shown again.
+              {t("settings.zeus.help")}
             </p>
             {saveKey.error && <p className="text-sm text-danger">{(saveKey.error as Error).message}</p>}
-            <p className="text-sm">{keyStatus.data?.configured ? "Link saved." : "No link saved yet."}</p>
+            <p className="text-sm">{keyStatus.data?.configured ? t("settings.zeus.saved") : t("settings.zeus.notSaved")}</p>
           </form>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
             <span>
-              Last sync: {lastRun ? `${lastRun.status} · ${when(lastRun.finished_at)}` : "never"}
-              {lastRun?.status === "ok" && ` · ${lastRun.fetched} events, ${lastRun.inserted} new, ${lastRun.updated} changed, ${lastRun.cancelled} cancelled`}
-              {lastRun?.error && ` · ${lastRun.error}`}
+              {t("settings.zeus.lastSync", { value: lastRun ? `${lastRun.status} · ${when(lastRun.finished_at)}` : t("common.never") })}
+              {lastRun?.status === "ok" &&
+                ` · ${t("settings.zeus.syncCounts", { fetched: lastRun.fetched, inserted: lastRun.inserted, updated: lastRun.updated, cancelled: lastRun.cancelled })}`}
+              {lastRun?.error && ` · ${translateServerMessage(lastRun.error, locale)}`}
             </span>
             <button type="button" className={primary} onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
-              {syncNow.isPending ? "Syncing…" : "Sync now"}
+              {syncNow.isPending ? t("settings.zeus.syncing") : t("settings.zeus.syncNow")}
             </button>
           </div>
           {syncNow.error && <p className="text-sm text-danger">{(syncNow.error as Error).message}</p>}
         </section>
         <section className={card}>
-          <h2 className="text-base font-bold">My groups</h2>
-          <p className="text-sm text-muted">Zeus sends every parallel group. Pick yours, or "All groups" if you attend every one; classes without a group are always shown.</p>
+          <h2 className="text-base font-bold">{t("settings.groups.title")}</h2>
+          <p className="text-sm text-muted">{t("settings.groups.help")}</p>
           {pick.error && <p className="text-sm text-danger">{(pick.error as Error).message}</p>}
-          {sections.data?.length === 0 && <p className="text-sm">No grouped classes yet. Sync first.</p>}
+          {sections.data?.length === 0 && <p className="text-sm">{t("settings.groups.none")}</p>}
           {sections.data?.map((choice) => (
             <label key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">
               {choice.subject_name}
@@ -105,10 +109,10 @@ export function SettingsPage() {
               >
                 {choice.chosen === null && (
                   <option value="" disabled>
-                    Choose…
+                    {t("settings.groups.choose")}
                   </option>
                 )}
-                <option value="ALL">All groups</option>
+                <option value="ALL">{t("settings.groups.all")}</option>
                 {choice.sections.map((s) => (
                   <option key={s} value={s}>
                     {s}

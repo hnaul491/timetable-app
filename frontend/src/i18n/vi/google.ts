@@ -1,3 +1,37 @@
 import type { Messages } from "../types";
 
-export const google: Messages["google"] = {};
+export const google: Messages["google"] = {
+  title: "Google Calendar",
+  kinds: {
+    class: "Buổi học",
+    exam: "Kỳ thi",
+    holiday: "Ngày nghỉ",
+    work: "Ca làm",
+    french_ext: "Tiếng Pháp (bên ngoài)",
+    other: "Sự kiện khác",
+  },
+  pushFailed: "Gửi thất bại: {error}",
+  unknownError: "lỗi không rõ",
+  skipped: "Chưa gửi gì cả — cần kết nối lại Google.",
+  sentWithError: "Đã gửi {sent} thay đổi. {error}",
+  sentLeft: "Đã gửi {sent} thay đổi, còn {remaining}…",
+  sent: "Đã gửi {sent} thay đổi",
+  connected: "Đã kết nối. Bấm “Gửi ngay” để điền vào lịch “My Timetable” của bạn.",
+  noOffline: "Google không cấp quyền truy cập ngoại tuyến. Hãy gỡ “Timetable” tại myaccount.google.com/permissions rồi kết nối lại.",
+  notConfigured: "Máy chủ chưa thiết lập gửi lên Google Calendar — làm theo mục “Google Calendar” trong docs/SETUP.md.",
+  intro: "Tạo một lịch tên “My Timetable” trong tài khoản Google của bạn và luôn cập nhật lịch đó. Ghi chú không bao giờ được gửi. Lời nhắc do Google Calendar đảm nhiệm — hãy đặt chúng trên lịch đó.",
+  connect: "Kết nối Google Calendar",
+  connectedAs: "Đã kết nối với",
+  accessStopped: "Quyền truy cập Google đã ngừng hoạt động.",
+  reconnect: "Kết nối lại Google",
+  sendToGoogle: "Gửi lên Google",
+  upToDate: "Mọi thứ đã được cập nhật.",
+  waiting: { one: "{count} thay đổi đang chờ gửi.", other: "{count} thay đổi đang chờ gửi." },
+  lastPush: "Lần gửi gần nhất: {value}.",
+  lastPushError: "Lần gửi gần nhất: {error}",
+  pushNow: "Gửi ngay",
+  pushing: "Đang gửi…",
+  disconnect: "Ngắt kết nối",
+  disconnectConfirm: "Bấm lần nữa để ngắt kết nối",
+  disconnectHelp: "Ngắt kết nối sẽ dừng cập nhật. Lịch “My Timetable” vẫn còn trên Google — hãy xoá ở đó nếu bạn không cần.",
+};
