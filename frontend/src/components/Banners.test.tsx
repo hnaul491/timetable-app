@@ -56,7 +56,7 @@ describe("banners", () => {
     wrap(
       <GoogleBanner
         status={{ configured: true, connected: true, email: "me@example.com", kinds: [], needs_reconnect: true,
-                  last_push_at: null, last_push_error: "Google access was revoked or expired — reconnect Google in Settings", pending: 0 }}
+                  last_push_at: null, last_push_error: "Google access was revoked or expired — reconnect Google in Settings", pending: 0, drive_enabled: false }}
       />,
     );
     expect(screen.getByText(/Google Calendar stopped updating/)).toBeInTheDocument();

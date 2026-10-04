@@ -170,6 +170,7 @@ export interface GoogleStatus {
   last_push_at: string | null;
   last_push_error: string | null;
   pending: number;
+  drive_enabled: boolean;
 }
 
 export interface PushResult {
@@ -178,4 +179,19 @@ export interface PushResult {
   failed: number;
   remaining: number;
   error: string | null;
+}
+
+export type DocumentTag = "slides" | "exercises" | "other";
+
+export interface DocumentItem {
+  id: number;
+  subject_id: number;
+  event_id: number | null;
+  event_start: string | null;
+  name: string;
+  mime_type: string;
+  size: number;
+  tag: DocumentTag;
+  web_view_link: string;
+  created_at: string;
 }

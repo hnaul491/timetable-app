@@ -1,6 +1,7 @@
 import { board } from "./board";
 import { calendar } from "./calendar";
 import { common } from "./common";
+import { documents } from "./documents";
 import { errors } from "./errors";
 import { event } from "./event";
 import { google } from "./google";
@@ -11,4 +12,4 @@ import { shortcuts } from "./shortcuts";
 import { subjects } from "./subjects";
 import { ui } from "./ui";
 
-export const en = { common, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts };
+export const en = { common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts };
