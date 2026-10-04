@@ -514,8 +514,43 @@ def test_sweep_removes_orphans_and_keeps_tracked_events(session, world):
     session.commit()
     result = run(session, account, fake)
     assert (result.status, result.failed, result.remaining) == ("ok", 0, 0)
-    assert set(fake.events) == tracked
+    assert set(fake.events) == tracked | {"dup2"}  # dup2 has no marker: the user's own event
     assert account.last_sweep_at == NOW
+
+
+def test_sweep_adopts_a_marked_event_whose_row_has_no_google_id(session, world):
+    events, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    row = events["old"]  # past the push window: no Google id and none planned
+    assert row.gcal_event_id is None
+    orphan(fake, "gold", str(row.id))
+    account.last_sweep_at = None
+    session.commit()
+    run(session, account, fake)
+    session.refresh(row)
+    assert "gold" in fake.events and row.gcal_event_id == "gold" and row.gcal_hash is None
+    assert ("delete_event", "gold") not in fake.calls
+
+
+def test_sweep_deletes_a_marked_duplicate_whose_row_points_elsewhere(session, world):
+    events, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    kept = events["class"].gcal_event_id
+    orphan(fake, "dupe", str(events["class"].id))
+    account.last_sweep_at = None
+    session.commit()
+    run(session, account, fake)
+    assert "dupe" not in fake.events and kept in fake.events and events["class"].gcal_event_id == kept
+
+
+def test_sweep_auth_error_fails_the_push_with_the_message(session, world):
+    _, account = world
+    fake = FakeCalendar(fail={"list_app_event_ids": [GoogleAuthError("revoked")]})
+    result = run(session, account, fake)
+    assert (result.status, result.error) == ("failed", "revoked")
+    assert account.needs_reconnect is True
 
 
 def test_sweep_runs_at_most_once_a_day(session, world):
@@ -536,9 +571,11 @@ def test_sweep_runs_at_most_once_a_day(session, world):
 def test_sweep_waits_for_a_push_without_failures(session, world):
     events, account = world
     fake = FakeCalendar(fail={"insert_event": [GoogleError("boom")]})
+    orphan(fake, "dup1")
+    account.last_sweep_at = None
+    session.commit()
     result = run(session, account, fake)
     assert result.failed == 1
-    orphan(fake, "dup1")
     assert "dup1" in fake.events and account.last_sweep_at is None
 
 

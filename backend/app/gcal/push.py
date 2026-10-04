@@ -324,6 +324,8 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
             if stop_run:
                 break
         result.remaining += len(ops) - consumed
+        if not (result.remaining or result.failed):
+            _sweep_orphans(session, account, gcal, now, deadline, clock)
     except GoogleAuthError as exc:
         session.rollback()
         account.needs_reconnect = True
@@ -335,8 +337,6 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
     else:
         if result.remaining or result.failed:
             result.status = "partial"
-        else:
-            _sweep_orphans(session, account, gcal, now, deadline, clock)
     finally:
         if workers is not None:
             workers.close()
@@ -348,10 +348,12 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
 
 def _sweep_orphans(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: datetime, deadline: float,
                    clock: Callable[[], float]) -> None:
-    """Delete Google events in the app's calendar that no timetable row (or tombstone) points at.
+    """Delete the app's own duplicate events from its Google calendar.
 
-    Runs after a complete push, at most once per 24 h. Best effort: Google errors never fail the push; an
-    interrupted sweep is not recorded as done, so it continues on the next push.
+    Runs after a complete push, at most once per 24 h. Only events carrying the app's marker are ever touched:
+    an event without a marker is the user's own and is kept. A marked event nobody points at is adopted when its
+    row has no Google id yet; it is deleted when its row points at another Google event or no longer exists.
+    Best effort: Google errors never fail the push (except auth); an interrupted sweep continues on the next push.
     """
     if account.calendar_id is None or deadline - clock() < SWEEP_MIN_LEFT_S:
         return
@@ -359,17 +361,32 @@ def _sweep_orphans(session: Session, account: GoogleAccount, gcal: GoogleCalenda
         return
     try:
         listed = gcal.list_app_event_ids(account.calendar_id)
+    except GoogleNotFound:
+        raise _CalendarMissing() from None
+    except GoogleAuthError:
+        raise
+    except GoogleError as exc:
+        logger.warning("Orphan sweep failed (%s)", type(exc).__name__)
+        return
+    try:
         known = set(session.scalars(select(Event.gcal_event_id).where(Event.gcal_event_id.is_not(None))))
         known.update(session.scalars(select(GcalTombstone.gcal_event_id)))
-        for gcal_event_id, _marker in listed:
-            if gcal_event_id in known:
-                continue
+        for gcal_event_id, marker in listed:
+            if marker is None or gcal_event_id in known:
+                continue  # the user's own event, or one the timetable already tracks
+            if not (marker.isdigit() and len(marker) < 18):
+                continue  # not a marker this app writes
             if deadline - clock() < SWEEP_MIN_LEFT_S:
                 return
+            row = session.get(Event, int(marker))
+            if row is not None and row.gcal_event_id is None:
+                row.gcal_event_id, row.gcal_hash = gcal_event_id, None  # adopt: the next push updates it
+                known.add(gcal_event_id)
+                continue
             _delete_quietly(gcal, account.calendar_id, gcal_event_id)
         account.last_sweep_at = now
     except GoogleAuthError:
-        account.needs_reconnect = True
+        raise
     except GoogleError as exc:
         logger.warning("Orphan sweep failed (%s)", type(exc).__name__)
 

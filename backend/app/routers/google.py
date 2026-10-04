@@ -12,7 +12,7 @@ from app.deps import get_gcal_factory, get_now
 from app.gcal.api import (ACCOUNT_ID, ALL_KINDS, CALENDAR_NAME, DEFAULT_KINDS, REFRESH_TOKEN_NAME, TIME_ZONE,
                           GcalFactory, GoogleError)
 from app.gdrive.api import DRIVE_SCOPE
-from app.gcal.push import _close, plan_ops, reset_calendar, run_push
+from app.gcal.push import _close, plan_ops, run_push
 from app.models import AppSecret, AppSetting, GoogleAccount
 from app.schemas import GoogleConnectIn, GoogleKindsIn, GoogleStatusOut, PushResultOut
 from app.secret_store import SecretStore
@@ -115,7 +115,7 @@ def disconnect(session: Session = Depends(get_session), settings: Settings = Dep
                 session.add(AppSetting(key=LAST_CALENDAR_KEY, value=account.calendar_id))
             else:
                 last.value = account.calendar_id
-        reset_calendar(session, account)
+        # The mapping (gcal ids, hashes, tombstones) stays: a reconnect reuses the calendar without re-inserting.
         session.delete(account)
     session.execute(delete(AppSecret).where(AppSecret.name == REFRESH_TOKEN_NAME))
     session.commit()

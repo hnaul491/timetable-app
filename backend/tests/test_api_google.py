@@ -80,7 +80,7 @@ def test_kinds(client, settings, session, semester):
     assert client.put("/api/google/kinds", headers=AUTH, json={"kinds": ["party"]}).status_code == 422
 
 
-def test_disconnect_forgets_everything(client, settings, session, semester):
+def test_disconnect_forgets_the_account_but_keeps_the_event_mapping(client, settings, session, semester):
     configure(client, settings, FakeCalendar())
     seed(session, semester)
     connect(client)
@@ -90,7 +90,8 @@ def test_disconnect_forgets_everything(client, settings, session, semester):
     assert client.get("/api/google", headers=AUTH).json()["connected"] is False
     session.expire_all()
     assert session.get(AppSecret, "google_refresh_token") is None
-    assert all(e.gcal_event_id is None for e in session.scalars(select(Event)))
+    assert session.get(GoogleAccount, 1) is None
+    assert all(e.gcal_event_id is not None for e in session.scalars(select(Event)))
 
 
 def test_revoked_access_shows_reconnect_and_reconnect_clears_it(client, settings, session, semester):
@@ -208,8 +209,41 @@ def test_reconnect_after_disconnect_reuses_the_calendar(client, settings, sessio
     assert fake.calendars == {"cal1": "My Timetable"}
     assert [c for c in fake.calls if c[0] == "create_calendar"] == [("create_calendar", "cal1")]
     result = client.post("/api/google/push", headers=AUTH).json()
-    assert (result["status"], result["done"]) == ("ok", 2)
-    assert len(fake.events) == 2  # the sweep removed the copies from before the disconnect
+    assert (result["status"], result["done"]) == ("ok", 0)  # the mapping survived: nothing is inserted again
+    assert len(fake.events) == 2 and set(fake.events) == {"g1", "g2"}
+
+
+def test_reconnect_keeps_past_and_other_semester_copies(client, settings, session, semester):
+    from datetime import date
+    from app.models import Semester
+    fake = FakeCalendar()
+    configure(client, settings, fake)
+    seed(session, semester)
+    old = Semester(code="S0", name="Old", zeus_group_id=1, start_date=date(2026, 2, 1), end_date=date(2026, 6, 30),
+                   is_active=False)
+    session.add(old)
+    session.flush()
+    subject = session.scalars(select(Subject)).first()
+    past = Event(source="custom", semester_id=semester.id, subject_id=subject.id, title_raw="past",
+                 start_at=datetime(2026, 9, 1, 8), end_at=datetime(2026, 9, 1, 10), room="A", kind="class",
+                 gcal_event_id="gpast", gcal_hash="h")
+    elsewhere = Event(source="custom", semester_id=old.id, title_raw="old sem", start_at=datetime(2026, 3, 1, 8),
+                      end_at=datetime(2026, 3, 1, 10), room="A", kind="class", gcal_event_id="gold", gcal_hash="h")
+    session.add_all([past, elsewhere])
+    session.commit()
+    for gid, row in (("gpast", past), ("gold", elsewhere)):
+        fake.events[gid] = {"summary": gid, "extendedProperties": {"private": {"timetableEventId": str(row.id)}}}
+    connect(client)
+    client.post("/api/google/push", headers=AUTH)
+    client.delete("/api/google", headers=AUTH)
+    connect(client)
+    client.post("/api/google/push", headers=AUTH)
+    session.expire_all()
+    assert "gpast" in fake.events and "gold" in fake.events
+    assert session.get(Event, past.id).gcal_event_id == "gpast"
+    assert session.get(Event, elsewhere.id).gcal_event_id == "gold"
+    assert all(e.gcal_event_id for e in session.scalars(select(Event)))
+    assert {e.gcal_event_id for e in session.scalars(select(Event))} <= set(fake.events)
 
 
 def test_reconnect_with_a_gone_calendar_recreates_it(client, settings, session, semester):
