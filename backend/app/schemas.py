@@ -314,6 +314,38 @@ Language = Literal["en", "vi"]
 _KEY = r"(?:[A-Za-z][A-Za-z0-9]{1,15}|\S)"
 SHORTCUT_KEYS = re.compile(rf"(?:(?:Mod\+)?(?:Alt\+)?(?:Shift\+)?{_KEY}|{_KEY} {_KEY})")
 MAX_SHORTCUTS = 200
+SHORTCUT_ID = re.compile(r"[a-z0-9-]{1,40}")
+_PREFIX = re.compile(r"^(Mod\+)?(Alt\+)?(Shift\+)?")
+# Keys the browser or OS owns, plus plain Tab/Enter/Space; mirrors frontend/src/lib/shortcutKeys.ts.
+_RESERVED_WITH_MOD = {"w", "t", "n", "l", "r", "q", "f", "p", "h", "m", "=", "-", "tab", *"0123456789"}
+_RESERVED_MOD_SHIFT = {"i", "j", "c"}
+
+
+def shortcut_keys_ok(keys: object) -> bool:
+    """True for a well-formed, allowed key string in the engine's syntax."""
+    if not isinstance(keys, str) or len(keys) > 32 or not SHORTCUT_KEYS.fullmatch(keys):
+        return False
+    match = _PREFIX.match(keys)
+    mod, alt, shift = (bool(g) for g in match.groups())
+    rest = keys[match.end():]
+    steps = [rest] if (mod or alt or shift) else rest.split(" ")
+    if not (mod or alt) and any(step in ("Tab", "Enter", "Space") for step in steps):
+        return False
+    if len(steps) == 1:
+        key = steps[0].lower() if len(steps[0]) == 1 else steps[0]
+        if mod and (key in _RESERVED_WITH_MOD or key.lower() == "tab" or (shift and key in _RESERVED_MOD_SHIFT)):
+            return False
+        if key in ("F5", "F11", "F12") or (alt and key in ("ArrowLeft", "ArrowRight")):
+            return False
+    return True
+
+
+def clean_shortcuts(raw: object) -> dict[str, str | None]:
+    """Stored overrides without anything invalid, so one bad entry never breaks reading."""
+    if not isinstance(raw, dict):
+        return {}
+    kept = {k: v for k, v in raw.items() if isinstance(k, str) and SHORTCUT_ID.fullmatch(k) and (v is None or shortcut_keys_ok(v))}
+    return dict(list(kept.items())[:MAX_SHORTCUTS])
 
 
 class Preferences(BaseModel):
@@ -328,9 +360,9 @@ class Preferences(BaseModel):
         if len(value) > MAX_SHORTCUTS:
             raise ValueError(f"at most {MAX_SHORTCUTS} shortcuts")
         for key, keys in value.items():
-            if not re.fullmatch(r"[a-z0-9-]{1,40}", key):
+            if not SHORTCUT_ID.fullmatch(key):
                 raise ValueError("invalid shortcut id")
-            if keys is not None and (len(keys) > 32 or not SHORTCUT_KEYS.fullmatch(keys)):
+            if keys is not None and not shortcut_keys_ok(keys):
                 raise ValueError("invalid shortcut keys")
         return value
 

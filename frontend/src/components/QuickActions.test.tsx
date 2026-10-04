@@ -161,9 +161,16 @@ describe("quick-action button", () => {
     const custom = setup("/", "en", { "cal-new": "Mod+j" });
     await user.click(fab());
     const item = screen.getByRole("menuitem", { name: "New event" });
-    expect(item).toHaveAttribute("aria-keyshortcuts", "Ctrl J");
+    expect(item).toHaveAttribute("aria-keyshortcuts", "Control+J");
     expect(item.querySelector("kbd")).toHaveTextContent("Ctrl J");
     custom.unmount();
+
+    const seq = setup("/", "en", { "cal-new": "g n" });
+    await user.click(fab());
+    const sequence = screen.getByRole("menuitem", { name: "New event" });
+    expect(sequence).not.toHaveAttribute("aria-keyshortcuts");
+    expect(sequence.querySelector("kbd")).toHaveTextContent("G N");
+    seq.unmount();
 
     setup("/", "en", { "cal-new": null });
     await user.click(fab());

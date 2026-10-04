@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MessageKey } from "../i18n";
-import { eventKey, isModifierKey, isSingleKey, parseKeys } from "./shortcutKeys";
+import { eventKey, isAltGr, isModifierKey, isReserved, isSingleKey, parseKeys, shiftMatches } from "./shortcutKeys";
 
 export { formatKeys, isSequence } from "./shortcutKeys";
 
@@ -16,6 +16,8 @@ export type ShortcutInfo = {
   defaultKeys: string;
   label: MessageKey;
   disabled: boolean;
+  /** Switched off by the single-key toggle (not by the user turning it off). */
+  blocked: boolean;
 };
 type Registry = {
   register: (entry: Entry) => () => void;
@@ -33,10 +35,14 @@ function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || target.closest('[contenteditable=""], [contenteditable="true"]') !== null || ["TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-/** Override ?? default; null (off) gives null. */
+/** Override ?? default; null (off) gives null. An override that takes Tab, Enter or Space (old data) is ignored. */
 export function effectiveKeys(id: string, defaultKeys: string, overrides: ShortcutOverrides): string | null {
-  return Object.prototype.hasOwnProperty.call(overrides, id) ? overrides[id] : defaultKeys;
+  if (!Object.prototype.hasOwnProperty.call(overrides, id)) return defaultKeys;
+  const own = overrides[id];
+  return own !== null && isReserved(own) && !isReserved(defaultKeys) ? defaultKeys : own;
 }
+
+const isBlocked = (keys: string, singleKey: boolean) => !singleKey && isSingleKey(keys) && keys !== "Escape";
 
 export function ShortcutProvider({
   children,
@@ -57,7 +63,7 @@ export function ShortcutProvider({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || isModifierKey(e.key)) return;
+      if (e.defaultPrevented || isModifierKey(e.key) || isAltGr(e)) return;
       const mod = e.ctrlKey || e.metaKey;
       const alt = e.altKey;
       const key = eventKey(e);
@@ -73,9 +79,9 @@ export function ShortcutProvider({
         const parsed = parseKeys(keys);
         if (parsed.mod !== mod || parsed.alt !== alt) return [];
         // Shift+letter/arrow belongs to text selection unless the shortcut asks for Shift.
-        if (parsed.shift ? !e.shiftKey : e.shiftKey && (arrow || /^[a-z]$/.test(key))) return [];
-        if (!allowSingle && isSingleKey(keys) && keys !== "Escape") return [];
-        if (typing && !parsed.mod && !parsed.alt) return [];
+        if (!shiftMatches(parsed.shift, e.shiftKey, key)) return [];
+        if (isBlocked(keys, allowSingle)) return [];
+        if (typing && !parsed.mod) return [];
         if (inDialog && !en.inDialog) return [];
         return [{ en, steps: parsed.steps }];
       });
@@ -120,11 +126,11 @@ export function ShortcutProvider({
       .filter((en): en is Entry & { label: MessageKey } => en.label !== undefined)
       .map(({ id, keys, label }) => {
         const keysNow = effectiveKeys(id, keys, effective);
-        return { id, keys: keysNow ?? "", defaultKeys: keys, label, disabled: keysNow === null };
+        return { id, keys: keysNow ?? "", defaultKeys: keys, label, disabled: keysNow === null, blocked: keysNow !== null && isBlocked(keysNow, singleKey) };
       });
     return { list, register };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, register, effective]);
+  }, [version, register, effective, singleKey]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

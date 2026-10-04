@@ -45,17 +45,55 @@ export function formatKeys(keys: string, mac: boolean = isMac()): string[] {
   return [...out, ...(modified ? [named(bare)] : bare.split(" ").map(named))];
 }
 
-const RESERVED_WITH_MOD = new Set(["w", "t", "n", "l", "r", "q", "f", "p", "Tab"]);
+const RESERVED_WITH_MOD = new Set(["w", "t", "n", "l", "r", "q", "f", "p", "h", "m", "=", "-", "Tab", ..."0123456789"]);
+const RESERVED_MOD_SHIFT = new Set(["i", "j", "c"]);
+const FOCUS_KEYS = new Set(["Tab", "Enter", "Space"]);
 
-/** Combos the browser or OS owns: Ctrl/Cmd+W/T/N/L/R/Tab/Q/F/P, F5, F11, Alt+Left/Right. */
+/** Combos the browser or OS owns, plus plain Tab/Enter/Space (focus and activation must keep working), in any step. */
 export function isReserved(keys: string): boolean {
   const parsed = parseKeys(keys);
+  const plain = !parsed.mod && !parsed.alt;
+  if (plain && parsed.steps.some((k) => FOCUS_KEYS.has(k))) return true;
   if (parsed.steps.length !== 1) return false;
   const key = parsed.steps[0];
-  if (parsed.mod && RESERVED_WITH_MOD.has(key)) return true;
-  if (key === "F5" || key === "F11") return true;
+  if (parsed.mod && (RESERVED_WITH_MOD.has(key) || (parsed.shift && RESERVED_MOD_SHIFT.has(key)))) return true;
+  if (key === "F5" || key === "F11" || key === "F12") return true;
   if (parsed.alt && (key === "ArrowLeft" || key === "ArrowRight")) return true;
   return false;
+}
+
+/** Letters and named keys must match Shift exactly; digits and symbols vary with the keyboard layout (AZERTY digits need Shift). */
+export const shiftMatters = (key: string) => key.length > 1 || /^\p{L}$/u.test(key);
+
+export function shiftMatches(wantsShift: boolean, shiftDown: boolean, key: string): boolean {
+  if (shiftMatters(key)) return wantsShift === shiftDown;
+  return wantsShift ? shiftDown : true;
+}
+
+/** AltGr on Windows reports Ctrl+Alt with a printable key; it types a character and is no shortcut. */
+export function isAltGr(e: KeyboardEvent): boolean {
+  return (e.ctrlKey && e.altKey && e.key.length === 1) || e.getModifierState?.("AltGraph") === true;
+}
+
+/** Two key strings clash when one would fire on the keys the other uses, including a plain key that starts a sequence. */
+export function keysConflict(a: string, b: string): boolean {
+  const pa = parseKeys(a);
+  const pb = parseKeys(b);
+  const plainSingle = (p: ParsedKeys) => p.steps.length === 1 && !p.mod && !p.alt && !p.shift;
+  if (pa.steps.length === 2 && plainSingle(pb)) return pa.steps[0] === pb.steps[0];
+  if (pb.steps.length === 2 && plainSingle(pa)) return pb.steps[0] === pa.steps[0];
+  if (pa.mod !== pb.mod || pa.alt !== pb.alt || pa.steps.length !== pb.steps.length) return false;
+  if (!pa.steps.every((s, i) => s === pb.steps[i])) return false;
+  return pa.steps.length === 2 || !shiftMatters(pa.steps[0]) || pa.shift === pb.shift;
+}
+
+/** WAI-ARIA aria-keyshortcuts value ("Control+K", "Meta+K", "Shift+W"); sequences have no equivalent. */
+export function ariaKeyShortcuts(keys: string, mac: boolean = isMac()): string | undefined {
+  const parsed = parseKeys(keys);
+  if (parsed.steps.length !== 1) return undefined;
+  const bare = keys.replace(/^(Mod\+)?(Alt\+)?(Shift\+)?/, "");
+  const key = bare.length === 1 ? bare.toUpperCase() : bare;
+  return [parsed.mod ? (mac ? "Meta" : "Control") : null, parsed.alt ? "Alt" : null, parsed.shift ? "Shift" : null, key].filter(Boolean).join("+");
 }
 
 const MODIFIER_KEYS = ["Control", "Meta", "Shift", "Alt", "AltGraph", "OS", "CapsLock"];
@@ -72,7 +110,7 @@ export function eventKey(e: KeyboardEvent): string {
 
 /** Keys string for a single non-sequence keydown, or null for a modifier on its own. */
 export function comboFromEvent(e: KeyboardEvent): string | null {
-  if (isModifierKey(e.key)) return null;
+  if (isModifierKey(e.key) || isAltGr(e)) return null;
   const key = eventKey(e);
   const mod = e.ctrlKey || e.metaKey;
   // A shifted symbol (e.g. "?") already says so in the key itself.

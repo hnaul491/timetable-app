@@ -493,6 +493,18 @@ describe("AssistantPage", () => {
       expect(signal?.aborted).toBe(true);
     });
 
+    it("a plain-letter stop key does not swallow typing in the box", async () => {
+      fetchMock.mockImplementation(async (u: string, init: RequestInit) => hang([frame("delta", { text: "Partial" })])(u, init));
+      route();
+      renderPage("en", "/", false, { "assistant-stop": "x" });
+      const box = await screen.findByRole("textbox", { name: "Message the assistant" });
+      await userEvent.type(box, "hi{Enter}");
+      await screen.findByText("Partial");
+      await userEvent.type(box, "x");
+      expect(box).toHaveValue("x");
+      expect(screen.queryByText("Stopped")).toBeNull();
+    });
+
     it("Escape from the page (focus outside the box) also stops", async () => {
       let signal: AbortSignal | undefined;
       fetchMock.mockImplementation(async (u: string, init: RequestInit) => {

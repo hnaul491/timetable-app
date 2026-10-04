@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useT, type MessageKey } from "../i18n";
 import { GROUP_TITLE, groupOfId, SHORTCUT_CATALOG, SHORTCUT_GROUPS, type ShortcutGroup } from "../lib/shortcutCatalog";
-import { comboFromEvent, formatKeys, isModifierKey, isReserved, isSequence, parseKeys } from "../lib/shortcutKeys";
+import { comboFromEvent, formatKeys, isModifierKey, isReserved, isSequence, keysConflict, parseKeys } from "../lib/shortcutKeys";
 import { useSaveShortcutPrefs, useShortcutSettings } from "../lib/shortcutPrefs";
 import { effectiveKeys, useShortcutList, type ShortcutOverrides } from "../lib/shortcuts";
 import { useConfirm } from "./ui/Confirm";
@@ -58,6 +58,11 @@ function useCapture(active: boolean, onKeys: (keys: string) => void, onCancel: (
       }
       const combo = comboFromEvent(e);
       if (!combo) return;
+      if (isReserved(combo)) {
+        clear();
+        callbacks.current.onKeys(combo);
+        return;
+      }
       const parsed = parseKeys(combo);
       const plain = !parsed.mod && !parsed.alt && !parsed.shift;
       if (first !== null && plain) {
@@ -94,6 +99,10 @@ export function ShortcutSettings() {
   const { overrides, singleKey } = useShortcutSettings();
   const save = useSaveShortcutPrefs();
   const [capturing, setCapturing] = useState<string | null>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (capturing) cancelButton.current?.focus();
+  }, [capturing]);
   const [waiting, setWaiting] = useState<string | null>(null);
   const [problem, setProblem] = useState<{ id: string; text: string } | null>(null);
   const [conflict, setConflict] = useState<{ id: string; keys: string; other: Row } | null>(null);
@@ -131,7 +140,7 @@ export function ShortcutSettings() {
     }
     setProblem(null);
     const other = rows.find(
-      (r) => r.id !== row.id && keysOf(r) === keys && (r.group === row.group || r.group === "everywhere" || row.group === "everywhere"),
+      (r) => r.id !== row.id && keysOf(r) !== null && keysConflict(keysOf(r)!, keys) && (r.group === row.group || r.group === "everywhere" || row.group === "everywhere"),
     );
     if (other) {
       setConflict({ id: row.id, keys, other });
@@ -231,7 +240,7 @@ export function ShortcutSettings() {
                         <Keys keys={keys} />
                       )}
                       {isCapturing ? (
-                        <button type="button" onClick={stop} className={button}>
+                        <button ref={cancelButton} type="button" onClick={stop} className={button}>
                           {t("shortcuts.settings.cancel")}
                         </button>
                       ) : (

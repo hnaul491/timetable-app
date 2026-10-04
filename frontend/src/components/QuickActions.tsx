@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useT, type MessageKey } from "../i18n";
+import { ariaKeyShortcuts } from "../lib/shortcutKeys";
 import { formatKeys, useShortcutList } from "../lib/shortcuts";
 import { useOpenSearch } from "../lib/searchContext";
 
@@ -94,7 +95,8 @@ export function QuickActions() {
           className={`flex min-w-52 origin-bottom-right flex-col rounded-2xl border border-line bg-surface p-1.5 shadow-lg ${closing ? "motion-safe:animate-[quick-out_120ms_ease-in_forwards]" : "motion-safe:animate-[quick-in_150ms_ease-out]"}`}
         >
           {list.map((item, i) => {
-            const keys = shortcuts.find((s) => s.id === item.shortcutId)?.keys;
+            const info = shortcuts.find((s) => s.id === item.shortcutId);
+            const keys = info && !info.blocked ? info.keys : undefined;
             return (
               <button
                 key={item.key}
@@ -103,7 +105,7 @@ export function QuickActions() {
                 }}
                 type="button"
                 role="menuitem"
-                aria-keyshortcuts={keys ? formatKeys(keys).join(" ") : undefined}
+                aria-keyshortcuts={keys ? ariaKeyShortcuts(keys) : undefined}
                 onClick={() => {
                   setClosing(false);
                   setOpen(false);

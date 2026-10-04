@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_user
 from app.db import get_session
 from app.models import AppSetting
-from app.schemas import Preferences
+from app.schemas import Preferences, clean_shortcuts
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 LANGUAGE_KEY = "language"
@@ -16,10 +16,11 @@ def _read(session: Session) -> Preferences:
     language = session.get(AppSetting, LANGUAGE_KEY)
     shortcuts = session.get(AppSetting, SHORTCUTS_KEY)
     single = session.get(AppSetting, SINGLE_KEY_KEY)
+    # Lenient: stored data that no longer validates is dropped rather than failing the whole read.
     return Preferences(
-        language=language.value if language else None,
-        shortcuts=shortcuts.value if shortcuts else {},
-        single_key_shortcuts=single.value if single else True,
+        language=language.value if language and language.value in ("en", "vi") else None,
+        shortcuts=clean_shortcuts(shortcuts.value if shortcuts else {}),
+        single_key_shortcuts=single.value if single and isinstance(single.value, bool) else True,
     )
 
 

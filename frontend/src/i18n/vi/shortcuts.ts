@@ -34,6 +34,7 @@ export const shortcuts: Messages["shortcuts"] = {
   settingsSection4: "Mở Google",
   settingsSection5: "Mở Trợ lý AI",
   settingsSection6: "Mở Sao lưu",
+  settingsSection7: "Mở Phím tắt",
   settingsFind: "Tìm một cài đặt",
   freeWeek: "Tuần này",
   freeMonth: "Tháng này",

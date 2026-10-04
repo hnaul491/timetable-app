@@ -44,12 +44,12 @@ def test_partial_put_keeps_other_fields(client):
     assert put(client, {}).json() == {**DEFAULT, "language": "en"}
 
 
-@pytest.mark.parametrize("keys", ["g x", "Mod+k", "Shift+ArrowLeft", "Alt+Shift+t", "?", "+", "Escape", "F5"])
+@pytest.mark.parametrize("keys", ["g x", "Mod+k", "Shift+ArrowLeft", "Alt+Shift+t", "?", "+", "Escape", "F1"])
 def test_valid_keys_accepted(client, keys):
     assert put(client, {"shortcuts": {"a": keys}}).status_code == 200
 
 
-@pytest.mark.parametrize("keys", ["", "Ctrl+k", "Mod+", "g x y", "Shift+Mod+k", "a" * 33, "Mod+Mod+k", "ab cd ef", "Mod+g x", "g  x"])
+@pytest.mark.parametrize("keys", ["", "Ctrl+k", "Mod+", "g x y", "Shift+Mod+k", "a" * 33, "Mod+Mod+k", "ab cd ef", "Mod+g x", "g  x", "F5", "F11"])
 def test_invalid_keys_rejected(client, keys):
     assert put(client, {"shortcuts": {"a": keys}}).status_code == 422
 
@@ -66,3 +66,38 @@ def test_entry_cap(client):
 
 def test_single_key_flag_must_be_boolean(client):
     assert put(client, {"single_key_shortcuts": "no"}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "keys",
+    ["Tab", "Enter", "Space", "Shift+Tab", "g Tab", "Tab g", "g Space", "Mod+1", "Mod+9", "Mod+0", "Mod+=", "Mod+-", "Mod+h", "Mod+m", "F12", "Mod+Shift+i", "Mod+Shift+j", "Mod+Shift+c", "Mod+Tab"],
+)
+def test_reserved_keys_rejected(client, keys):
+    assert put(client, {"shortcuts": {"a": keys}}).status_code == 422
+
+
+@pytest.mark.parametrize("keys", ["Mod+Enter", "Alt+Space", "Mod+Shift+k", "Mod+i", "Mod+j"])
+def test_non_reserved_combos_accepted(client, keys):
+    assert put(client, {"shortcuts": {"a": keys}}).status_code == 200
+
+
+def test_get_drops_invalid_stored_entries(client, session):
+    from app.models import AppSetting
+
+    put(client, {"language": "vi"})
+    session.add(AppSetting(key="shortcuts", value={"ok": "g x", "bad": "Tab", "Bad Id": "n", "off": None, "num": 5}))
+    session.add(AppSetting(key="single_key_shortcuts", value="yes"))
+    session.commit()
+    assert client.get("/api/preferences", headers=AUTH).json() == {
+        "language": "vi",
+        "shortcuts": {"ok": "g x", "off": None},
+        "single_key_shortcuts": True,
+    }
+
+
+def test_get_survives_non_dict_shortcuts(client, session):
+    from app.models import AppSetting
+
+    session.add(AppSetting(key="shortcuts", value=["x"]))
+    session.commit()
+    assert client.get("/api/preferences", headers=AUTH).json()["shortcuts"] == {}

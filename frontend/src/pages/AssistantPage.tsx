@@ -10,7 +10,7 @@ import { apiFetch } from "../lib/api";
 import { translateServerMessage } from "../i18n/serverMessages";
 import { aiErrorText, sendFailedText } from "../lib/aiError";
 import { streamChat } from "../lib/chatStream";
-import { comboFromEvent } from "../lib/shortcutKeys";
+import { comboFromEvent, isSingleKey } from "../lib/shortcutKeys";
 import { useShortcut, useShortcutList } from "../lib/shortcuts";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { formatLongDate, parisParts } from "../lib/time";
@@ -272,7 +272,9 @@ export function AssistantPage() {
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // The engine ignores plain keys while typing, and focus stays in the box during a reply.
     const stopKeys = shortcutList.find((s) => s.id === "assistant-stop");
-    if (streaming && stopKeys && !stopKeys.disabled && comboFromEvent(e.nativeEvent) === stopKeys.keys) {
+    // Only Escape or a Mod/Alt combo is caught here; a plain-letter stop key must not swallow typing.
+    const catchable = stopKeys && !stopKeys.disabled && (stopKeys.keys === "Escape" || !isSingleKey(stopKeys.keys));
+    if (streaming && catchable && comboFromEvent(e.nativeEvent) === stopKeys.keys) {
       e.preventDefault();
       stop();
       return;

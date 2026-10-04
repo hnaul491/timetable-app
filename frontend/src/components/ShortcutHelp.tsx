@@ -22,7 +22,7 @@ const helpGroup = (id: string): ShortcutGroup => {
 
 export function ShortcutHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
-  const list = useShortcutList().filter((s) => !s.disabled);
+  const list = useShortcutList().filter((s) => !s.disabled && !s.blocked);
   const page = pageGroup(useLocation().pathname);
   const groups = (["everywhere", ...PAGE_GROUPS] as ShortcutGroup[])
     .filter((g) => g === "everywhere" || g === page)

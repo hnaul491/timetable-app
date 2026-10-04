@@ -32,6 +32,7 @@ export const shortcuts = {
   settingsSection4: "Open Google",
   settingsSection5: "Open AI assistant",
   settingsSection6: "Open Backup",
+  settingsSection7: "Open Shortcuts",
   settingsFind: "Find a setting",
   freeWeek: "This week",
   freeMonth: "This month",

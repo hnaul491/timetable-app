@@ -73,6 +73,7 @@ export function SettingsPage() {
   useShortcut("settings-section-4", "4", () => openSection(SECTIONS[3].id), { label: "shortcuts.settingsSection4" });
   useShortcut("settings-section-5", "5", () => openSection(SECTIONS[4].id), { label: "shortcuts.settingsSection5" });
   useShortcut("settings-section-6", "6", () => openSection(SECTIONS[5].id), { label: "shortcuts.settingsSection6" });
+  useShortcut("settings-section-7", "7", () => openSection(SECTIONS[6].id), { label: "shortcuts.settingsSection7" });
   useShortcut("settings-find", "f", () => finder.current?.focus(), { label: "shortcuts.settingsFind", enabled: desktop });
 
   const goBack = () => {

@@ -52,6 +52,7 @@ export const SHORTCUT_CATALOG: CatalogEntry[] = [
   { id: "settings-section-4", keys: "4", label: "shortcuts.settingsSection4", group: "settings" },
   { id: "settings-section-5", keys: "5", label: "shortcuts.settingsSection5", group: "settings" },
   { id: "settings-section-6", keys: "6", label: "shortcuts.settingsSection6", group: "settings" },
+  { id: "settings-section-7", keys: "7", label: "shortcuts.settingsSection7", group: "settings" },
   { id: "settings-find", keys: "f", label: "shortcuts.settingsFind", group: "settings" },
   { id: "free-week", keys: "w", label: "shortcuts.freeWeek", group: "freeTime" },
   { id: "free-month", keys: "m", label: "shortcuts.freeMonth", group: "freeTime" },
