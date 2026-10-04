@@ -265,6 +265,7 @@ def _propose_task(session: Session, args: dict, now: datetime) -> dict:
     semester = _semester(session)
     subject_id = None
     event_id = None
+    subject_name = None
     if args.get("event_id") is not None:
         found = _int_arg(args["event_id"])
         event = session.get(Event, found) if found is not None else None
@@ -273,10 +274,13 @@ def _propose_task(session: Session, args: dict, now: datetime) -> dict:
         event_id, subject_id = event.id, event.subject_id
     if args.get("subject"):
         subject_id = _find_subject(session, semester.id, args["subject"]).id
+    if subject_id is not None:
+        found_subject = session.get(Subject, subject_id)
+        subject_name = found_subject.display_name if found_subject else None
     due = _day(args["due_date"], "due_date").isoformat() if args.get("due_date") else None
     summary = f"Task: {title}" + (f" (due {due})" if due else "")
     return _pending(session, "task", summary, {"title": title, "due_date": due, "subject_id": subject_id,
-                                               "event_id": event_id}, now)
+                                               "subject_name": subject_name, "event_id": event_id}, now)
 
 
 def _propose_event(session: Session, args: dict, now: datetime) -> dict:
@@ -299,7 +303,8 @@ def _propose_note(session: Session, args: dict, now: datetime) -> dict:
         raise ToolError("tab must be after or before")
     text = _text(args.get("text"), "text", 5000)
     return _pending(session, "note", f"Add to the {args['tab']}-class note of {event.title_raw}: {text[:80]}",
-                    {"event_id": event.id, "tab": args["tab"], "text": text}, now)
+                    {"event_id": event.id, "tab": args["tab"], "text": text,
+                     "event_title": event.title_raw[:200], "event_date": paris_iso(event.start_at)[:10]}, now)
 
 
 def _propose_study_blocks(session: Session, args: dict, now: datetime) -> dict:
