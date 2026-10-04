@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { RouterProvider, createMemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventDetail } from "../types";
 import { ConfirmProvider } from "../components/ui/Confirm";
@@ -36,17 +36,19 @@ const detail = (over: Partial<EventDetail["event"]> = {}): EventDetail => ({
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const router = createMemoryRouter(
+    [
+      { path: "/events/:id", element: <EventPage /> },
+      { path: "/", element: <p>Calendar home</p> },
+    ],
+    { initialEntries: ["/events/7"] },
+  );
   return render(
     <QueryClientProvider client={client}>
       <ToastProvider>
         <ConfirmProvider>
           <ShortcutProvider>
-            <MemoryRouter initialEntries={["/events/7"]}>
-              <Routes>
-                <Route path="/events/:id" element={<EventPage />} />
-                <Route path="/" element={<p>Calendar home</p>} />
-              </Routes>
-            </MemoryRouter>
+            <RouterProvider router={router} />
           </ShortcutProvider>
         </ConfirmProvider>
       </ToastProvider>
@@ -141,6 +143,7 @@ describe("EventPage", () => {
     fireEvent.change(box, { target: { value: "draft for 7" } });
     await userEvent.click(screen.getByRole("tab", { name: "Before next class" }));
     await userEvent.click(screen.getByRole("link", { name: /Next class/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Leave" }));
     const box8 = await screen.findByDisplayValue("Event 8 note");
     expect(box8).toHaveAccessibleName("After class note");
     expect(screen.getByRole("tab", { name: "After class" })).toHaveAttribute("aria-selected", "true");
@@ -237,5 +240,40 @@ describe("EventPage", () => {
     expect(box).toHaveValue("[ ] Redo ex 3");
     expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
     expect(localStorage.getItem("timetable:draft:7:after")).toBeNull();
+  });
+
+  it("asks before leaving with unsaved changes; cancel stays, confirm leaves", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    await userEvent.type(await screen.findByLabelText("After class note"), " more");
+    await userEvent.click(screen.getByRole("link", { name: /Back to calendar/ }));
+    expect(await screen.findByText("Leave without saving?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByText("Leave without saving?")).not.toBeInTheDocument());
+    expect(screen.queryByText("Calendar home")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: /Back to calendar/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Leave" }));
+    expect(await screen.findByText("Calendar home")).toBeInTheDocument();
+  });
+
+  it("leaves freely when nothing is unsaved", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    await screen.findByLabelText("After class note");
+    await userEvent.click(screen.getByRole("link", { name: /Back to calendar/ }));
+    expect(await screen.findByText("Calendar home")).toBeInTheDocument();
+  });
+
+  it("registers beforeunload only while there are unsaved changes", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    const box = await screen.findByLabelText("After class note");
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+    await userEvent.type(box, "x");
+    const dirty = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
   });
 });
