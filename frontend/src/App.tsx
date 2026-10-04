@@ -4,6 +4,9 @@ import { AuthGate } from "./auth/AuthGate";
 import { I18nProvider } from "./i18n";
 import { LanguageRoot } from "./i18n/LanguageRoot";
 import { Layout } from "./components/Layout";
+import { ConfirmProvider } from "./components/ui/Confirm";
+import { ToastProvider } from "./components/ui/Toast";
+import { TopProgress } from "./components/ui/TopProgress";
 import { ApiError } from "./lib/api";
 import { initialLanguage } from "./lib/language";
 import { BoardPage } from "./pages/BoardPage";
@@ -30,20 +33,25 @@ export default function App() {
       <I18nProvider locale={initialLanguage()}>
         <AuthGate>
           <LanguageRoot>
-            <BrowserRouter>
-              <Routes>
-                <Route element={<Layout />}>
-                  <Route index element={<CalendarPage />} />
-                  <Route path="board" element={<BoardPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="review" element={<ReviewPage />} />
-                  <Route path="subjects" element={<SubjectsPage />} />
-                  <Route path="subjects/:id" element={<SubjectPage />} />
-                  <Route path="events/new" element={<NewEventPage />} />
-                  <Route path="events/:id" element={<EventPage />} />
-                </Route>
-              </Routes>
-            </BrowserRouter>
+            <ToastProvider>
+              <ConfirmProvider>
+                <TopProgress />
+                <BrowserRouter>
+                  <Routes>
+                    <Route element={<Layout />}>
+                      <Route index element={<CalendarPage />} />
+                      <Route path="board" element={<BoardPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                      <Route path="review" element={<ReviewPage />} />
+                      <Route path="subjects" element={<SubjectsPage />} />
+                      <Route path="subjects/:id" element={<SubjectPage />} />
+                      <Route path="events/new" element={<NewEventPage />} />
+                      <Route path="events/:id" element={<EventPage />} />
+                    </Route>
+                  </Routes>
+                </BrowserRouter>
+              </ConfirmProvider>
+            </ToastProvider>
           </LanguageRoot>
         </AuthGate>
       </I18nProvider>

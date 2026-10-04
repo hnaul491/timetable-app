@@ -8,6 +8,8 @@ import { google } from "./google";
 import { nav } from "./nav";
 import { review } from "./review";
 import { settings } from "./settings";
+import { shortcuts } from "./shortcuts";
 import { subjects } from "./subjects";
+import { ui } from "./ui";
 
-export const vi: Messages = { common, errors, nav, calendar, event, board, subjects, review, settings, google };
+export const vi: Messages = { common, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts };

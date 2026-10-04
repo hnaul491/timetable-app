@@ -34,9 +34,11 @@
   --color-success: var(--tt-success);
   --color-success-soft: var(--tt-success-soft);
   --color-important: var(--tt-important);
+  --color-backdrop: var(--tt-backdrop);
 }
 
 :root {
+  --tt-backdrop: rgb(21 23 28 / 0.45);
   color-scheme: light;
   --tt-canvas: #f4f5f7;
   --tt-surface: #ffffff;
@@ -69,6 +71,7 @@
 }
 
 :root[data-theme="dark"] {
+  --tt-backdrop: rgb(0 0 0 / 0.6);
   color-scheme: dark;
   --tt-canvas: #121418;
   --tt-surface: #1a1d23;
