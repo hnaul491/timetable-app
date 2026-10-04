@@ -7,7 +7,7 @@ export const freeTime: Messages["freeTime"] = {
   to: "Đến",
   period: "Khoảng thời gian",
   periods: { today: "Hôm nay", tomorrow: "Ngày mai", week: "Tuần này", nextWeek: "Tuần sau", month: "Tháng này", nextMonth: "Tháng sau", semester: "Phần còn lại của học kỳ", custom: "Tùy chọn" },
-  step: { prevDay: "Ngày trước", nextDay: "Ngày sau", prevWeek: "Tuần trước", nextWeek: "Tuần sau", prevMonth: "Tháng trước", nextMonth: "Tháng sau" },
+  step: { prevDay: "Về ngày trước", nextDay: "Sang ngày sau", prevWeek: "Về tuần trước", nextWeek: "Sang tuần sau", prevMonth: "Về tháng trước", nextMonth: "Sang tháng sau" },
   customStart: "Ngày đầu",
   customEnd: "Ngày cuối",
   weekdays: "Các thứ trong tuần",

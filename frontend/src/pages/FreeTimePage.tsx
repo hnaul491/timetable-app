@@ -311,7 +311,8 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
   const current = data.start === range.start && data.end === range.end;
   const { unit, offset } = form.period;
   const periodKey = !current ? "custom" : unit === "week" ? (offset === 0 ? "week" : offset === 1 ? "nextWeek" : "custom") : unit;
-  const dayName = `${new Date(`${data.start}T12:00:00Z`).toLocaleDateString(intl, { weekday: "long", timeZone: "UTC" })} ${longDate(data.start)}`;
+  const dayLong = new Date(`${data.start}T12:00:00Z`).toLocaleDateString(intl, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const dayName = locale === "en" ? dayLong.replace(",", "") : dayLong; // newer ICU puts a comma after the English weekday
   const summary =
     t("freeTime.summaryWindow", { from: data.window.from, to: data.window.to }) +
     t(`freeTime.summaryPeriod.${periodKey}` as MessageKey, { month: monthName, date: dayName, start: longDate(data.start), end: longDate(data.end) }) +

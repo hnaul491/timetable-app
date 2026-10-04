@@ -62,7 +62,7 @@ function renderPage(locale: "en" | "vi" = "en", help = false, path = "/free-time
 
 /** The period chip (it has aria-pressed); the step buttons can share a name such as "Next week". */
 const chip = (name: string) => screen.getAllByRole("button", { name }).find((b) => b.hasAttribute("aria-pressed"))!;
-const stepButton = (name: string) => screen.getAllByRole("button", { name }).find((b) => !b.hasAttribute("aria-pressed"))!;
+const stepButton = (name: string) => screen.getByRole("button", { name: `Go to ${name.toLowerCase()}` });
 const pressedChips = () => within(screen.getByRole("group", { name: "Period" })).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
 
 const freeCalls = () => apiFetch.mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/api/free-time"));
@@ -440,7 +440,7 @@ describe("FreeTimePage", () => {
       renderPage("en", true);
       const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
       expect(within(dialog).getByRole("heading", { name: "Free time" })).toBeInTheDocument();
-      for (const label of ["Today", "Tomorrow", "Previous day, week or month", "Next day, week or month", "This week", "This month", "Rest of semester", "Custom dates", "Travel buffer", "Toggle Monday", "Toggle Sunday"]) {
+      for (const label of ["Today", "Tomorrow", "Go to previous period", "Go to next period", "This week", "This month", "Rest of semester", "Custom dates", "Travel buffer", "Toggle Monday", "Toggle Sunday"]) {
         expect(within(dialog).getByText(label)).toBeInTheDocument();
       }
     });
@@ -513,7 +513,7 @@ describe("FreeTimePage", () => {
 
       await user.click(chip("Today"));
       expect(screen.getByTestId("period-label")).toHaveTextContent("Wed 14 Oct");
-      await user.click(screen.getByRole("button", { name: "Previous day" }));
+      await user.click(screen.getByRole("button", { name: "Go to previous day" }));
       expect(screen.getByTestId("period-label")).toHaveTextContent("Tue 13 Oct");
       expect(pressedChips()).toEqual([]);
       await waitFor(() => expect(lastParams().get("start")).toBe("2026-10-13"));
@@ -524,14 +524,14 @@ describe("FreeTimePage", () => {
       renderPage();
       await screen.findByTestId("free-big");
       await user.click(chip("Rest of semester"));
-      expect(screen.getByRole("button", { name: /^Previous/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /^Go to previous/ })).toBeDisabled();
       expect(stepButton("Next day")).toBeDisabled();
       expect(screen.getByTestId("period-label")).toBeEmptyDOMElement();
       await user.click(chip("Custom"));
-      expect(screen.getByRole("button", { name: /^Previous/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /^Go to previous/ })).toBeDisabled();
       expect(stepButton("Next day")).toBeDisabled();
       await user.click(chip("This week"));
-      expect(screen.getByRole("button", { name: "Previous week" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Go to previous week" })).toBeEnabled();
     });
 
     it("t, Shift+T, left and right arrows", async () => {
@@ -577,13 +577,13 @@ describe("FreeTimePage", () => {
         expect(chip(label)).toBeInTheDocument();
       }
       await user.click(chip("Hôm nay"));
-      await user.click(screen.getByRole("button", { name: "Ngày sau" }));
+      await user.click(screen.getByRole("button", { name: "Sang ngày sau" }));
       expect(screen.getByTestId("period-label")).toHaveTextContent("15");
-      expect(await screen.findByText(/rảnh từ 06:00 đến 08:00 vào .*15/)).toBeInTheDocument();
+      expect(await screen.findByText(/rảnh từ 06:00 đến 08:00 vào Thứ Năm, 15 tháng 10, 2026/)).toBeInTheDocument();
       await user.click(chip("Tuần này"));
-      expect(screen.getByRole("button", { name: "Tuần trước" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Về tuần trước" })).toBeInTheDocument();
       await user.click(chip("Tháng này"));
-      expect(screen.getByRole("button", { name: "Tháng trước" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Về tháng trước" })).toBeInTheDocument();
     });
   });
 
