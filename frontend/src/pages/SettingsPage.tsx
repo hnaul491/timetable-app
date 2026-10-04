@@ -5,6 +5,7 @@ import { AISettings } from "../components/AISettings";
 import { GoogleSettings } from "../components/GoogleSettings";
 import { useToast } from "../components/ui/Toast";
 import { AppearanceSettings } from "../components/AppearanceSettings";
+import { MobileSemesterSwitch } from "../components/MobileSemesterSwitch";
 import { RecurringList } from "../components/RecurringList";
 import { SemesterSettings } from "../components/SemesterSettings";
 import { SubjectSettings } from "../components/SubjectSettings";
@@ -67,6 +68,7 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold tracking-tight">{t("settings.title")}</h1>
+      <MobileSemesterSwitch />
       {keyStatus.error && <ErrorPanel error={keyStatus.error} />}
       <AppearanceSettings />
       <div className="grid gap-4 lg:grid-cols-2">
