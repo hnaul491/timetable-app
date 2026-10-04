@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
+import { useLocale, useT } from "../i18n";
 import { layoutDay, type Span } from "../lib/layout";
 import { dayLabel, formatTime, parisParts, todayParis } from "../lib/time";
 import type { ApiEvent } from "../types";
@@ -25,6 +26,7 @@ function bounds(timed: Timed[]): [number, number] {
 }
 
 export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
+  const locale = useLocale();
   const today = todayParis();
   const { byDay, holidays, firstHour, lastHour } = useMemo(() => {
     const byDay = new Map<string, Timed[]>(days.map((d) => [d, []]));
@@ -51,7 +53,7 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
       <div className="grid" style={{ gridTemplateColumns: columns }}>
         <div className="border-b border-line" />
         {days.map((date) => {
-          const label = dayLabel(date);
+          const label = dayLabel(date, locale);
           const isToday = date === today;
           return (
             <div key={date} className="flex flex-wrap items-center gap-2 border-b border-l border-line px-2 py-2.5">
@@ -120,9 +122,10 @@ function EventBlock({
   columns: number;
   onSelect?: (id: number) => void;
 }) {
+  const t = useT();
   const color = ev.color ?? KIND_COLORS[ev.kind] ?? "#3B4252";
   const title = ev.section ? `${ev.title} ${ev.section}` : ev.title;
-  const label = `${title}, ${formatTime(ev.start)} to ${formatTime(ev.end)}${ev.room ? `, ${ev.room}` : ""}`;
+  const label = `${t("calendar.grid.eventLabel", { title, start: formatTime(ev.start), end: formatTime(ev.end) })}${ev.room ? `, ${ev.room}` : ""}`;
   const outline = ev.kind === "french_ext" ? { border: `1.5px dashed ${color}`, background: "var(--tt-surface)" } : { background: `color-mix(in srgb, ${color} var(--event-fill), transparent)` };
   return (
     <div
@@ -137,7 +140,7 @@ function EventBlock({
       {onSelect && (
         <button
           type="button"
-          aria-label={`Open ${title}`}
+          aria-label={t("calendar.grid.open", { title })}
           className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-accent"
           onClick={() => onSelect(ev.id)}
         />
@@ -145,7 +148,7 @@ function EventBlock({
       <span className="flex items-center gap-1.5 leading-tight font-bold">
         <span className="size-2 shrink-0 rounded-full" style={{ background: color }} />
         {ev.important && (
-          <span role="img" aria-label="Important" className="shrink-0 text-[13px] leading-none text-important">
+          <span role="img" aria-label={t("calendar.grid.important")} className="shrink-0 text-[13px] leading-none text-important">
             ★
           </span>
         )}
@@ -157,12 +160,12 @@ function EventBlock({
       </span>
       {ev.room && <span className="text-[11px] text-ink-2">{ev.room}</span>}
       <span className="flex flex-wrap gap-1">
-        {ev.kind === "exam" && <span className="rounded-full bg-danger px-1.5 text-[10.5px] font-bold text-on-danger">Exam</span>}
-        {ev.status === "changed" && <span className="rounded-full bg-changed px-1.5 text-[10.5px] font-bold text-on-changed">Changed</span>}
-        {ev.note_count > 0 && <span className="rounded-full bg-surface px-1.5 text-[10.5px] font-semibold">Note</span>}
+        {ev.kind === "exam" && <span className="rounded-full bg-danger px-1.5 text-[10.5px] font-bold text-on-danger">{t("calendar.grid.exam")}</span>}
+        {ev.status === "changed" && <span className="rounded-full bg-changed px-1.5 text-[10.5px] font-bold text-on-changed">{t("calendar.grid.changed")}</span>}
+        {ev.note_count > 0 && <span className="rounded-full bg-surface px-1.5 text-[10.5px] font-semibold">{t("calendar.grid.note")}</span>}
         {ev.open_tasks > 0 && (
           <span className="rounded-full bg-surface px-1.5 text-[10.5px] font-semibold">
-            {ev.open_tasks} {ev.open_tasks === 1 ? "task" : "tasks"}
+            {t("calendar.grid.tasks", { count: ev.open_tasks })}
           </span>
         )}
       </span>

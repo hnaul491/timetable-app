@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { WeekGrid } from "../components/WeekGrid";
+import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { rememberCalendarSearch } from "../lib/calendarLocation";
 import { addDays, dayLabel, formatLongDate, rangeUtc, startOfWeek, todayParis } from "../lib/time";
@@ -23,6 +24,8 @@ function parseDate(value: string | null): string | null {
 const buttonClass = "h-10 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold hover:bg-surface-2";
 
 export function CalendarPage() {
+  const t = useT();
+  const locale = useLocale();
   const navigate = useNavigate();
   const isPhone = useMediaQuery("(max-width: 767px)");
   // The shown date and view live in the address, so coming back from an event keeps the same week.
@@ -49,25 +52,25 @@ export function CalendarPage() {
 
   const title =
     view === "week"
-      ? `${dayLabel(days[0]).day} – ${formatLongDate(days[6])}`
-      : `${dayLabel(anchor).weekday} ${formatLongDate(anchor)}`;
+      ? `${dayLabel(days[0], locale).day} – ${formatLongDate(days[6], locale)}`
+      : `${dayLabel(anchor, locale).weekday} ${formatLongDate(anchor, locale)}`;
 
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-bold tracking-tight">{title}</h1>
         <div className="flex gap-1.5">
-          <button type="button" aria-label={`Previous ${view}`} className={buttonClass} onClick={() => setAnchor(addDays(anchor, -step))}>
+          <button type="button" aria-label={t(view === "week" ? "calendar.header.previousWeek" : "calendar.header.previousDay")} className={buttonClass} onClick={() => setAnchor(addDays(anchor, -step))}>
             ‹
           </button>
           <button type="button" className={buttonClass} onClick={() => setAnchor(todayParis())}>
-            Today
+            {t("common.today")}
           </button>
-          <button type="button" aria-label={`Next ${view}`} className={buttonClass} onClick={() => setAnchor(addDays(anchor, step))}>
+          <button type="button" aria-label={t(view === "week" ? "calendar.header.nextWeek" : "calendar.header.nextDay")} className={buttonClass} onClick={() => setAnchor(addDays(anchor, step))}>
             ›
           </button>
         </div>
-        <div role="group" aria-label="View" className="flex rounded-xl bg-subtle p-[3px]">
+        <div role="group" aria-label={t("calendar.header.view")} className="flex rounded-xl bg-subtle p-[3px]">
           {(["week", "day"] as const).map((v) => (
             <button
               key={v}
@@ -76,12 +79,12 @@ export function CalendarPage() {
               onClick={() => setView(v)}
               className={`h-[34px] rounded-lg px-4 text-sm capitalize ${view === v ? "bg-surface font-semibold shadow-sm" : "font-medium text-ink-2"}`}
             >
-              {v}
+              {t(v === "week" ? "calendar.header.viewWeek" : "calendar.header.viewDay")}
             </button>
           ))}
         </div>
         <Link to="/events/new" className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
-          Add event
+          {t("calendar.header.addEvent")}
         </Link>
       </header>
       <SyncBanner status={sync.data} />

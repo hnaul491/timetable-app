@@ -2,17 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { calendarHref } from "../lib/calendarLocation";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 
-const TABS: { id: NoteTab; label: string }[] = [
-  { id: "after", label: "After class" },
-  { id: "before", label: "Before next class" },
+const TABS: { id: NoteTab; label: MessageKey; noteLabel: MessageKey }[] = [
+  { id: "after", label: "event.tabAfter", noteLabel: "event.noteAfter" },
+  { id: "before", label: "event.tabBefore", noteLabel: "event.noteBefore" },
 ];
-const KIND_LABEL: Record<string, string> = { work: "Work", french_ext: "French (external)", other: "My event" };
+const KIND_LABEL: Record<string, MessageKey> = { work: "event.kindWork", french_ext: "event.kindFrench", other: "event.kindOther" };
 const chip = "rounded-full bg-subtle px-2.5 py-1 text-xs font-semibold text-ink-2";
 
 interface Draft {
@@ -55,6 +56,8 @@ export function EventPage() {
 }
 
 function EventPageInner() {
+  const t = useT();
+  const locale = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -89,7 +92,7 @@ function EventPageInner() {
       apiFetch<EventDetail>(`/api/events/${id}/important`, { method: "PUT", body: JSON.stringify({ important }) }),
     onSuccess: (data) => {
       queryClient.setQueryData(["event", id], data);
-      setStarNotice(data.event.important ? "Marked important" : "No longer important");
+      setStarNotice(t(data.event.important ? "event.markedImportant" : "event.noLongerImportant"));
       invalidateLists();
     },
   });
@@ -113,7 +116,7 @@ function EventPageInner() {
   });
 
   if (detail.error) return <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />;
-  if (!detail.data) return <p className="text-muted">Loading…</p>;
+  if (!detail.data) return <p className="text-muted">{t("common.loading")}</p>;
 
   const { event, tasks, notes } = detail.data;
   const saved = notes[tab];
@@ -141,19 +144,19 @@ function EventPageInner() {
   });
   const start = parisParts(event.start);
   const nextStart = detail.data.next_event_start;
-  const tabLabel = TABS.find((t) => t.id === tab)!.label;
+  const noteLabel = TABS.find((x) => x.id === tab)!.noteLabel;
 
   return (
     <div className="flex flex-col gap-4">
       <Link to={calendarHref()} className="text-sm font-semibold text-accent">
-        ‹ Back to calendar
+        {t("event.backToCalendar")}
       </Link>
       <article className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 md:p-7">
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             {event.subject_name && <span className={chip}>{event.subject_name}</span>}
-            <span className={chip}>{event.source === "zeus" ? "School timetable" : KIND_LABEL[event.kind]}</span>
-            {event.status !== "normal" && <span className={chip}>{event.status === "changed" ? "Changed" : "Cancelled"}</span>}
+            <span className={chip}>{event.source === "zeus" ? t("event.schoolTimetable") : t(KIND_LABEL[event.kind])}</span>
+            {event.status !== "normal" && <span className={chip}>{t(event.status === "changed" ? "event.changed" : "event.cancelled")}</span>}
             <button
               type="button"
               aria-pressed={event.important}
@@ -164,7 +167,7 @@ function EventPageInner() {
               }`}
             >
               <span aria-hidden="true" className="text-base leading-none">{event.important ? "★" : "☆"}</span>
-              {event.important ? "Important" : "Mark important"}
+              {t(event.important ? "event.important" : "event.markImportant")}
             </button>
           </div>
           <p role="status" className="min-h-0 text-sm text-muted empty:hidden">
@@ -175,7 +178,7 @@ function EventPageInner() {
             {event.section ? ` · ${event.section}` : ""}
           </h1>
           <p className="text-sm text-ink-2">
-            {dayLabel(start.date).weekday} {formatLongDate(start.date)} ·{" "}
+            {dayLabel(start.date, locale).weekday} {formatLongDate(start.date, locale)} ·{" "}
             <span className="font-mono">
               {formatTime(event.start)}–{formatTime(event.end)}
             </span>
@@ -183,38 +186,38 @@ function EventPageInner() {
           </p>
           {detail.data.next_event_id && nextStart && (
             <Link to={`/events/${detail.data.next_event_id}`} className="text-sm font-semibold text-accent">
-              Next class: {formatLongDate(parisParts(nextStart).date)} {formatTime(nextStart)}
+              {t("event.nextClass", { date: formatLongDate(parisParts(nextStart).date, locale), time: formatTime(nextStart) })}
             </Link>
           )}
         </header>
 
-        <div role="tablist" aria-label="Notes" className="flex gap-1 border-b border-line">
-          {TABS.map((t) => (
+        <div role="tablist" aria-label={t("event.notes")} className="flex gap-1 border-b border-line">
+          {TABS.map((x) => (
             <button
-              key={t.id}
+              key={x.id}
               type="button"
               role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={`-mb-px px-3.5 py-2.5 text-sm ${tab === t.id ? "border-b-2 border-accent font-semibold text-accent-strong" : "font-medium text-muted"}`}
+              aria-selected={tab === x.id}
+              onClick={() => setTab(x.id)}
+              className={`-mb-px px-3.5 py-2.5 text-sm ${tab === x.id ? "border-b-2 border-accent font-semibold text-accent-strong" : "font-medium text-muted"}`}
             >
-              {t.label}
+              {t(x.label)}
             </button>
           ))}
         </div>
 
         <textarea
-          aria-label={`${tabLabel} note`}
+          aria-label={t(noteLabel)}
           value={current.body}
           onChange={(e) => setCurrent({ body: e.target.value })}
           rows={10}
           maxLength={20000}
           className="w-full rounded-xl border border-line p-4 font-sans text-[15px] leading-relaxed"
-          placeholder="What was covered? Homework? Write [ ] at the start of a line to make it a task."
+          placeholder={t("event.placeholder")}
         />
         <p className="text-xs text-muted">
-          Lines starting with <code>[ ]</code> become tasks on your board; <code>[x]</code> marks one done. Add{" "}
-          <code>@2026-10-22</code> at the end of a task line for a due date.
+          {t("event.helpStart")} <code>[ ]</code> {t("event.helpTasks")} <code>[x]</code> {t("event.helpDone")}{" "}
+          <code>@2026-10-22</code> {t("event.helpDue")}
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -223,27 +226,27 @@ function EventPageInner() {
             onClick={() => save.mutate({ tab, draft: current })}
             className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
           >
-            Save note
+            {t("event.saveNote")}
           </button>
           {dirty && (
             <button type="button" onClick={discard} className="h-10 rounded-xl border border-line px-4 text-sm font-semibold text-ink-2">
-              Discard changes
+              {t("event.discard")}
             </button>
           )}
-          {dirty ? <span className="text-sm text-muted">Unsaved changes</span> : saved.updated_at ? <span className="text-sm text-muted">Saved</span> : null}
+          {dirty ? <span className="text-sm text-muted">{t("event.unsaved")}</span> : saved.updated_at ? <span className="text-sm text-muted">{t("event.saved")}</span> : null}
           {save.error && <p className="text-sm text-danger">{(save.error as Error).message}</p>}
         </div>
 
         {tasks.length > 0 && (
-          <section aria-label="Tasks from this class" className="flex flex-col gap-2 border-t border-line pt-4">
-            <h2 className="text-sm font-bold">Tasks from this class</h2>
-            {anyDirty && <p className="text-xs text-muted">Save your note first to tick tasks.</p>}
+          <section aria-label={t("event.tasksFromClass")} className="flex flex-col gap-2 border-t border-line pt-4">
+            <h2 className="text-sm font-bold">{t("event.tasksFromClass")}</h2>
+            {anyDirty && <p className="text-xs text-muted">{t("event.saveFirst")}</p>}
             {tasks.map((task) => (
               <label key={task.id} className="flex items-center gap-2.5 text-sm">
                 <input type="checkbox" disabled={anyDirty} checked={task.status === "done"} onChange={() => toggleTask.mutate(task)} />
                 <span className={task.status === "done" ? "text-muted line-through" : ""}>{task.title}</span>
-                {task.status === "doing" && <span className={chip}>Doing</span>}
-                {task.due_date && <span className="font-mono text-xs text-muted">due {task.due_date}</span>}
+                {task.status === "doing" && <span className={chip}>{t("event.doing")}</span>}
+                {task.due_date && <span className="font-mono text-xs text-muted">{t("event.due", { date: task.due_date })}</span>}
               </label>
             ))}
             {toggleTask.error && <p className="text-sm text-danger">{(toggleTask.error as Error).message}</p>}
@@ -259,11 +262,11 @@ function EventPageInner() {
             >
               {event.note_count > 0
                 ? confirmDelete
-                  ? "Click again to delete event and notes"
-                  : "Delete event and its notes"
+                  ? t("event.deleteWithNotesConfirm")
+                  : t("event.deleteWithNotes")
                 : confirmDelete
-                  ? "Click again to delete"
-                  : "Delete event"}
+                  ? t("event.deleteConfirm")
+                  : t("event.deleteEvent")}
             </button>
             {remove.error && <p className="text-sm text-danger">{(remove.error as Error).message}</p>}
           </div>

@@ -1,3 +1,45 @@
 import type { Messages } from "../types";
 
-export const calendar: Messages["calendar"] = {};
+export const calendar: Messages["calendar"] = {
+  header: {
+    previousWeek: "Tuần trước",
+    previousDay: "Ngày trước",
+    nextWeek: "Tuần sau",
+    nextDay: "Ngày sau",
+    view: "Chế độ xem",
+    viewWeek: "tuần",
+    viewDay: "ngày",
+    addEvent: "Thêm sự kiện",
+  },
+  grid: {
+    eventLabel: "{title}, {start} đến {end}",
+    open: "Mở {title}",
+    important: "Quan trọng",
+    exam: "Thi",
+    changed: "Đã đổi",
+    note: "Ghi chú",
+    tasks: { one: "{count} việc", other: "{count} việc" },
+  },
+  banner: {
+    noDataBefore: "Chưa có dữ liệu của trường.",
+    noDataLink: "Dán liên kết Zeus trong Cài đặt",
+    noDataAfter: ", rồi bấm Đồng bộ ngay.",
+    authFailedBefore: "Zeus đã từ chối liên kết. Hãy tạo liên kết mới trong Zeus và",
+    authFailedLink: "dán vào Cài đặt",
+    authFailedAfter: ". Đang hiện dữ liệu từ {since}.",
+    failed: "Đồng bộ lịch học của trường thất bại. Đang hiện dữ liệu từ {since}.",
+    partial: "Đồng bộ lịch học của trường: {error}. Hãy kiểm tra Zeus — nếu các buổi học đó thật sự đã bị xoá, chúng sẽ được huỷ khi dữ liệu đầy đủ.",
+    staleBefore: "Lịch học của trường cập nhật lần cuối lúc {since}. Đồng bộ hằng ngày có thể đã dừng — hãy bấm",
+    staleLink: "Đồng bộ ngay trong Cài đặt",
+    staleAfter: "hoặc kiểm tra GitHub Actions.",
+    missingBefore: "Một số buổi học bị ẩn cho đến khi bạn chọn nhóm: {names}.",
+    missingLink: "Chọn nhóm của bạn",
+    notAllowed: "Tài khoản Google này không được phép dùng ứng dụng.",
+    signOut: "Đăng xuất",
+    loadFailed: "Không tải được dữ liệu: {message}.",
+    unknownError: "Lỗi không xác định",
+    googleStopped: "Google Calendar đã ngừng cập nhật: {reason}.",
+    accessRevoked: "quyền truy cập đã bị thu hồi",
+    reconnectGoogle: "Kết nối lại Google",
+  },
+};
