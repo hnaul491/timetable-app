@@ -7,7 +7,7 @@ Collected from the per-task and final whole-branch reviews of plan 1. None block
 - Stale-sync banner: warn when `last_success_at` is older than ~36 h (a broken cron currently shows nothing). — DONE in plan 2A (Task 2)
 
 ## Verify against the real feed
-- Multi-day holidays (date-only `Vacances` spanning days) render only on their start date.
+- Multi-day holidays (date-only `Vacances` spanning days) render only on their start date. — DONE in polish pass
 - Group id inside a pasted Zeus link is ignored; the semester's `zeus_group_id` is used.
 
 ## Deferred minors (raw, from the execution ledger)
