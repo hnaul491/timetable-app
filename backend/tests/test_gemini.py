@@ -154,3 +154,46 @@ def test_empty_stop_candidate_is_empty_reply_but_safety_is_unavailable():
     p, _ = make(lambda r: httpx.Response(200, json={"candidates": [{"finishReason": "SAFETY"}]}))
     with pytest.raises(AIUnavailable):
         p.generate("S", [Turn("user", text="x")], [])
+
+
+def test_google_error_is_logged_without_the_key(caplog):
+    import httpx as _httpx
+
+    from app.ai.gemini import GeminiProvider
+    from app.ai.provider import AIUnavailable
+
+    def handler(request):
+        return _httpx.Response(400, json={"error": {"code": 400, "status": "INVALID_ARGUMENT", "message": "API key not valid."}})
+
+    provider = GeminiProvider("secret-key-123", "gemini-2.5-flash", http=_httpx.Client(transport=_httpx.MockTransport(handler)))
+    with caplog.at_level("WARNING"):
+        try:
+            provider.generate("sys", [], [])
+        except AIUnavailable:
+            pass
+    assert "INVALID_ARGUMENT" in caplog.text and "API key not valid." in caplog.text
+    assert "secret-key-123" not in caplog.text
+
+
+def test_thought_signature_is_kept_and_sent_back():
+    import json as _json
+
+    import httpx as _httpx
+
+    from app.ai.gemini import GeminiProvider
+    from app.ai.provider import Turn
+
+    bodies = []
+
+    def handler(request):
+        bodies.append(_json.loads(request.content))
+        return _httpx.Response(200, json={"candidates": [{"content": {"parts": [
+            {"functionCall": {"name": "get_subjects", "args": {}}, "thoughtSignature": "sig-abc"}]}}]})
+
+    provider = GeminiProvider("k", "gemini-3.8-flash", http=_httpx.Client(transport=_httpx.MockTransport(handler)))
+    reply = provider.generate("sys", [Turn(role="user", text="hi")], [])
+    assert reply.calls[0].thought_signature == "sig-abc"
+    provider.generate("sys", [Turn(role="user", text="hi"), Turn(role="model", calls=reply.calls),
+                              Turn(role="tool", tool_name="get_subjects", tool_result={"items": []})], [])
+    model_part = bodies[1]["contents"][1]["parts"][0]
+    assert model_part["thoughtSignature"] == "sig-abc" and model_part["functionCall"]["name"] == "get_subjects"

@@ -1,8 +1,21 @@
 import json
+import logging
 
 import httpx
 
 from app.ai.provider import AIRateLimited, AIUnavailable, FunctionCall, LLMReply, ToolDecl, Turn
+
+logger = logging.getLogger(__name__)
+
+
+def _log_google_error(resp: httpx.Response) -> None:
+    """Log Gemini's error status and message (never the key or the request) so failures can be diagnosed."""
+    try:
+        error = resp.json().get("error", {})
+        status, message = error.get("status", ""), str(error.get("message", ""))[:300]
+    except (ValueError, AttributeError):
+        status, message = "", ""
+    logger.warning("Gemini request failed: HTTP %s %s %s", resp.status_code, status, message)
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 RATE_MSG = "AI limit reached, try again later"
@@ -19,7 +32,10 @@ def _content(turn: Turn) -> dict:
     if turn.text:
         parts.append({"text": turn.text})
     for c in turn.calls:
-        parts.append({"functionCall": {"name": c.name, "args": c.args}})
+        part: dict = {"functionCall": {"name": c.name, "args": c.args}}
+        if c.thought_signature:
+            part["thoughtSignature"] = c.thought_signature
+        parts.append(part)
     return {"role": turn.role, "parts": parts}
 
 
@@ -45,6 +61,7 @@ class GeminiProvider:
             if resp.status_code == 429:
                 failure = AIRateLimited(RATE_MSG)
             elif resp.status_code >= 400:
+                _log_google_error(resp)
                 failure = AIUnavailable(UNAVAILABLE_MSG)
             else:
                 try:
@@ -85,7 +102,8 @@ class GeminiProvider:
         parts = self._parts(self._post(body, timeout))
         texts = [p["text"] for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)]
         calls = [
-            FunctionCall(p["functionCall"]["name"], p["functionCall"].get("args") or {})
+            FunctionCall(p["functionCall"]["name"], p["functionCall"].get("args") or {},
+                         thought_signature=p.get("thoughtSignature") if isinstance(p.get("thoughtSignature"), str) else None)
             for p in parts
             if isinstance(p, dict) and isinstance(p.get("functionCall"), dict) and "name" in p["functionCall"]
         ]

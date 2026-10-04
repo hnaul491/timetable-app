@@ -26,6 +26,7 @@ class FunctionCall:
     name: str
     args: dict
     id: str | None = None
+    thought_signature: str | None = None  # Gemini 3+: must be echoed back with the call
 
 
 @dataclass
