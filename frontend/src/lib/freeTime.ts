@@ -1,6 +1,6 @@
 import { addDays, startOfWeek } from "./time";
 
-export type Period = "week" | "month" | "semester" | "custom";
+export type Period = "week" | "nextWeek" | "month" | "nextMonth" | "semester" | "custom";
 
 export interface FreeTimeForm {
   from: string;
@@ -68,6 +68,15 @@ export function daysBetween(start: string, end: string): number {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** The whole calendar month `offset` months after the month of `today`. */
+function monthRange(today: string, offset: number): Range {
+  const [y, m] = today.split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 1 + offset, 1));
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0));
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: iso(first), end: iso(last) };
+}
+
 /** The inclusive Paris-date range for a period, or null when it cannot be computed (no/over semester end). */
 export function computeRange(form: FreeTimeForm, today: string, semesterEnd: string | null): Range | null {
   switch (form.period) {
@@ -75,12 +84,14 @@ export function computeRange(form: FreeTimeForm, today: string, semesterEnd: str
       const start = startOfWeek(today);
       return { start, end: addDays(start, 6) };
     }
-    case "month": {
-      const [y, m] = today.split("-").map(Number);
-      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-      const mm = String(m).padStart(2, "0");
-      return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+    case "nextWeek": {
+      const start = addDays(startOfWeek(today), 7);
+      return { start, end: addDays(start, 6) };
     }
+    case "month":
+      return monthRange(today, 0);
+    case "nextMonth":
+      return monthRange(today, 1);
     case "semester":
       return semesterEnd && semesterEnd >= today ? { start: today, end: semesterEnd < addDays(today, MAX_DAYS - 1) ? semesterEnd : addDays(today, MAX_DAYS - 1) } : null;
     case "custom":
@@ -120,7 +131,7 @@ export function loadForm(today: string): FreeTimeForm {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as Partial<FreeTimeForm> | null;
     if (!raw || typeof raw !== "object") return base;
-    const periods: Period[] = ["week", "month", "semester", "custom"];
+    const periods: Period[] = ["week", "nextWeek", "month", "nextMonth", "semester", "custom"];
     return {
       from: typeof raw.from === "string" ? raw.from : base.from,
       to: typeof raw.to === "string" ? raw.to : base.to,

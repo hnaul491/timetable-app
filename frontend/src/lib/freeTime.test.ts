@@ -12,6 +12,19 @@ describe("computeRange", () => {
     expect(computeRange(form({ period: "month" }), TODAY, null)).toEqual({ start: "2026-10-01", end: "2026-10-31" });
     expect(computeRange(form({ period: "month" }), "2028-02-10", null)).toEqual({ start: "2028-02-01", end: "2028-02-29" });
   });
+  it("next week is the following Monday to Sunday", () => {
+    expect(computeRange(form({ period: "nextWeek" }), TODAY, null)).toEqual({ start: "2026-10-19", end: "2026-10-25" });
+    expect(computeRange(form({ period: "nextWeek" }), "2026-10-18", null)).toEqual({ start: "2026-10-19", end: "2026-10-25" }); // from a Sunday
+  });
+  it("next month is the whole following month, also across the new year", () => {
+    expect(computeRange(form({ period: "nextMonth" }), TODAY, null)).toEqual({ start: "2026-11-01", end: "2026-11-30" });
+    expect(computeRange(form({ period: "nextMonth" }), "2026-12-20", null)).toEqual({ start: "2027-01-01", end: "2027-01-31" });
+    expect(computeRange(form({ period: "nextMonth" }), "2028-01-31", null)).toEqual({ start: "2028-02-01", end: "2028-02-29" });
+  });
+  it("remembers next week and next month as saved periods", () => {
+    saveForm(form({ period: "nextMonth" }));
+    expect(loadForm(TODAY).period).toBe("nextMonth");
+  });
   it("rest of semester runs from today to the semester end, and is unavailable without a usable end", () => {
     expect(computeRange(form({ period: "semester" }), TODAY, "2027-01-20")).toEqual({ start: TODAY, end: "2027-01-20" });
     expect(computeRange(form({ period: "semester" }), TODAY, null)).toBeNull();
