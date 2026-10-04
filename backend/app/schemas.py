@@ -412,3 +412,13 @@ class ChatReply(BaseModel):
 class ActionResult(BaseModel):
     status: str
     result: dict | None = None
+
+
+class BackupStatusOut(BaseModel):
+    drive_available: bool
+    last_at: str | None
+
+
+class BackupDriveOut(BaseModel):
+    file_name: str
+    created_at: str
