@@ -20,13 +20,13 @@ export function SubjectSettings() {
   const error = (patch.error ?? merge.error) as Error | null;
   const all = subjects.data ?? [];
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-5">
+    <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-base font-bold">Subjects</h2>
       <p className="text-sm text-muted">Rename, recolour or hide subjects. "Merge into" combines duplicates (e.g. two names for the same French class); future syncs use the merged subject.</p>
       {all.map((s) => (
         <SubjectRow key={s.id} subject={s} others={all.filter((o) => o.id !== s.id)} onPatch={(body) => patch.mutate({ id: s.id, body })} onMerge={(into) => merge.mutate({ id: s.id, into })} />
       ))}
-      {error && <p className="text-sm text-[#8B1A1A]">{error.message}</p>}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
     </section>
   );
 }
@@ -44,17 +44,17 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
   const target = others.some((o) => String(o.id) === into) ? into : "";
   const label = subject.display_name;
   return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-[#F8F9FB] px-3 py-2.5">
+    <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-surface-2 px-3 py-2.5">
       <input type="color" aria-label={`Colour of ${label}`} value={color} onChange={(e) => setColor(e.target.value)} onBlur={() => color.toLowerCase() !== subject.color.toLowerCase() && onPatch({ color })} className="size-8 rounded" />
-      <input aria-label={`Name of ${label}`} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} className="h-9 min-w-[200px] flex-1 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm" />
-      <button type="button" aria-label={`Save name of ${label}`} disabled={!name.trim() || name.trim() === subject.display_name} onClick={() => onPatch({ display_name: name.trim() })} className="h-9 rounded-lg border border-line bg-white px-3 text-sm font-semibold disabled:opacity-50">
+      <input aria-label={`Name of ${label}`} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} className="h-9 min-w-[200px] flex-1 rounded-lg border border-line-strong bg-surface px-2 text-sm" />
+      <button type="button" aria-label={`Save name of ${label}`} disabled={!name.trim() || name.trim() === subject.display_name} onClick={() => onPatch({ display_name: name.trim() })} className="h-9 rounded-lg border border-line bg-surface px-3 text-sm font-semibold disabled:opacity-50">
         Save
       </button>
       <label className="flex items-center gap-1.5 text-sm">
         <input type="checkbox" aria-label={`Hide ${label}`} checked={subject.hidden} onChange={(e) => onPatch({ hidden: e.target.checked })} />
         Hide
       </label>
-      <select aria-label={`Merge ${label} into`} value={target} onChange={(e) => { setInto(e.target.value); setConfirm(false); }} className="h-9 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm">
+      <select aria-label={`Merge ${label} into`} value={target} onChange={(e) => { setInto(e.target.value); setConfirm(false); }} className="h-9 rounded-lg border border-line-strong bg-surface px-2 text-sm">
         <option value="">Merge into…</option>
         {others.map((o) => (
           <option key={o.id} value={o.id}>
@@ -68,7 +68,7 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
         disabled={!target}
         onClick={() => (confirm ? onMerge(Number(target)) : setConfirm(true))}
         onBlur={() => setConfirm(false)}
-        className="h-9 rounded-lg px-3 text-sm font-semibold text-[#8B1A1A] disabled:opacity-40"
+        className="h-9 rounded-lg px-3 text-sm font-semibold text-danger disabled:opacity-40"
       >
         {confirm ? "Click again to merge" : "Merge"}
       </button>

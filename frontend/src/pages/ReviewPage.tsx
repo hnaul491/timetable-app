@@ -7,7 +7,7 @@ import { invalidateTaskViews } from "../lib/invalidate";
 import { addDays, dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { ApiEvent, Review, Task } from "../types";
 
-const card = "flex flex-col gap-2.5 rounded-2xl border border-line bg-white p-4";
+const card = "flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-4";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function weekTitle(start: string, end: string): string {
@@ -18,7 +18,7 @@ function weekTitle(start: string, end: string): string {
 }
 
 function Section({ title, tone, children }: { title: string; tone?: "warn" | "error"; children: ReactNode }) {
-  const border = tone === "error" ? "border-[#F3C4C4]" : tone === "warn" ? "border-[#F5D9B8] bg-[#FFF7ED]" : "";
+  const border = tone === "error" ? "border-danger-line" : tone === "warn" ? "border-warn-line bg-warn-soft" : "";
   return (
     <section aria-label={title} className={`${card} ${border}`}>
       <h2 className="text-[15px] font-bold">{title}</h2>
@@ -70,23 +70,23 @@ export function ReviewPage() {
           <p className="text-sm text-muted">Weekend review</p>
           <h1 className="text-2xl font-bold tracking-tight">{weekTitle(r.week_start, r.week_end)}</h1>
         </div>
-        <button type="button" aria-label="Previous week" onClick={() => setWeekStart(addDays(shownWeek, -7))} className="h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold">
+        <button type="button" aria-label="Previous week" onClick={() => setWeekStart(addDays(shownWeek, -7))} className="h-10 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold">
           ‹
         </button>
-        <button type="button" aria-label="Next week" onClick={() => setWeekStart(addDays(shownWeek, 7))} className="h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold">
+        <button type="button" aria-label="Next week" onClick={() => setWeekStart(addDays(shownWeek, 7))} className="h-10 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold">
           ›
         </button>
         {r.reviewed_at ? (
-          <span className="rounded-xl bg-[#E7F5EC] px-4 py-2.5 text-sm font-semibold text-[#145C33]">
+          <span className="rounded-xl bg-success-soft px-4 py-2.5 text-sm font-semibold text-success">
             Reviewed on {formatLongDate(parisParts(r.reviewed_at).date)}
           </span>
         ) : (
-          <button type="button" onClick={() => mark.mutate(r.week_start)} disabled={mark.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={() => mark.mutate(r.week_start)} disabled={mark.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent disabled:opacity-50">
             Mark week as reviewed
           </button>
         )}
       </header>
-      {error && <p className="text-sm text-[#8B1A1A]">{error.message}</p>}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
 
       {review.error && !review.data ? (
         <ErrorPanel error={review.error} onRetry={() => review.refetch()} />
@@ -123,7 +123,7 @@ export function ReviewPage() {
                   <span className="font-medium">{e.title}{e.section ? ` · ${e.section}` : ""}</span>
                   <span className="text-xs text-muted">{when(e)}</span>
                 </span>
-                <Link to={`/events/${e.id}`} className="rounded-lg border border-[#C9D3F7] bg-accent-soft px-3 py-1.5 text-sm font-semibold text-accent-strong">
+                <Link to={`/events/${e.id}`} className="rounded-lg border border-accent-line bg-accent-soft px-3 py-1.5 text-sm font-semibold text-accent-strong">
                   Add note
                 </Link>
               </div>
@@ -136,7 +136,7 @@ export function ReviewPage() {
           ) : (
             r.changes.map((e) => (
               <Link key={e.id} to={`/events/${e.id}`} className="text-sm">
-                <span className="mr-2 rounded-full bg-[#9A3412] px-2 text-[11px] font-bold text-white">{e.status === "cancelled" ? "Cancelled" : "Changed"}</span>
+                <span className="mr-2 rounded-full bg-changed px-2 text-[11px] font-bold text-on-changed">{e.status === "cancelled" ? "Cancelled" : "Changed"}</span>
                 {e.title} · {when(e)}
               </Link>
             ))
@@ -155,7 +155,7 @@ export function ReviewPage() {
           {days.map((day) => {
             const items = r.week.filter((e) => parisParts(e.start).date === day);
             return (
-              <div key={day} className="flex flex-col gap-1.5 rounded-xl bg-[#F8F9FB] p-3">
+              <div key={day} className="flex flex-col gap-1.5 rounded-xl bg-surface-2 p-3">
                 <span className="text-xs font-bold uppercase tracking-wide text-muted">
                   {dayLabel(day).weekday} {dayLabel(day).day}
                 </span>
@@ -163,7 +163,7 @@ export function ReviewPage() {
                 {items.map((e) => (
                   <span key={e.id} className={`flex items-baseline gap-1.5 text-[12.5px] ${e.status === "cancelled" ? "text-muted line-through" : ""}`}>
                     <span className="size-1.5 shrink-0 rounded-full" style={{ background: e.color ?? (e.kind === "french_ext" ? "#0E7F72" : "#3B4252") }} />
-                    <span className="font-mono text-[11px] text-[#3A3F4B]">{e.kind === "holiday" ? "all day" : formatTime(e.start)}</span>
+                    <span className="font-mono text-[11px] text-ink-2">{e.kind === "holiday" ? "all day" : formatTime(e.start)}</span>
                     {e.title}
                   </span>
                 ))}

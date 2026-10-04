@@ -14,9 +14,9 @@ const KINDS: [GoogleKind, string][] = [
   ["other", "Other events"],
 ];
 const MAX_ROUNDS = 15;
-const card = "flex flex-col gap-3 rounded-2xl border border-line bg-white p-5";
-const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-60";
-const secondary = "h-10 rounded-xl border border-line bg-white px-4 text-sm font-semibold disabled:opacity-60";
+const card = "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5";
+const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60";
+const secondary = "h-10 rounded-xl border border-line bg-surface px-4 text-sm font-semibold disabled:opacity-60";
 
 function summary(sent: number, r: PushResult): string {
   if (r.status === "failed") return `Push failed: ${r.error ?? "unknown error"}`;
@@ -97,7 +97,7 @@ export function GoogleSettings() {
         <p className="text-sm text-muted">Google Calendar push isn't set up on the server yet — follow “Google Calendar” in docs/SETUP.md.</p>
       ) : !s.connected ? (
         <>
-          <p className="text-sm text-[#3A3F4B]">
+          <p className="text-sm text-ink-2">
             Creates a calendar called “My Timetable” in your Google account and keeps it up to date. Notes are never sent. Reminders come from Google
             Calendar — set them on that calendar.
           </p>
@@ -111,7 +111,7 @@ export function GoogleSettings() {
             Connected as <span className="font-semibold">{s.email}</span>
           </p>
           {s.needs_reconnect && (
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#F3C4C4] bg-[#FDECEC] px-4 py-3 text-sm text-[#8B1A1A]">
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">
               <span>{s.last_push_error ?? "Google access stopped working."}</span>
               <button type="button" className={primary} onClick={startConnect}>
                 Reconnect Google
@@ -119,7 +119,7 @@ export function GoogleSettings() {
             </div>
           )}
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="mb-1 text-sm font-semibold text-[#3A3F4B]">Send to Google</legend>
+            <legend className="mb-1 text-sm font-semibold text-ink-2">Send to Google</legend>
             {KINDS.map(([kind, label]) => (
               <label key={kind} className="flex items-center gap-2 text-sm">
                 <input
@@ -136,7 +136,7 @@ export function GoogleSettings() {
             {s.pending === 0 ? "Everything is up to date." : `${s.pending} ${s.pending === 1 ? "change" : "changes"} waiting to be sent.`} Last push:{" "}
             {s.last_push_at ? `${parisParts(s.last_push_at).date} ${formatTime(s.last_push_at)}` : "never"}.
           </p>
-          {s.last_push_error && !s.needs_reconnect && <p className="text-sm text-[#8B1A1A]">Last push: {s.last_push_error}</p>}
+          {s.last_push_error && !s.needs_reconnect && <p className="text-sm text-danger">Last push: {s.last_push_error}</p>}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={primary} onClick={() => push.mutate()} disabled={push.isPending || s.needs_reconnect}>
               {push.isPending ? "Pushing…" : "Push now"}
@@ -154,11 +154,11 @@ export function GoogleSettings() {
           <p className="text-xs text-muted">
             Disconnecting stops updates. The “My Timetable” calendar stays in Google — delete it there if you don't need it.
           </p>
-          {progress && <p className="text-sm text-[#3A3F4B]">{progress}</p>}
+          {progress && <p className="text-sm text-ink-2">{progress}</p>}
         </>
       )}
-      {notice && <p className="text-sm text-[#3A3F4B]">{notice}</p>}
-      {error && <p className="text-sm text-[#8B1A1A]">{error.message}</p>}
+      {notice && <p className="text-sm text-ink-2">{notice}</p>}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
     </section>
   );
 }

@@ -47,7 +47,7 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
   const columns = `56px repeat(${days.length}, minmax(${days.length > 1 ? 110 : 0}px, 1fr))`;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-line bg-white">
+    <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
       <div className="grid" style={{ gridTemplateColumns: columns }}>
         <div className="border-b border-line" />
         {days.map((date) => {
@@ -56,11 +56,11 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
           return (
             <div key={date} className="flex flex-wrap items-center gap-2 border-b border-l border-line px-2 py-2.5">
               <span className="text-xs font-semibold tracking-wide text-muted uppercase">{label.weekday}</span>
-              <span className={`flex size-[30px] items-center justify-center rounded-full text-[15px] font-bold ${isToday ? "bg-accent text-white" : ""}`}>
+              <span className={`flex size-[30px] items-center justify-center rounded-full text-[15px] font-bold ${isToday ? "bg-accent text-on-accent" : ""}`}>
                 {label.day}
               </span>
               {(holidays.get(date) ?? []).map((name) => (
-                <span key={name} className="rounded-full bg-[#F0F1F4] px-2 py-0.5 text-[11px] font-semibold text-[#3A3F4B]">
+                <span key={name} className="rounded-full bg-subtle px-2 py-0.5 text-[11px] font-semibold text-ink-2">
                   {name}
                 </span>
               ))}
@@ -77,7 +77,7 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
         {days.map((date) => (
           <div
             key={date}
-            className="relative border-l border-[#EEF0F3]"
+            className="relative border-l border-subtle"
             style={{
               height,
               backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, #EEF0F3 ${hourHeight - 1}px, #EEF0F3 ${hourHeight}px)`,
@@ -123,7 +123,7 @@ function EventBlock({
   const color = ev.color ?? KIND_COLORS[ev.kind] ?? "#3B4252";
   const title = ev.section ? `${ev.title} ${ev.section}` : ev.title;
   const label = `${title}, ${formatTime(ev.start)} to ${formatTime(ev.end)}${ev.room ? `, ${ev.room}` : ""}`;
-  const outline = ev.kind === "french_ext" ? { border: `1.5px dashed ${color}`, background: "#FFFFFF" } : { background: `${color}1F` };
+  const outline = ev.kind === "french_ext" ? { border: `1.5px dashed ${color}`, background: "var(--tt-surface)" } : { background: `color-mix(in srgb, ${color} var(--event-fill), transparent)` };
   return (
     <div
       role="group"
@@ -132,7 +132,7 @@ function EventBlock({
       data-columns={columns}
       data-kind={ev.kind}
       className={`absolute flex flex-col gap-0.5 overflow-hidden rounded-lg px-2 py-1.5 text-xs ${ev.status === "cancelled" ? "line-through opacity-60" : ""}`}
-      style={{ ...style, ...outline, ...(ev.important ? { boxShadow: "inset 3px 0 0 #EA580C" } : {}) }}
+      style={{ ...style, ...outline, ...(ev.important ? { boxShadow: "inset 3px 0 0 var(--tt-important)" } : {}) }}
     >
       {onSelect && (
         <button
@@ -145,23 +145,23 @@ function EventBlock({
       <span className="flex items-center gap-1.5 leading-tight font-bold">
         <span className="size-2 shrink-0 rounded-full" style={{ background: color }} />
         {ev.important && (
-          <span role="img" aria-label="Important" className="shrink-0 text-[13px] leading-none text-[#EA580C]">
+          <span role="img" aria-label="Important" className="shrink-0 text-[13px] leading-none text-important">
             ★
           </span>
         )}
         {ev.title}
         {ev.section ? ` · ${ev.section}` : ""}
       </span>
-      <span className="font-mono text-[10.5px] text-[#3A3F4B]">
+      <span className="font-mono text-[10.5px] text-ink-2">
         {formatTime(ev.start)}–{formatTime(ev.end)}
       </span>
-      {ev.room && <span className="text-[11px] text-[#3A3F4B]">{ev.room}</span>}
+      {ev.room && <span className="text-[11px] text-ink-2">{ev.room}</span>}
       <span className="flex flex-wrap gap-1">
-        {ev.kind === "exam" && <span className="rounded-full bg-[#8B1A1A] px-1.5 text-[10.5px] font-bold text-white">Exam</span>}
-        {ev.status === "changed" && <span className="rounded-full bg-[#9A3412] px-1.5 text-[10.5px] font-bold text-white">Changed</span>}
-        {ev.note_count > 0 && <span className="rounded-full bg-white px-1.5 text-[10.5px] font-semibold">Note</span>}
+        {ev.kind === "exam" && <span className="rounded-full bg-danger px-1.5 text-[10.5px] font-bold text-on-danger">Exam</span>}
+        {ev.status === "changed" && <span className="rounded-full bg-changed px-1.5 text-[10.5px] font-bold text-on-changed">Changed</span>}
+        {ev.note_count > 0 && <span className="rounded-full bg-surface px-1.5 text-[10.5px] font-semibold">Note</span>}
         {ev.open_tasks > 0 && (
-          <span className="rounded-full bg-white px-1.5 text-[10.5px] font-semibold">
+          <span className="rounded-full bg-surface px-1.5 text-[10.5px] font-semibold">
             {ev.open_tasks} {ev.open_tasks === 1 ? "task" : "tasks"}
           </span>
         )}

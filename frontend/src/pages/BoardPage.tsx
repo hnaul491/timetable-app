@@ -11,7 +11,7 @@ const COLUMNS: { status: TaskStatus; label: string; dot: string }[] = [
   { status: "doing", label: "Doing", dot: "#2E55E6" },
   { status: "done", label: "Done", dot: "#1F8A4C" },
 ];
-const field = "h-10 rounded-xl border border-[#D5D9E0] bg-white px-3 text-sm";
+const field = "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm";
 
 export function BoardPage() {
   const queryClient = useQueryClient();
@@ -68,7 +68,7 @@ export function BoardPage() {
         </label>
       </header>
 
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-2 rounded-2xl border border-line bg-white p-3">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-2 rounded-2xl border border-line bg-surface p-3">
         <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-semibold text-muted">
           New task
           <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} placeholder="e.g. Print the lab sheet" />
@@ -77,22 +77,22 @@ export function BoardPage() {
           Due
           <input type="date" className={field} value={due} onChange={(e) => setDue(e.target.value)} />
         </label>
-        <button type="submit" disabled={add.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-50">
+        <button type="submit" disabled={add.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50">
           Add task
         </button>
       </form>
-      {mutationError && <p className="text-sm text-[#8B1A1A]">{mutationError.message}</p>}
+      {mutationError && <p className="text-sm text-danger">{mutationError.message}</p>}
       {tasks.error && tasks.data && <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />}
 
       <div className="grid items-start gap-4 md:grid-cols-3">
         {COLUMNS.map((col) => {
           const cards = visible.filter((t) => t.status === col.status);
           return (
-            <section key={col.status} aria-label={col.label} className="flex flex-col gap-2.5 rounded-2xl bg-[#EBEDF1] p-3">
+            <section key={col.status} aria-label={col.label} className="flex flex-col gap-2.5 rounded-2xl bg-subtle p-3">
               <h2 className="flex items-center gap-2 px-1 text-sm font-bold">
                 <span className="size-2.5 rounded-full" style={{ background: col.dot }} />
                 {col.label}
-                <span className="rounded-full bg-white px-2 text-xs font-semibold text-[#3A3F4B]">{cards.length}</span>
+                <span className="rounded-full bg-surface px-2 text-xs font-semibold text-ink-2">{cards.length}</span>
               </h2>
               {cards.map((t) => (
                 <TaskCard key={t.id} task={t} pending={move.isPending && move.variables?.id === t.id} onMove={(status) => move.mutate({ id: t.id, status })} onDelete={() => remove.mutate(t.id)} />
@@ -108,10 +108,10 @@ export function BoardPage() {
 function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: boolean; onMove: (s: TaskStatus) => void; onDelete: () => void }) {
   const [confirm, setConfirm] = useState(false);
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[#E1E4EA] bg-white p-3">
+    <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3">
       <div className="flex flex-wrap gap-1.5">
         {task.subject_name && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11.5px] font-semibold text-accent-strong">{task.subject_name}</span>}
-        {task.important && <span className="rounded-full bg-[#FFF1E0] px-2 py-0.5 text-[11.5px] font-bold text-[#7C2D12]">Important</span>}
+        {task.important && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11.5px] font-bold text-warn">Important</span>}
       </div>
       <p className={`text-[14.5px] font-semibold ${task.status === "done" ? "text-muted line-through" : ""}`}>{task.title}</p>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
@@ -128,7 +128,7 @@ function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: bo
           value={task.status}
           disabled={pending}
           onChange={(e) => onMove(e.target.value as TaskStatus)}
-          className="h-9 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-line-strong bg-surface px-2 text-sm"
         >
           {COLUMNS.map((c) => (
             <option key={c.status} value={c.status}>
@@ -142,7 +142,7 @@ function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: bo
             aria-label={confirm ? `Click again to delete ${task.title}` : `Delete ${task.title}`}
             onClick={() => (confirm ? onDelete() : setConfirm(true))}
             onBlur={() => setConfirm(false)}
-            className="h-9 rounded-lg px-2 text-sm font-semibold text-[#8B1A1A]"
+            className="h-9 rounded-lg px-2 text-sm font-semibold text-danger"
           >
             {confirm ? "Click again to delete" : "Delete"}
           </button>

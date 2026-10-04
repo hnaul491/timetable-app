@@ -9,8 +9,8 @@ import { apiFetch } from "../lib/api";
 import { formatTime, parisParts } from "../lib/time";
 import type { SectionChoice, SyncRun, SyncStatus } from "../types";
 
-const card = "flex flex-col gap-3 rounded-2xl border border-line bg-white p-5";
-const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-60";
+const card = "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5";
+const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60";
 
 function when(iso: string | null | undefined): string {
   return iso ? `${parisParts(iso).date} ${formatTime(iso)}` : "never";
@@ -55,7 +55,7 @@ export function SettingsPage() {
         <section className={card}>
           <h2 className="text-base font-bold">School timetable (Zeus)</h2>
           <form onSubmit={submit} className="flex flex-col gap-2">
-            <label htmlFor="zeus-link" className="text-sm font-semibold text-[#3A3F4B]">
+            <label htmlFor="zeus-link" className="text-sm font-semibold text-ink-2">
               Zeus ICS subscription link
             </label>
             <div className="flex gap-2">
@@ -66,7 +66,7 @@ export function SettingsPage() {
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
                 placeholder={keyStatus.data?.configured ? "Saved. Paste a new link to replace it." : "https://zeus.ionis-it.com/api/group/…/ics/…"}
-                className="h-10 min-w-0 flex-1 rounded-xl border border-[#D5D9E0] px-3 text-sm"
+                className="h-10 min-w-0 flex-1 rounded-xl border border-line-strong px-3 text-sm"
               />
               <button type="submit" className={primary} disabled={saveKey.isPending}>
                 Save
@@ -75,10 +75,10 @@ export function SettingsPage() {
             <p className="text-xs text-muted">
               In Zeus, generate the calendar link for your group and paste it here. It is stored on the server only and never shown again.
             </p>
-            {saveKey.error && <p className="text-sm text-[#8B1A1A]">{(saveKey.error as Error).message}</p>}
+            {saveKey.error && <p className="text-sm text-danger">{(saveKey.error as Error).message}</p>}
             <p className="text-sm">{keyStatus.data?.configured ? "Link saved." : "No link saved yet."}</p>
           </form>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#F8F9FB] px-3 py-2.5 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
             <span>
               Last sync: {lastRun ? `${lastRun.status} · ${when(lastRun.finished_at)}` : "never"}
               {lastRun?.status === "ok" && ` · ${lastRun.fetched} events, ${lastRun.inserted} new, ${lastRun.updated} changed, ${lastRun.cancelled} cancelled`}
@@ -88,12 +88,12 @@ export function SettingsPage() {
               {syncNow.isPending ? "Syncing…" : "Sync now"}
             </button>
           </div>
-          {syncNow.error && <p className="text-sm text-[#8B1A1A]">{(syncNow.error as Error).message}</p>}
+          {syncNow.error && <p className="text-sm text-danger">{(syncNow.error as Error).message}</p>}
         </section>
         <section className={card}>
           <h2 className="text-base font-bold">My groups</h2>
           <p className="text-sm text-muted">Zeus sends every parallel group. Pick yours, or "All groups" if you attend every one; classes without a group are always shown.</p>
-          {pick.error && <p className="text-sm text-[#8B1A1A]">{(pick.error as Error).message}</p>}
+          {pick.error && <p className="text-sm text-danger">{(pick.error as Error).message}</p>}
           {sections.data?.length === 0 && <p className="text-sm">No grouped classes yet. Sync first.</p>}
           {sections.data?.map((choice) => (
             <label key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">
@@ -101,7 +101,7 @@ export function SettingsPage() {
               <select
                 value={choice.chosen ?? ""}
                 onChange={(e) => pick.mutate({ subject_id: choice.subject_id, section: e.target.value })}
-                className="h-10 min-w-[120px] rounded-xl border border-[#D5D9E0] bg-white px-2.5 font-semibold"
+                className="h-10 min-w-[120px] rounded-xl border border-line-strong bg-surface px-2.5 font-semibold"
               >
                 {choice.chosen === null && (
                   <option value="" disabled>
