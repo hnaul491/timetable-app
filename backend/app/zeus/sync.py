@@ -43,7 +43,10 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
     would_cancel = sum(1 for e in upcoming if e.zeus_uid not in feed_uids)
     # A truncated feed (wrong group, Zeus hiccup) must not wipe the semester: still apply
     # new/changed classes, but keep the missing ones instead of cancelling them.
-    keep_missing = len(upcoming) >= MIN_EVENTS_FOR_GUARD and would_cancel / len(upcoming) > MAX_CANCEL_RATIO
+    # Right after the group was changed on purpose, the old group's classes are meant to go: no guards.
+    changed_on_purpose = semester.group_changed_at is not None
+    keep_missing = (not changed_on_purpose and len(upcoming) >= MIN_EVENTS_FOR_GUARD
+                    and would_cancel / len(upcoming) > MAX_CANCEL_RATIO)
     new_uids = feed_uids - set(existing)
     if keep_missing and len(new_uids) >= would_cancel:
         # Mostly unknown classes replacing the known ones: a different Zeus group, not a truncation.
@@ -85,6 +88,7 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
             event.status, event.changed_at = "cancelled", now
             result.cancelled += 1
 
+    semester.group_changed_at = None
     session.flush()
     return result
 

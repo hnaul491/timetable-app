@@ -18,6 +18,7 @@ class Semester(Base):
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     drive_folder_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    group_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Subject(Base):

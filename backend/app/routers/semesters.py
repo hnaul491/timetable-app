@@ -1,9 +1,12 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import require_user
 from app.db import get_session
+from app.deps import get_now
 from app.models import Semester
 from app.schemas import SemesterOut, SemesterPatch
 
@@ -37,10 +40,13 @@ def activate(semester_id: int, session: Session = Depends(get_session)) -> list[
 
 
 @router.patch("/semesters/{semester_id}", response_model=SemesterOut)
-def patch_semester(semester_id: int, body: SemesterPatch, session: Session = Depends(get_session)) -> SemesterOut:
+def patch_semester(semester_id: int, body: SemesterPatch, session: Session = Depends(get_session),
+                   now: datetime = Depends(get_now)) -> SemesterOut:
     semester = _semester(session, semester_id)
     sent = body.model_fields_set
     if "zeus_group_id" in sent:
+        if body.zeus_group_id is not None and body.zeus_group_id != semester.zeus_group_id:
+            semester.group_changed_at = now  # the next sync may replace the old group's upcoming classes
         semester.zeus_group_id = body.zeus_group_id
     if "start_date" in sent:
         semester.start_date = body.start_date

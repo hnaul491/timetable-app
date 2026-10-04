@@ -50,3 +50,25 @@ def test_patch_group_and_dates(client, session):
     assert client.patch(f"/api/semesters/{sems['S2'].id}", headers=AUTH,
                         json={"start_date": "2027-07-01", "end_date": "2027-06-30"}).status_code == 422
     assert client.patch("/api/semesters/999", headers=AUTH, json={"zeus_group_id": 1}).status_code == 404
+
+
+def test_changing_the_group_records_a_marker(client, session):
+    sems = seeded(session)
+    s2 = sems["S2"]
+    url = f"/api/semesters/{s2.id}"
+    client.patch(url, headers=AUTH, json={"zeus_group_id": 905})
+    session.refresh(s2)
+    first = s2.group_changed_at
+    assert first is not None
+    session.expire_all()
+    client.patch(url, headers=AUTH, json={"zeus_group_id": 905, "start_date": "2027-02-01"})  # same group
+    session.refresh(s2)
+    assert s2.group_changed_at == first
+    client.patch(url, headers=AUTH, json={"zeus_group_id": None})  # clearing is not a change to a new group
+    session.refresh(s2)
+    assert s2.group_changed_at == first
+    s2.group_changed_at = None
+    session.commit()
+    client.patch(url, headers=AUTH, json={"zeus_group_id": 906})
+    session.refresh(s2)
+    assert s2.group_changed_at is not None

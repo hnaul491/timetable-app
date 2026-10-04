@@ -218,3 +218,28 @@ def test_run_sync_wrong_group_feed_fails(session, semester):
     assert run.status == "failed"
     assert run.error.startswith("invalid feed: feed looks like a different group")
     assert len(session.scalars(select(Event)).all()) == 20
+
+
+def test_group_change_marker_lets_the_first_sync_replace_the_old_classes(session, semester):
+    apply_feed(session, semester, feed(*many(20)), NOW)
+    session.commit()
+    semester.group_changed_at = NOW
+    session.commit()
+    result = apply_feed(session, semester, feed(*_other_group(20)), LATER)
+    session.commit()
+    assert (result.inserted, result.cancelled, result.kept) == (20, 20, 0)
+    assert semester.group_changed_at is None
+    old = [e for e in session.scalars(select(Event)) if not e.zeus_uid.startswith("other")]
+    assert {e.status for e in old} == {"cancelled"}
+    # the marker is one-shot: the guard is back for the next sync
+    with pytest.raises(InvalidFeedError, match="different group"):
+        third = [replace(e, uid=f"third{i}") for i, e in enumerate(many(20))]
+        apply_feed(session, semester, feed(*third), LATER + timedelta(days=1))
+
+
+def test_group_change_marker_stays_when_the_sync_fails(session, semester):
+    semester.group_changed_at = NOW
+    session.commit()
+    with pytest.raises(InvalidFeedError):
+        apply_feed(session, semester, feed(), LATER)
+    assert semester.group_changed_at == NOW
