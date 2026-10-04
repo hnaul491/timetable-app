@@ -8,6 +8,8 @@ export const common: Messages["common"] = {
   close: "Đóng",
   loading: "Đang tải…",
   retry: "Thử lại",
+  authErrorTitle: "Không kiểm tra được phiên đăng nhập",
+  authErrorBody: "Hãy kiểm tra kết nối rồi thử lại.",
   today: "Hôm nay",
   week: "Tuần",
   day: "Ngày",

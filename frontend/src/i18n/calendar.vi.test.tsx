@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, RouterProvider, createMemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
@@ -46,11 +46,7 @@ function renderAt(path: string, ui: React.ReactNode, route: string) {
           <ConfirmProvider>
             <ShortcutProvider>
               <ChromeProvider>
-                <MemoryRouter initialEntries={[path]}>
-                  <Routes>
-                    <Route path={route} element={ui} />
-                  </Routes>
-                </MemoryRouter>
+                <RouterProvider router={createMemoryRouter([{ path: route, element: ui }], { initialEntries: [path] })} />
               </ChromeProvider>
             </ShortcutProvider>
           </ConfirmProvider>

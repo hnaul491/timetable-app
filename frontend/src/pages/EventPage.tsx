@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useBlocker, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { DocumentsSection } from "../components/DocumentsSection";
 import { SuggestTasks } from "../components/SuggestTasks";
@@ -149,6 +149,37 @@ function EventPageInner() {
     },
     { label: "shortcuts.save" },
   );
+
+  const hasUnsaved =
+    detail.data !== undefined &&
+    TABS.some((x) => {
+      const d = drafts[x.id];
+      const n = detail.data!.notes[x.id];
+      return d !== undefined && (d.body !== n.body || d.important !== n.important);
+    });
+  useEffect(() => {
+    if (!hasUnsaved) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsaved]);
+  const blocker = useBlocker(hasUnsaved);
+  const blockerRef = useRef(blocker);
+  blockerRef.current = blocker;
+  const asking = useRef(false);
+  useEffect(() => {
+    if (blocker.state !== "blocked" || asking.current) return;
+    asking.current = true;
+    void confirm({ title: t("event.leaveTitle"), body: t("event.leaveBody"), confirmLabel: t("event.leave"), tone: "danger" }).then((ok) => {
+      asking.current = false;
+      if (blockerRef.current.state !== "blocked") return;
+      if (ok) blockerRef.current.proceed();
+      else blockerRef.current.reset();
+    });
+  }, [blocker.state, confirm, t]);
 
   if (detail.error) return <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />;
   if (!detail.data) return <p className="text-muted">{t("common.loading")}</p>;

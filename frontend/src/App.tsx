@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { RouterProvider, createBrowserRouter } from "react-router";
 import { AuthGate } from "./auth/AuthGate";
 import { I18nProvider } from "./i18n";
 import { LanguageRoot } from "./i18n/LanguageRoot";
@@ -30,6 +30,24 @@ const queryClient = new QueryClient({
   },
 });
 
+// a data router, so EventPage can block navigation away from unsaved notes (useBlocker)
+const router = createBrowserRouter([
+  {
+    element: <Layout />,
+    children: [
+      { index: true, element: <CalendarPage /> },
+      { path: "board", element: <BoardPage /> },
+      { path: "settings", element: <SettingsPage /> },
+      { path: "assistant", element: <AssistantPage /> },
+      { path: "review", element: <ReviewPage /> },
+      { path: "subjects", element: <SubjectsPage /> },
+      { path: "subjects/:id", element: <SubjectPage /> },
+      { path: "events/new", element: <NewEventPage /> },
+      { path: "events/:id", element: <EventPage /> },
+    ],
+  },
+]);
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -41,21 +59,7 @@ export default function App() {
                 <TopProgress />
                 <ShortcutProvider>
                   <ChromeProvider>
-                    <BrowserRouter>
-                      <Routes>
-                        <Route element={<Layout />}>
-                          <Route index element={<CalendarPage />} />
-                          <Route path="board" element={<BoardPage />} />
-                          <Route path="settings" element={<SettingsPage />} />
-                          <Route path="assistant" element={<AssistantPage />} />
-                          <Route path="review" element={<ReviewPage />} />
-                          <Route path="subjects" element={<SubjectsPage />} />
-                          <Route path="subjects/:id" element={<SubjectPage />} />
-                          <Route path="events/new" element={<NewEventPage />} />
-                          <Route path="events/:id" element={<EventPage />} />
-                        </Route>
-                      </Routes>
-                    </BrowserRouter>
+                    <RouterProvider router={router} />
                   </ChromeProvider>
                 </ShortcutProvider>
               </ConfirmProvider>

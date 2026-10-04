@@ -47,7 +47,17 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect, onCreateAt }
         continue;
       }
       const end = parisParts(ev.end);
-      byDay.get(start.date)?.push({ ...ev, startMin: start.minutes, endMin: end.date === start.date ? end.minutes : DAY_MIN });
+      if (end.date <= start.date) {
+        byDay.get(start.date)?.push({ ...ev, startMin: start.minutes, endMin: end.minutes });
+        continue;
+      }
+      // Across midnight: first day until 24:00, later days from 00:00 to the end (an end at exactly midnight adds no day).
+      const lastDate = end.minutes === 0 ? addDays(end.date, -1) : end.date;
+      let date = start.date;
+      for (let guard = 0; date <= lastDate && guard < 400; guard++) {
+        byDay.get(date)?.push({ ...ev, startMin: date === start.date ? start.minutes : 0, endMin: date === end.date ? end.minutes : DAY_MIN });
+        date = addDays(date, 1);
+      }
     }
     const [firstHour, lastHour] = bounds([...byDay.values()].flat());
     return { byDay, holidays, firstHour, lastHour };
@@ -107,7 +117,7 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect, onCreateAt }
           >
             {layoutDay(byDay.get(date) ?? []).map(({ item, column, columns: count }) => (
               <EventBlock
-                key={item.id}
+                key={`${item.id}-${date}`}
                 ev={item}
                 column={column}
                 columns={count}

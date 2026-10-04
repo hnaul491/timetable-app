@@ -6,6 +6,8 @@ export const common = {
   close: "Close",
   loading: "Loading…",
   retry: "Try again",
+  authErrorTitle: "Could not check your sign-in",
+  authErrorBody: "Check your connection, then try again.",
   today: "Today",
   week: "Week",
   day: "Day",
