@@ -38,6 +38,36 @@ describe("Dialog", () => {
   });
 });
 
+describe("Dialog page lock", () => {
+  it("makes #root inert and locks scroll until the last dialog closes", () => {
+    const root = document.createElement("div");
+    root.id = "root";
+    document.body.appendChild(root);
+    const view = render(
+      <>
+        <Dialog open onClose={() => {}} title="A"><button type="button">a</button></Dialog>
+        <Dialog open onClose={() => {}} title="B"><button type="button">b</button></Dialog>
+      </>,
+    );
+    expect(root).toHaveAttribute("inert");
+    expect(document.body.style.overflow).toBe("hidden");
+    view.rerender(<Dialog open onClose={() => {}} title="A"><button type="button">a</button></Dialog>);
+    expect(root).toHaveAttribute("inert");
+    view.unmount();
+    expect(root).not.toHaveAttribute("inert");
+    expect(document.body.style.overflow).toBe("");
+    root.remove();
+  });
+
+  it("Shift+Tab from the panel itself wraps to the last control", async () => {
+    render(<Dialog open onClose={() => {}} title="A"><button type="button">only</button></Dialog>);
+    const panel = screen.getByRole("dialog");
+    panel.focus();
+    await userEvent.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "only" })).toHaveFocus();
+  });
+});
+
 function ConfirmHarness({ onResult }: { onResult: (v: boolean) => void }) {
   const confirm = useConfirm();
   return (
@@ -48,6 +78,22 @@ function ConfirmHarness({ onResult }: { onResult: (v: boolean) => void }) {
 }
 
 describe("Confirm", () => {
+  it("resolves a pending question with false when another is asked", async () => {
+    const results: boolean[] = [];
+    function Twice() {
+      const confirm = useConfirm();
+      return (
+        <button type="button" onClick={() => { void confirm({ title: "One", confirmLabel: "Yes" }).then((v) => results.push(v)); void confirm({ title: "Two", confirmLabel: "Yes" }); }}>
+          Both
+        </button>
+      );
+    }
+    render(<ConfirmProvider><Twice /></ConfirmProvider>);
+    await userEvent.click(screen.getByRole("button", { name: "Both" }));
+    await waitFor(() => expect(results).toEqual([false]));
+    expect(screen.getByRole("dialog", { name: "Two" })).toBeInTheDocument();
+  });
+
   it("resolves true on confirm and false on cancel", async () => {
     const onResult = vi.fn();
     render(

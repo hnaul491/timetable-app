@@ -5,6 +5,27 @@ import { useT } from "../../i18n";
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+let openDialogs = 0;
+let savedOverflow = "";
+
+/** Keeps the page behind open dialogs unreachable and unscrollable; nested dialogs share one lock. */
+function lockPage(): () => void {
+  const root = document.getElementById("root");
+  if (openDialogs === 0) {
+    savedOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+  openDialogs += 1;
+  root?.setAttribute("inert", "");
+  return () => {
+    openDialogs -= 1;
+    if (openDialogs === 0) {
+      root?.removeAttribute("inert");
+      document.body.style.overflow = savedOverflow;
+    }
+  };
+}
+
 export type DialogSize = "sm" | "md" | "side";
 
 const PANEL: Record<DialogSize, string> = {
@@ -37,6 +58,7 @@ export function Dialog({ open, onClose, title, size = "md", children, footer }: 
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const node = panel.current;
     if (!node) return;
+    const unlock = lockPage();
     (node.querySelector<HTMLElement>("[data-autofocus]") ?? node.querySelector<HTMLElement>(FOCUSABLE) ?? node).focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -52,7 +74,7 @@ export function Dialog({ open, onClose, title, size = "md", children, footer }: 
       }
       const first = items[0];
       const last = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === node)) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
@@ -63,6 +85,7 @@ export function Dialog({ open, onClose, title, size = "md", children, footer }: 
     node.addEventListener("keydown", onKey);
     return () => {
       node.removeEventListener("keydown", onKey);
+      unlock();
       opener?.focus();
     };
   }, [open]);

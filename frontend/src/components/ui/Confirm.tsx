@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { useT } from "../../i18n";
 import { Dialog } from "./Dialog";
 
@@ -15,9 +15,17 @@ const ConfirmContext = createContext<Ask>(async () => false);
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const t = useT();
   const [pending, setPending] = useState<(ConfirmOptions & { resolve: (value: boolean) => void }) | null>(null);
-  const ask = useCallback<Ask>((options) => new Promise((resolve) => setPending({ ...options, resolve })), []);
+  const current = useRef<((value: boolean) => void) | null>(null);
+  const ask = useCallback<Ask>((options) => {
+    current.current?.(false); // a newer question replaces one still open
+    return new Promise((resolve) => {
+      current.current = resolve;
+      setPending({ ...options, resolve });
+    });
+  }, []);
   const finish = (value: boolean) => {
     pending?.resolve(value);
+    current.current = null;
     setPending(null);
   };
   const danger = pending?.tone === "danger";
