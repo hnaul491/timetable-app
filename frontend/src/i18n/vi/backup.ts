@@ -11,7 +11,8 @@ export const backup: Messages["backup"] = {
   driving: "Đang sao lưu…",
   driveDone: "Đã lưu bản sao lưu lên Google Drive với tên {name}",
   driveFailed: "Không sao lưu được lên Google Drive: {error}",
-  needDrive: "Hãy kết nối Google có quyền Drive (thẻ Google bên dưới) để sao lưu lên Drive.",
-  lastAt: "Bản sao lưu tự động gần nhất: {date}",
-  never: "Bản sao lưu tự động gần nhất: chưa có",
+  needDrive: "Hãy kết nối Google có quyền Drive (thẻ Google phía trên) để sao lưu lên Drive.",
+  lastAt: "Sao lưu Drive gần nhất: {date}",
+  never: "Sao lưu Drive gần nhất: chưa có",
+  statusFailed: "Không tải được trạng thái sao lưu: {error}",
 };

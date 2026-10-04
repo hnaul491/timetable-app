@@ -87,3 +87,46 @@ describe("BackupSettings", () => {
     expect(screen.getByText(/Google Drive của bạn/)).toBeInTheDocument();
   });
 });
+
+describe("BackupSettings status and cleanup", () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  });
+
+  it("shows an error line when the status request fails", async () => {
+    apiFetch.mockRejectedValue(new Error("offline"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <I18nProvider locale="en">
+          <ToastProvider>
+            <BackupSettings />
+          </ToastProvider>
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText(translate("en", "backup.statusFailed", { error: "offline" }))).toBeInTheDocument();
+  });
+
+  it("revokes the object URL after the click, not before", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
+    apiFetch.mockResolvedValue({ drive_available: true, last_at: null });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <I18nProvider locale="en">
+          <ToastProvider>
+            <BackupSettings />
+          </ToastProvider>
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: translate("en", "backup.download") }));
+    await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled());
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:x"), { timeout: 3000 });
+  });
+});

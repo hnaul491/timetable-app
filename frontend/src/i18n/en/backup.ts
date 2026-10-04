@@ -9,7 +9,8 @@ export const backup = {
   driving: "Backing up…",
   driveDone: "Backup saved to Google Drive as {name}",
   driveFailed: "Could not back up to Google Drive: {error}",
-  needDrive: "Connect Google with Drive access (Google card below) to back up to Drive.",
-  lastAt: "Last automatic backup: {date}",
-  never: "Last automatic backup: never",
+  needDrive: "Connect Google with Drive access (Google card above) to back up to Drive.",
+  lastAt: "Last Drive backup: {date}",
+  never: "Last Drive backup: never",
+  statusFailed: "Could not load the backup status: {error}",
 };

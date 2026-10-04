@@ -39,7 +39,7 @@ export function BackupSettings() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
     onSuccess: () => toast.success(t("backup.downloaded")),
     onError: (error) => toast.error(t("backup.downloadFailed", { error: message(error) })),
@@ -67,6 +67,7 @@ export function BackupSettings() {
           {drive.isPending ? t("backup.driving") : t("backup.drive")}
         </button>
       </div>
+      {status.isError && <p className="text-sm text-danger">{t("backup.statusFailed", { error: message(status.error) })}</p>}
       {status.data && !available && <p className="text-sm text-muted">{t("backup.needDrive")}</p>}
       {status.data && (
         <p className="text-sm text-muted">
