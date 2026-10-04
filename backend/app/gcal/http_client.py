@@ -189,7 +189,8 @@ class HttpGoogleCalendar:
             for item in data.get("items") or []:
                 if not isinstance(item, dict) or not isinstance(item.get("id"), str):
                     continue
-                props = (item.get("extendedProperties") or {}).get("private") or {}
+                extended = item.get("extendedProperties")
+                props = (extended.get("private") or {}) if isinstance(extended, dict) else {}
                 marker = props.get("timetableEventId") if isinstance(props, dict) else None
                 found.append((item["id"], marker if isinstance(marker, str) else None))
             token = data.get("nextPageToken")

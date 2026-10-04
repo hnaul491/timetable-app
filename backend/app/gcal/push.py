@@ -371,16 +371,18 @@ def _sweep_orphans(session: Session, account: GoogleAccount, gcal: GoogleCalenda
     try:
         known = set(session.scalars(select(Event.gcal_event_id).where(Event.gcal_event_id.is_not(None))))
         known.update(session.scalars(select(GcalTombstone.gcal_event_id)))
+        listed_ids = {gcal_event_id for gcal_event_id, _ in listed}
         for gcal_event_id, marker in listed:
             if marker is None or gcal_event_id in known:
                 continue  # the user's own event, or one the timetable already tracks
-            if not (marker.isdigit() and len(marker) < 18):
+            if not (marker.isascii() and marker.isdigit() and len(marker) < 18):
                 continue  # not a marker this app writes
             if deadline - clock() < SWEEP_MIN_LEFT_S:
                 return
             row = session.get(Event, int(marker))
-            if row is not None and row.gcal_event_id is None:
-                row.gcal_event_id, row.gcal_hash = gcal_event_id, None  # adopt: the next push updates it
+            if row is not None and (row.gcal_event_id is None or row.gcal_event_id not in listed_ids):
+                # adopt: the row has no copy, or its recorded copy is gone — keep this one; the next push updates it
+                row.gcal_event_id, row.gcal_hash = gcal_event_id, None
                 known.add(gcal_event_id)
                 continue
             _delete_quietly(gcal, account.calendar_id, gcal_event_id)

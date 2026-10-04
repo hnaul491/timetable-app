@@ -595,3 +595,29 @@ def test_sweep_errors_do_not_fail_the_push(session, world):
     fake = FakeCalendar(fail={"list_app_event_ids": [GoogleError("boom")]})
     result = run(session, account, fake)
     assert result.status == "ok" and account.last_sweep_at is None
+
+
+def test_sweep_keeps_the_only_copy_when_the_recorded_one_is_gone(session, world):
+    events, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    gone = events["class"].gcal_event_id
+    del fake.events[gone]  # the recorded copy was deleted by hand in Google
+    orphan(fake, "survivor", str(events["class"].id))
+    account.last_sweep_at = None
+    session.commit()
+    run(session, account, fake)
+    assert "survivor" in fake.events
+    assert events["class"].gcal_event_id == "survivor"
+
+
+def test_sweep_ignores_non_ascii_digit_markers(session, world):
+    _, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    orphan(fake, "odd", "²")  # superscript two: isdigit() but not an id the app writes
+    account.last_sweep_at = None
+    session.commit()
+    result = run(session, account, fake)
+    assert result.status == "ok"
+    assert "odd" in fake.events
