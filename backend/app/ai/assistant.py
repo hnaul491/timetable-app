@@ -25,6 +25,7 @@ LIMIT_REPLY = {
     "en": "I've reached the limit of steps for this question — try narrowing it down.",
     "vi": "Mình đã dùng hết số bước cho câu hỏi này — hãy thử hỏi cụ thể hơn nhé.",
 }
+CUT_NOTE = {"en": " … (reply cut off: time limit)", "vi": " … (câu trả lời bị cắt: hết thời gian)"}
 EMPTY_REPLY = {"en": "I have nothing to add.", "vi": "Mình chưa có gì để bổ sung."}
 LANGUAGES = {"en": "English", "vi": "Vietnamese"}
 RATE_LIMITED = "AI limit reached, try again later"
@@ -150,6 +151,10 @@ def run_chat(session: Session, llm: LLMProvider, user_text: str, context: ChatCo
     return ChatResult(reply=reply, action_ids=action_ids)
 
 
+def _clock() -> float:
+    return time.monotonic()
+
+
 def _ai_error_text(exc: AIError) -> str:
     # fixed texts: nothing from the provider (which could echo request details) reaches the client
     return RATE_LIMITED if isinstance(exc, AIRateLimited) else UNAVAILABLE
@@ -164,23 +169,41 @@ def stream_chat(session: Session, llm: LLMProvider, user_text: str, context: Cha
     action_ids: list[int] = []
     used = 0
     reply: str | None = None
-    deadline = time.monotonic() + budget
+    deadline = _clock() + budget
     try:
         while reply is None:
-            remaining = deadline - time.monotonic()
+            remaining = deadline - _clock()
             if remaining < MIN_REMAINING:
                 reply = LIMIT_REPLY[locale]
                 yield {"event": "delta", "data": {"text": reply}}
                 break
             text_parts: list[str] = []
             calls: list[FunctionCall] = []
-            for part in llm.stream(system, turns, TOOLS, timeout=min(CALL_TIMEOUT, remaining - 3)):
-                if isinstance(part, TextDelta):
-                    text_parts.append(part.text)
-                    yield {"event": "delta", "data": {"text": part.text}}
-                else:
-                    calls.append(part.call)
+            expired = False
+            parts = llm.stream(system, turns, TOOLS, timeout=min(CALL_TIMEOUT, remaining - 3))
+            try:
+                for part in parts:
+                    if isinstance(part, TextDelta):
+                        text_parts.append(part.text)
+                        yield {"event": "delta", "data": {"text": part.text}}
+                    else:
+                        calls.append(part.call)
+                    if _clock() >= deadline:
+                        expired = True
+                        break
+            finally:
+                close = getattr(parts, "close", None)
+                if close is not None:
+                    close()  # closes the HTTP response of a half-read stream
             text = "".join(text_parts)
+            if expired:
+                if text.strip():
+                    reply = text.strip() + CUT_NOTE[locale]
+                    yield {"event": "delta", "data": {"text": CUT_NOTE[locale]}}
+                else:
+                    reply = LIMIT_REPLY[locale]
+                    yield {"event": "delta", "data": {"text": reply}}
+                break
             if not calls:
                 reply = text.strip() or EMPTY_REPLY[locale]
                 if not text.strip():

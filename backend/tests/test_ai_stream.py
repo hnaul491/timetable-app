@@ -152,3 +152,55 @@ def test_http_stream_ai_off_is_503_json(client):
 
 def test_http_stream_requires_auth(client):
     assert client.post("/api/chat/stream", json={"message": "hi", "context": {}}).status_code in (401, 403)
+
+
+class Clock:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+def slow_provider(clock, parts_before, step=30.0):
+    class Slow(FakeProvider):
+        closed = False
+
+        def stream(self, system, turns, tools, timeout=None):
+            try:
+                for p in parts_before:
+                    clock.t += step
+                    yield p
+            finally:
+                Slow.closed = True
+    return Slow(stream_script=[])
+
+
+def test_deadline_mid_stream_persists_partial_with_note(session, semester, monkeypatch):
+    from app.ai import assistant
+    clock = Clock()
+    monkeypatch.setattr(assistant, "_clock", clock)
+    llm = slow_provider(clock, [TextDelta("Hel"), TextDelta("lo"), TextDelta("never")])
+    ev = run(session, llm, budget=50)
+    assert names(ev) == ["delta", "delta", "delta", "done"]
+    assert ev[-1]["data"]["message"]["content"] == "Hel" "lo" + assistant.CUT_NOTE["en"]
+    assert type(llm).closed is True
+
+
+def test_deadline_mid_stream_vietnamese_note(session, semester, monkeypatch):
+    from app.ai import assistant
+    clock = Clock()
+    monkeypatch.setattr(assistant, "_clock", clock)
+    llm = slow_provider(clock, [TextDelta("Chào"), TextDelta("x")])
+    ev = list(stream_chat(session, llm, "hi", ChatContext(), "vi", NOW, budget=50))
+    assert ev[-1]["data"]["message"]["content"].endswith("(câu trả lời bị cắt: hết thời gian)")
+
+
+def test_deadline_with_no_text_is_limit_reply(session, semester, monkeypatch):
+    from app.ai import assistant
+    clock = Clock()
+    monkeypatch.setattr(assistant, "_clock", clock)
+    llm = slow_provider(clock, [call("get_subjects")], step=60.0)
+    ev = run(session, llm, budget=50)
+    assert names(ev) == ["delta", "done"]
+    assert ev[-1]["data"]["message"]["content"] == LIMIT_REPLY["en"]
