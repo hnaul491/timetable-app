@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GoogleStatus, PushResult } from "../types";
 import { GoogleSettings } from "./GoogleSettings";
+import { ConfirmProvider } from "./ui/Confirm";
+import { ToastProvider } from "./ui/Toast";
 
 const apiFetch = vi.fn();
 vi.mock("../lib/api", async (importOriginal) => ({
@@ -26,7 +28,11 @@ function renderWith(status: GoogleStatus, pushes: PushResult[] = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <GoogleSettings />
+      <ToastProvider>
+        <ConfirmProvider>
+          <GoogleSettings />
+        </ConfirmProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -89,12 +95,28 @@ describe("GoogleSettings", () => {
     expect(apiFetch.mock.calls.filter(([path]) => path === "/api/google/push")).toHaveLength(2);
   });
 
-  it("disconnects only after a second click", async () => {
+  it("disconnects only after the dialog is confirmed", async () => {
     renderWith(connected);
     await userEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    const dialog = screen.getByRole("dialog", { name: "Disconnect Google Calendar?" });
+    expect(dialog).toHaveTextContent("stays in Google");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(apiFetch).not.toHaveBeenCalledWith("/api/google", { method: "DELETE" });
-    await userEvent.click(screen.getByRole("button", { name: "Click again to disconnect" }));
+    await userEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Disconnect" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/google", { method: "DELETE" });
+    expect(await screen.findByText("Google Calendar disconnected")).toBeInTheDocument();
+  });
+
+  it("toasts when a push finishes and when it fails", async () => {
+    renderWith(connected, [
+      { status: "ok", done: 4, failed: 0, remaining: 0, error: null },
+      { status: "failed", done: 0, failed: 3, remaining: 3, error: "boom" },
+    ]);
+    await userEvent.click(await screen.findByRole("button", { name: "Push now" }));
+    expect(await screen.findAllByText("4 changes sent")).toHaveLength(2);
+    await userEvent.click(screen.getByRole("button", { name: "Push now" }));
+    expect((await screen.findAllByText("Push failed: boom")).length).toBeGreaterThanOrEqual(2);
   });
 
   it("says the calendar stays in Google after disconnecting", async () => {
@@ -117,14 +139,14 @@ describe("GoogleSettings", () => {
       { status: "ok", done: 5, failed: 0, remaining: 0, error: null },
     ]);
     await userEvent.click(await screen.findByRole("button", { name: "Push now" }));
-    expect(await screen.findByText(`0 changes sent. ${msg}`)).toBeInTheDocument();
+    expect((await screen.findAllByText(`0 changes sent. ${msg}`)).length).toBeGreaterThan(0);
     expect(apiFetch.mock.calls.filter(([path]) => path === "/api/google/push")).toHaveLength(1);
   });
 
   it("shows a failed push", async () => {
     renderWith(connected, [{ status: "failed", done: 0, failed: 3, remaining: 3, error: "boom" }]);
     await userEvent.click(await screen.findByRole("button", { name: "Push now" }));
-    expect(await screen.findByText("Push failed: boom")).toBeInTheDocument();
+    expect((await screen.findAllByText("Push failed: boom")).length).toBeGreaterThan(0);
   });
 
   it("shows when Google rejects the consent start", async () => {

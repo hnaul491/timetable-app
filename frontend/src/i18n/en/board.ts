@@ -18,7 +18,7 @@ export const board = {
     fromClass: "From class",
     statusFor: "Status for {title}",
     deleteAria: "Delete {title}",
-    confirmDeleteAria: "Click again to delete {title}",
-    confirmDelete: "Click again to delete",
   },
+  deleteTitle: "Delete task “{title}”?",
+  toast: { added: "Task added", moved: "Moved to {column}", deleted: "Task deleted" },
 };

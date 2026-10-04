@@ -66,4 +66,18 @@ describe("Subjects", () => {
     expect(screen.getByText("Cancelled")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "1 of 10 sessions done" })).toBeInTheDocument();
   });
+
+  it("shows list skeletons with an accessible status while loading", () => {
+    apiFetch.mockImplementation(() => new Promise(() => {}));
+    renderAt("/subjects");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading subjects…");
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("shows a subject page skeleton with an accessible status while loading", () => {
+    apiFetch.mockImplementation(() => new Promise(() => {}));
+    renderAt("/subjects/1");
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
 });

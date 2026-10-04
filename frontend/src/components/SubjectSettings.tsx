@@ -3,41 +3,59 @@ import { useState } from "react";
 import { useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import type { SubjectSummary } from "../types";
+import { useConfirm } from "./ui/Confirm";
+import { useToast } from "./ui/Toast";
 
 type Patch = Partial<Pick<SubjectSummary, "display_name" | "color" | "hidden">>;
 
 export function SubjectSettings() {
   const t = useT();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => apiFetch<SubjectSummary[]>("/api/subjects") });
   const refresh = () => queryClient.invalidateQueries();
   const patch = useMutation({
     mutationFn: (v: { id: number; body: Patch }) => apiFetch(`/api/subjects/${v.id}`, { method: "PATCH", body: JSON.stringify(v.body) }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      toast.success(t("settings.subjects.saved"));
+    },
+    onError: (error, v) => toast.error(error.message, { retry: () => patch.mutate(v) }),
   });
   const merge = useMutation({
     mutationFn: (v: { id: number; into: number }) => apiFetch(`/api/subjects/${v.id}/merge`, { method: "POST", body: JSON.stringify({ into_id: v.into }) }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      toast.success(t("settings.subjects.merged"));
+    },
+    onError: (error, v) => toast.error(error.message, { retry: () => merge.mutate(v) }),
   });
-  const error = (patch.error ?? merge.error) as Error | null;
+  const askMerge = async (from: SubjectSummary, into: SubjectSummary) => {
+    const ok = await confirm({
+      title: t("settings.subjects.mergeTitle", { from: from.display_name, into: into.display_name }),
+      body: t("settings.subjects.mergeBody"),
+      confirmLabel: t("settings.subjects.merge"),
+      tone: "danger",
+    });
+    if (ok) merge.mutate({ id: from.id, into: into.id });
+  };
   const all = subjects.data ?? [];
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-base font-bold">{t("settings.subjects.title")}</h2>
       <p className="text-sm text-muted">{t("settings.subjects.help")}</p>
       {all.map((s) => (
-        <SubjectRow key={s.id} subject={s} others={all.filter((o) => o.id !== s.id)} onPatch={(body) => patch.mutate({ id: s.id, body })} onMerge={(into) => merge.mutate({ id: s.id, into })} />
+        <SubjectRow key={s.id} subject={s} others={all.filter((o) => o.id !== s.id)} onPatch={(body) => patch.mutate({ id: s.id, body })} onMerge={(into) => void askMerge(s, into)} />
       ))}
-      {error && <p className="text-sm text-danger">{error.message}</p>}
     </section>
   );
 }
 
-function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSummary; others: SubjectSummary[]; onPatch: (b: Patch) => void; onMerge: (into: number) => void }) {
+function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSummary; others: SubjectSummary[]; onPatch: (b: Patch) => void; onMerge: (into: SubjectSummary) => void }) {
   const t = useT();
   const [name, setName] = useState(subject.display_name);
   const [into, setInto] = useState("");
-  const [confirm, setConfirm] = useState(false);
   const [color, setColor] = useState(subject.color.toLowerCase());
   const [syncedColor, setSyncedColor] = useState(subject.color);
   if (syncedColor !== subject.color) {
@@ -45,6 +63,7 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
     setColor(subject.color.toLowerCase());
   }
   const target = others.some((o) => String(o.id) === into) ? into : "";
+  const targetSubject = others.find((o) => String(o.id) === target);
   const label = subject.display_name;
   return (
     <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-surface-2 px-3 py-2.5">
@@ -57,7 +76,7 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
         <input type="checkbox" aria-label={t("settings.subjects.hideAria", { name: label })} checked={subject.hidden} onChange={(e) => onPatch({ hidden: e.target.checked })} />
         {t("settings.subjects.hide")}
       </label>
-      <select aria-label={t("settings.subjects.mergeIntoAria", { name: label })} value={target} onChange={(e) => { setInto(e.target.value); setConfirm(false); }} className="h-9 rounded-lg border border-line-strong bg-surface px-2 text-sm">
+      <select aria-label={t("settings.subjects.mergeIntoAria", { name: label })} value={target} onChange={(e) => setInto(e.target.value)} className="h-9 rounded-lg border border-line-strong bg-surface px-2 text-sm">
         <option value="">{t("settings.subjects.mergeInto")}</option>
         {others.map((o) => (
           <option key={o.id} value={o.id}>
@@ -67,13 +86,12 @@ function SubjectRow({ subject, others, onPatch, onMerge }: { subject: SubjectSum
       </select>
       <button
         type="button"
-        aria-label={confirm ? t("settings.subjects.mergeConfirmAria", { name: label }) : t("settings.subjects.mergeAria", { name: label })}
-        disabled={!target}
-        onClick={() => (confirm ? onMerge(Number(target)) : setConfirm(true))}
-        onBlur={() => setConfirm(false)}
+        aria-label={t("settings.subjects.mergeAria", { name: label })}
+        disabled={!targetSubject}
+        onClick={() => targetSubject && onMerge(targetSubject)}
         className="h-9 rounded-lg px-3 text-sm font-semibold text-danger disabled:opacity-40"
       >
-        {confirm ? t("settings.subjects.mergeConfirm") : t("settings.subjects.merge")}
+        {t("settings.subjects.merge")}
       </button>
     </div>
   );

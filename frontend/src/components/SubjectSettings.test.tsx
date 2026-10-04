@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SubjectSummary } from "../types";
 import { SubjectSettings } from "./SubjectSettings";
+import { ConfirmProvider } from "./ui/Confirm";
+import { ToastProvider } from "./ui/Toast";
 
 const apiFetch = vi.fn();
 vi.mock("../lib/api", async (importOriginal) => ({
@@ -20,7 +22,11 @@ const SUBJECTS: SubjectSummary[] = [
 function renderIt() {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <SubjectSettings />
+      <ToastProvider>
+        <ConfirmProvider>
+          <SubjectSettings />
+        </ConfirmProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -45,12 +51,24 @@ describe("SubjectSettings", () => {
     expect(apiFetch).toHaveBeenCalledWith("/api/subjects/2", { method: "PATCH", body: JSON.stringify({ hidden: true }) });
   });
 
-  it("merges only after a second click", async () => {
+  it("merges only after the dialog is confirmed", async () => {
     renderIt();
     await userEvent.selectOptions(await screen.findByLabelText("Merge French for Spring F26 T1 into"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Merge French for Spring F26 T1" }));
+    const dialog = screen.getByRole("dialog", { name: "Merge “French for Spring F26 T1” into “French for Fall 26 T1”?" });
+    expect(dialog).toHaveTextContent("Its classes, tasks and notes move over.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(apiFetch).not.toHaveBeenCalledWith("/api/subjects/2/merge", expect.anything());
-    await userEvent.click(screen.getByRole("button", { name: "Click again to merge French for Spring F26 T1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Merge French for Spring F26 T1" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Merge" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/subjects/2/merge", { method: "POST", body: JSON.stringify({ into_id: 1 }) });
+    expect(await screen.findByText("Subjects merged")).toBeInTheDocument();
+  });
+
+  it("toasts after a rename", async () => {
+    renderIt();
+    fireEvent.change(await screen.findByLabelText("Name of French for Spring F26 T1"), { target: { value: "French (spring)" } });
+    await userEvent.click(screen.getByRole("button", { name: "Save name of French for Spring F26 T1" }));
+    expect(await screen.findByText("Subject saved")).toBeInTheDocument();
   });
 });

@@ -24,4 +24,5 @@ export const review = {
   free: "Free",
   allDay: "all day",
   taskDue: "due {date}",
+  toast: { taskDone: "Task marked done", reviewed: "Week marked as reviewed" },
 };

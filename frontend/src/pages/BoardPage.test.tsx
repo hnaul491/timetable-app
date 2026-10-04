@@ -3,6 +3,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "../components/ui/Confirm";
+import { ToastProvider } from "../components/ui/Toast";
 import type { Task } from "../types";
 import { BoardPage } from "./BoardPage";
 
@@ -26,9 +28,13 @@ function renderBoard() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <BoardPage />
-      </MemoryRouter>
+      <ToastProvider>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <BoardPage />
+          </MemoryRouter>
+        </ConfirmProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -68,13 +74,36 @@ describe("BoardPage", () => {
     expect(apiFetch).toHaveBeenCalledWith("/api/tasks", { method: "POST", body: JSON.stringify({ title: "Print slides", due_date: null }) });
   });
 
-  it("names delete buttons per task and resets the confirmation on blur", async () => {
+  it("asks in a dialog before deleting and sends nothing on Cancel", async () => {
     renderBoard();
-    const del = await screen.findByRole("button", { name: "Delete Buy notebook" });
-    await userEvent.click(del);
-    expect(screen.getByRole("button", { name: "Click again to delete Buy notebook" })).toBeInTheDocument();
-    await userEvent.tab();
-    expect(screen.getByRole("button", { name: "Delete Buy notebook" })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Buy notebook" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete task “Buy notebook”?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(apiFetch).not.toHaveBeenCalledWith("/api/tasks/3", { method: "DELETE" });
+  });
+
+  it("deletes after confirming and shows a success toast", async () => {
+    renderBoard();
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Buy notebook" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
+    expect(apiFetch).toHaveBeenCalledWith("/api/tasks/3", { method: "DELETE" });
+    expect(await screen.findByText("Task deleted")).toBeInTheDocument();
+  });
+
+  it("toasts after adding and moving a task", async () => {
+    renderBoard();
+    await userEvent.type(await screen.findByLabelText("New task"), "Print slides");
+    await userEvent.click(screen.getByRole("button", { name: "Add task" }));
+    expect(await screen.findByText("Task added")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Status for Redo ex 3" }), "doing");
+    expect(await screen.findByText("Moved to Doing")).toBeInTheDocument();
+  });
+
+  it("shows three column skeletons while loading", () => {
+    apiFetch.mockImplementation(() => new Promise(() => {}));
+    renderBoard();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading tasks…");
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 });

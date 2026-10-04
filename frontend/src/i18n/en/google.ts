@@ -30,6 +30,7 @@ export const google = {
   pushNow: "Push now",
   pushing: "Pushing…",
   disconnect: "Disconnect",
-  disconnectConfirm: "Click again to disconnect",
+  disconnectTitle: "Disconnect Google Calendar?",
+  disconnected: "Google Calendar disconnected",
   disconnectHelp: "Disconnecting stops updates. The “My Timetable” calendar stays in Google — delete it there if you don't need it.",
 };

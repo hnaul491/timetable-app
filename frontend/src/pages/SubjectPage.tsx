@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { Skeleton } from "../components/ui/Skeleton";
 import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
@@ -12,7 +13,21 @@ export function SubjectPage() {
   const { id } = useParams();
   const detail = useQuery({ queryKey: ["subject", id], queryFn: () => apiFetch<SubjectDetail>(`/api/subjects/${id}`), refetchOnMount: "always" });
   if (detail.error) return <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />;
-  if (!detail.data) return <p className="text-sm text-muted">{t("common.loading")}</p>;
+  if (!detail.data)
+    return (
+      <div role="status" className="flex flex-col gap-4">
+        <span className="sr-only">{t("common.loading")}</span>
+        <Skeleton className="h-5 w-28" />
+        <div aria-hidden="true" className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 md:p-7">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-80 max-w-full" />
+          <Skeleton className="h-2 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </div>
+    );
   const { subject, sessions, tasks } = detail.data;
   const pct = subject.sessions ? Math.round((subject.sessions_done / subject.sessions) * 100) : 0;
   return (
