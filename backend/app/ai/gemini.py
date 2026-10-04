@@ -32,7 +32,10 @@ def _content(turn: Turn) -> dict:
     if turn.text:
         parts.append({"text": turn.text})
     for c in turn.calls:
-        parts.append({"functionCall": {"name": c.name, "args": c.args}})
+        part: dict = {"functionCall": {"name": c.name, "args": c.args}}
+        if c.thought_signature:
+            part["thoughtSignature"] = c.thought_signature
+        parts.append(part)
     return {"role": turn.role, "parts": parts}
 
 
@@ -99,7 +102,8 @@ class GeminiProvider:
         parts = self._parts(self._post(body, timeout))
         texts = [p["text"] for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)]
         calls = [
-            FunctionCall(p["functionCall"]["name"], p["functionCall"].get("args") or {})
+            FunctionCall(p["functionCall"]["name"], p["functionCall"].get("args") or {},
+                         thought_signature=p.get("thoughtSignature") if isinstance(p.get("thoughtSignature"), str) else None)
             for p in parts
             if isinstance(p, dict) and isinstance(p.get("functionCall"), dict) and "name" in p["functionCall"]
         ]
