@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, Field, StrictBool, StringConstraints, field_validator, model_validator
 
 
 class EventOut(BaseModel):
@@ -355,6 +355,8 @@ class AiModelOut(BaseModel):
     id: str
     label: str
     note: str
+    note_key: Literal["best", "fastest"] | None = None
+    available: bool = True
 
 
 class AiStatus(BaseModel):
@@ -366,7 +368,7 @@ class AiStatus(BaseModel):
 
 class AiSettingsIn(BaseModel):
     model: str | None = None
-    auto_fallback: bool | None = None
+    auto_fallback: StrictBool | None = None
 
 
 class SuggestIn(BaseModel):

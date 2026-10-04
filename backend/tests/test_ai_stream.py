@@ -191,7 +191,7 @@ def test_deadline_mid_stream_vietnamese_note(session, semester, monkeypatch):
     from app.ai import assistant
     clock = Clock()
     monkeypatch.setattr(assistant, "_clock", clock)
-    llm = slow_provider(clock, [TextDelta("Chào"), TextDelta("x")])
+    llm = slow_provider(clock, [TextDelta("Chào"), TextDelta("x"), TextDelta("y")])
     ev = list(stream_chat(session, llm, "hi", ChatContext(), "vi", NOW, budget=50))
     assert ev[-1]["data"]["message"]["content"].endswith("(câu trả lời bị cắt: hết thời gian)")
 
@@ -200,7 +200,17 @@ def test_deadline_with_no_text_is_limit_reply(session, semester, monkeypatch):
     from app.ai import assistant
     clock = Clock()
     monkeypatch.setattr(assistant, "_clock", clock)
-    llm = slow_provider(clock, [call("get_subjects")], step=60.0)
+    llm = slow_provider(clock, [call("get_subjects"), call("get_subjects")], step=60.0)
     ev = run(session, llm, budget=50)
     assert names(ev) == ["delta", "done"]
     assert ev[-1]["data"]["message"]["content"] == LIMIT_REPLY["en"]
+
+
+def test_deadline_passing_on_the_last_part_is_not_cut(session, semester, monkeypatch):
+    from app.ai import assistant
+    clock = Clock()
+    monkeypatch.setattr(assistant, "_clock", clock)
+    llm = slow_provider(clock, [TextDelta("Hel"), TextDelta("lo")])  # deadline passes as "lo" arrives; stream ends
+    ev = run(session, llm, budget=50)
+    assert names(ev) == ["delta", "delta", "done"]
+    assert ev[-1]["data"]["message"]["content"] == "Hello"

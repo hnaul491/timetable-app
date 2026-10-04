@@ -8,8 +8,8 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.ai.assistant import run_chat, stream_chat
-from app.ai.models import (FALLBACK_KEY, MODEL_IDS, MODEL_KEY, MODELS, auto_fallback, save_setting,
-                           selected_model)
+from app.ai.models import (FALLBACK_KEY, MODEL_IDS, MODEL_KEY, MODELS, auto_fallback, missing_models,
+                           save_setting, selected_model)
 from app.ai.provider import AIError, AIRateLimited, LLMProvider
 from app.ai.suggest import suggest_tasks
 from app.auth import require_user
@@ -32,6 +32,7 @@ NOT_SET_UP = "AI is not set up on the server"
 RATE_LIMITED = "AI limit reached, try again later"
 UNAVAILABLE = "The assistant is not available right now"
 NOTE_LIMIT = 20000
+SUGGEST_BUDGET = 40.0  # seconds for the whole fallback chain (the web proxy gives up after about a minute)
 
 
 def _need_llm(llm: LLMProvider | None) -> LLMProvider:
@@ -48,8 +49,10 @@ def _ai_error(exc: AIError) -> HTTPException:
 
 
 def _status(session: Session, settings: Settings) -> AiStatus:
+    gone = missing_models()
+    models = [{**m, "available": m["id"] not in gone} for m in MODELS]
     return AiStatus(enabled=settings.ai_enabled, model=selected_model(session, settings.gemini_model),
-                    models=MODELS, auto_fallback=auto_fallback(session))
+                    models=models, auto_fallback=auto_fallback(session))
 
 
 @router.get("/ai/status", response_model=AiStatus)
@@ -81,7 +84,7 @@ def suggest(body: SuggestIn, session: Session = Depends(get_session), llm: LLMPr
     described = describe_event(session, event)
     context = f"{described.title}, {described.start_at:%Y-%m-%d}"
     try:
-        items = suggest_tasks(llm, note.body, context, body.locale or "en")
+        items = suggest_tasks(llm, note.body, context, body.locale or "en", SUGGEST_BUDGET)
     except AIError as exc:
         raise _ai_error(exc) from None
     return SuggestOut(suggestions=items)

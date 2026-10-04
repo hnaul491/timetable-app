@@ -444,3 +444,10 @@ def test_old_pending_actions_are_trimmed(client, session, semester):
     use_llm(client, FakeProvider([text("ok")]))
     client.post("/api/chat", headers=AUTH, json={"message": "hi", "context": {}})
     assert session.scalar(select(func.count()).select_from(PendingAction)) == 1
+
+
+def test_suggest_passes_total_budget(client, session, semester):
+    _, _, c1, _ = seed(session, semester)
+    llm = use_llm(client, FakeProvider(json_result=[]))
+    assert client.post("/api/ai/suggest", headers=AUTH, json={"event_id": c1.id, "tab": "after"}).status_code == 200
+    assert llm.calls[0]["timeout"] == 40.0

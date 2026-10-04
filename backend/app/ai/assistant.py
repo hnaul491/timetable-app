@@ -182,14 +182,16 @@ def stream_chat(session: Session, llm: LLMProvider, user_text: str, context: Cha
             expired = False
             parts = llm.stream(system, turns, TOOLS, timeout=min(CALL_TIMEOUT, remaining - 3))
             try:
-                for part in parts:
+                it = iter(parts)
+                for part in it:
                     if isinstance(part, TextDelta):
                         text_parts.append(part.text)
                         yield {"event": "delta", "data": {"text": part.text}}
                     else:
                         calls.append(part.call)
                     if _clock() >= deadline:
-                        expired = True
+                        # cut only when more was still coming: a stream that just ended is complete
+                        expired = next(it, None) is not None
                         break
             finally:
                 close = getattr(parts, "close", None)

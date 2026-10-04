@@ -85,3 +85,11 @@ def client(engine, settings):
     app.dependency_overrides[get_verifier] = lambda: FakeVerifier()
     app.dependency_overrides[get_now] = lambda: NOW
     return TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _reset_missing_models():
+    from app.ai import models
+    models._missing.clear()
+    yield
+    models._missing.clear()
