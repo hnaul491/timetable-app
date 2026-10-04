@@ -13,6 +13,7 @@ class FakeDrive:
         self.trashed_folders: set[str] = set()
         self.keep_limit: int | None = None  # when set, Drive keeps at most this many bytes per chunk call
         self.sessions: dict[str, dict] = {}
+        self.parents: dict[str, str] = {}  # file id -> parent folder id
         self.calls: list[tuple[str, str]] = []
         self._fail = {name: list(queue) for name, queue in (fail or {}).items()}
         self._folders = 0
@@ -66,6 +67,7 @@ class FakeDrive:
                          web_view_link=f"https://drive.example/{file_id}")
         self.files[file_id] = done
         self.contents[file_id] = state["data"]
+        self.parents[file_id] = state["parent"]
         return done, total
 
     def rename(self, file_id: str, name: str) -> None:
@@ -75,6 +77,14 @@ class FakeDrive:
         if file_id in self.folders:
             self.folders[file_id] = (name, self.folders[file_id][1])
         self.calls.append(("rename", file_id))
+
+    def move(self, file_id: str, add_parent: str, remove_parent: str) -> None:
+        self._check("move")
+        if file_id not in self.files:
+            raise GoogleNotFound("Google Drive returned 404")
+        assert self.parents[file_id] == remove_parent, "moved from the wrong folder"
+        self.parents[file_id] = add_parent
+        self.calls.append(("move", file_id))
 
     def trash(self, file_id: str) -> None:
         self._check("trash")

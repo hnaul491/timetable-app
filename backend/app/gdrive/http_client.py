@@ -92,3 +92,7 @@ class HttpGoogleDrive:
 
     def rename(self, file_id: str, name: str) -> None:
         self._call("PATCH", _file_url(file_id), json={"name": name})
+
+    def move(self, file_id: str, add_parent: str, remove_parent: str) -> None:
+        self._call("PATCH", _file_url(file_id), params={"addParents": add_parent, "removeParents": remove_parent},
+                   json={})

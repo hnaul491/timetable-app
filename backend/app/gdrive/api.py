@@ -32,6 +32,8 @@ class GoogleDrive(Protocol):
 
     def rename(self, file_id: str, name: str) -> None: ...
 
+    def move(self, file_id: str, add_parent: str, remove_parent: str) -> None: ...
+
 
 DriveFactory = Callable[[str], GoogleDrive]
 """Builds a client from a refresh token."""

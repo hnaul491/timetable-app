@@ -401,3 +401,58 @@ def test_plaintext_session_uri_is_treated_as_expired(client, settings, session, 
     assert put(client, "legacy", b"a", 0).status_code == 404
     session.expire_all()
     assert session.get(DocumentUpload, "legacy") is None
+
+
+def _other_subject(session, semester, name="Algorithms"):
+    other = Subject(semester_id=semester.id, display_name=name, aliases=[], color="#2E55E6")
+    session.add(other)
+    session.commit()
+    return other
+
+
+def test_merging_subjects_moves_the_drive_files(client, settings, session, semester, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    other = _other_subject(session, semester)
+    moved = upload(client, subject)
+    kept = upload(client, other, name="kept.pdf")
+    source_folder, target_folder = folder_of(session, subject), folder_of(session, other)
+    source_id, other_id = subject.id, other.id
+    response = client.post(f"/api/subjects/{source_id}/merge", headers=AUTH, json={"into_id": other_id})
+    assert response.status_code == 200
+    file_id = session.get(Document, moved["id"]).drive_file_id
+    assert drive.parents[file_id] == target_folder
+    assert drive.parents[session.get(Document, kept["id"]).drive_file_id] == target_folder
+    assert ("move", file_id) in drive.calls and source_folder != target_folder
+
+
+def test_merge_creates_the_target_folder_when_missing(client, settings, session, semester, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    other = _other_subject(session, semester)
+    doc = upload(client, subject)
+    other_id = other.id
+    assert client.post(f"/api/subjects/{subject.id}/merge", headers=AUTH, json={"into_id": other_id}).status_code == 200
+    session.expire_all()
+    target_folder = session.get(Subject, other_id).drive_folder_id
+    assert target_folder and drive.parents[session.get(Document, doc["id"]).drive_file_id] == target_folder
+
+
+def test_merge_survives_a_drive_failure(client, settings, session, semester, subject):
+    drive = FakeDrive(fail={"move": [GoogleError("Google Drive returned 500")]})
+    configure(client, settings, drive)
+    other = _other_subject(session, semester)
+    upload(client, subject)
+    other_id = other.id
+    response = client.post(f"/api/subjects/{subject.id}/merge", headers=AUTH, json={"into_id": other_id})
+    assert response.status_code == 200
+    session.expire_all()
+    assert session.scalar(select(Document)).subject_id == other_id
+
+
+def test_merge_without_drive_touches_nothing(client, settings, session, semester, subject):
+    drive = FakeDrive()
+    other = _other_subject(session, semester)
+    client.app.dependency_overrides[get_drive_factory] = lambda: (lambda token: drive)
+    assert client.post(f"/api/subjects/{subject.id}/merge", headers=AUTH, json={"into_id": other.id}).status_code == 200
+    assert not [c for c in drive.calls if c[0] == "move"]

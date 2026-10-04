@@ -177,3 +177,11 @@ def test_rename_patches_the_name():
     request = google.requests[1]
     assert (request.method, request.url.path) == ("PATCH", "/drive/v3/files/d1")
     assert json.loads(request.content) == {"name": "New name"}
+
+
+def test_move_sends_add_and_remove_parents_as_query_params():
+    google = Google([httpx.Response(200, json={})])
+    drive(google).move("d1", "new", "old")
+    request = google.requests[1]
+    assert (request.method, request.url.path) == ("PATCH", "/drive/v3/files/d1")
+    assert request.url.params["addParents"] == "new" and request.url.params["removeParents"] == "old"

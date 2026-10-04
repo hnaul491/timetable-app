@@ -70,6 +70,37 @@ def rename_subject_folder(session: Session, settings: Settings, factory: DriveFa
         session.rollback()
 
 
+def move_documents_to_subject_folder(session: Session, settings: Settings, factory: DriveFactory,
+                                     from_folder_id: str | None, file_ids: list[str], target: Subject) -> None:
+    """After a merge, move the Drive files into the target subject's folder. Best effort: never raises,
+    logs the error type only."""
+    try:
+        if not from_folder_id or not file_ids:
+            return
+        account = session.get(GoogleAccount, ACCOUNT_ID)
+        if not drive_enabled(account):
+            return
+        token = SecretStore(session, settings.token_encryption_key).get(REFRESH_TOKEN_NAME)
+        semester = session.get(Semester, target.semester_id)
+        if not token or semester is None:
+            return
+        drive = factory(token)
+        try:
+            folder = ensure_folders(session, drive, semester, target)
+            if folder == from_folder_id:
+                return
+            for file_id in file_ids:
+                try:
+                    drive.move(file_id, folder, from_folder_id)
+                except GoogleError as exc:  # one file failing (e.g. deleted in Drive) must not stop the others
+                    logger.warning("Moving a Drive file after a merge failed (%s)", type(exc).__name__)
+        finally:
+            close_drive(drive)
+    except Exception as exc:  # noqa: BLE001 - the merge already succeeded; the move is a courtesy
+        logger.warning("Moving Drive files after a merge failed (%s)", type(exc).__name__)
+        session.rollback()
+
+
 def event_for_subject(session: Session, event_id: int, subject_id: int) -> Event:
     event = session.get(Event, event_id)
     if event is None or event.subject_id != subject_id:

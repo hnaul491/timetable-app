@@ -9,9 +9,9 @@ from app.config import Settings, get_settings
 from app.db import get_session
 from app.deps import get_drive_factory, get_now
 from app.gdrive.api import DriveFactory
-from app.models import Subject, Task
+from app.models import Document, Subject, Task
 from app.schemas import MergeIn, SessionOut, SubjectDetailOut, SubjectPatch, SubjectSummaryOut
-from app.services.documents import rename_subject_folder
+from app.services.documents import move_documents_to_subject_folder, rename_subject_folder
 from app.services.events_query import active_semester
 from app.services.subjects_query import (SubjectSummary, merge_subjects, note_snippets, subject_sessions,
                                          subject_summaries)
@@ -105,11 +105,15 @@ def patch_subject(subject_id: int, body: SubjectPatch, session: Session = Depend
 
 @router.post("/subjects/{subject_id}/merge", response_model=SubjectSummaryOut)
 def merge_subject(subject_id: int, body: MergeIn, session: Session = Depends(get_session),
-                  now: datetime = Depends(get_now)) -> SubjectSummaryOut:
+                  now: datetime = Depends(get_now), settings: Settings = Depends(get_settings),
+                  drive_factory: DriveFactory = Depends(get_drive_factory)) -> SubjectSummaryOut:
     source = _subject(session, subject_id)
     target = _subject(session, body.into_id)
     if source.id == target.id or source.semester_id != target.semester_id:
         raise HTTPException(status_code=422, detail="choose a different subject of the same semester")
+    source_folder = source.drive_folder_id
+    file_ids = list(session.scalars(select(Document.drive_file_id).where(Document.subject_id == source.id)))
     merge_subjects(session, source, target)
     session.commit()
+    move_documents_to_subject_folder(session, settings, drive_factory, source_folder, file_ids, target)
     return _summary_of(session, target, now)
