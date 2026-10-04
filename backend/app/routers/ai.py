@@ -1,10 +1,13 @@
+import json
+from collections.abc import Iterator
 from datetime import date, datetime, time
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.ai.assistant import run_chat
+from app.ai.assistant import run_chat, stream_chat
 from app.ai.provider import AIError, AIRateLimited, LLMProvider
 from app.ai.suggest import suggest_tasks
 from app.auth import require_user
@@ -15,12 +18,12 @@ from app.models import ChatMessage, Event, Note, PendingAction, Subject
 from app.routers.custom_events import add_custom_event
 from app.routers.notes import load_event
 from app.routers.tasks import add_task
-from app.schemas import (ActionResult, AiStatus, ChatHistory, ChatIn, ChatMessageOut, ChatReply, CustomEventIn,
-                         PendingActionOut, SuggestIn, SuggestOut, TaskCreate)
+from app.schemas import (ActionResult, AiStatus, ChatHistory, ChatIn, ChatReply, CustomEventIn,
+                         SuggestIn, SuggestOut, TaskCreate)
+from app.services.chat_out import message_out
 from app.services.events_query import describe_event
 from app.services.note_tasks import sync_note_tasks
 from app.services.recurrence import PARIS
-from app.timeutil import iso_utc
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 NOT_SET_UP = "AI is not set up on the server"
@@ -40,20 +43,6 @@ def _ai_error(exc: AIError) -> HTTPException:
     if isinstance(exc, AIRateLimited):
         return HTTPException(status_code=429, detail=RATE_LIMITED)
     return HTTPException(status_code=502, detail=UNAVAILABLE)
-
-
-def action_out(action: PendingAction, now: datetime) -> PendingActionOut:
-    status = "expired" if action.status == "pending" and action.expires_at <= now else action.status
-    return PendingActionOut(id=action.id, kind=action.kind, status=status, summary=str(action.payload.get("summary", "")),
-                            payload=action.payload, result=action.result, expires_at=iso_utc(action.expires_at))
-
-
-def message_out(session: Session, message: ChatMessage, now: datetime) -> ChatMessageOut:
-    actions = []
-    if message.actions:
-        found = {a.id: a for a in session.scalars(select(PendingAction).where(PendingAction.id.in_(message.actions)))}
-        actions = [action_out(found[i], now) for i in message.actions if i in found]
-    return ChatMessageOut(id=message.id, role=message.role, content=message.content, actions=actions)
 
 
 @router.get("/ai/status", response_model=AiStatus)
@@ -94,6 +83,29 @@ def chat(body: ChatIn, session: Session = Depends(get_session), llm: LLMProvider
         raise _ai_error(exc) from None
     last = session.scalar(select(ChatMessage).where(ChatMessage.role == "assistant").order_by(ChatMessage.id.desc()))
     return ChatReply(message=message_out(session, last, now))
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.post("/chat/stream")
+def chat_stream(body: ChatIn, session: Session = Depends(get_session), llm: LLMProvider | None = Depends(get_llm),
+                now: datetime = Depends(get_now)) -> StreamingResponse:
+    llm = _need_llm(llm)  # 503 JSON before any streaming starts
+
+    # The yield-dependencies (DB session, HTTP client) are released only after the response has been fully sent
+    # (FastAPI >= 0.118), so they stay open while this generator runs.
+    def events() -> Iterator[str]:
+        try:
+            for item in stream_chat(session, llm, body.message, body.context, body.locale or "en", now):
+                yield _sse(item["event"], item["data"])
+        except Exception:
+            session.rollback()
+            yield _sse("error", {"message": UNAVAILABLE})  # never the exception text
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.delete("/chat", status_code=204)

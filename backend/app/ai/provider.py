@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
@@ -53,8 +54,24 @@ class LLMReply:
     calls: list[FunctionCall] = field(default_factory=list)
 
 
+@dataclass
+class TextDelta:
+    text: str
+
+
+@dataclass
+class CallPart:
+    call: FunctionCall
+
+
+StreamPart = TextDelta | CallPart
+
+
 class LLMProvider(Protocol):
     def generate(self, system: str, turns: list[Turn], tools: list[ToolDecl],
                  timeout: float | None = None) -> LLMReply: ...
+
+    def stream(self, system: str, turns: list[Turn], tools: list[ToolDecl],
+               timeout: float | None = None) -> Iterator[StreamPart]: ...
 
     def generate_json(self, system: str, prompt: str, schema: dict, timeout: float | None = None) -> dict | list: ...

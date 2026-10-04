@@ -1,9 +1,11 @@
 import json
 import logging
+from collections.abc import Iterator
 
 import httpx
 
-from app.ai.provider import AIRateLimited, AIUnavailable, FunctionCall, LLMReply, ToolDecl, Turn
+from app.ai.provider import (AIRateLimited, AIUnavailable, CallPart, FunctionCall, LLMReply, StreamPart, TextDelta,
+                             ToolDecl, Turn)
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +90,7 @@ class GeminiProvider:
             return {"thinkingConfig": {"thinkingBudget": 0}}
         return {}
 
-    def generate(self, system: str, turns: list[Turn], tools: list[ToolDecl],
-                 timeout: float | None = None) -> LLMReply:
+    def _chat_body(self, system: str, turns: list[Turn], tools: list[ToolDecl]) -> dict:
         body: dict = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [_content(t) for t in turns],
@@ -99,15 +100,71 @@ class GeminiProvider:
         if tools:
             body["tools"] = [{"functionDeclarations": [
                 {"name": t.name, "description": t.description, "parameters": t.parameters} for t in tools]}]
-        parts = self._parts(self._post(body, timeout))
+        return body
+
+    @staticmethod
+    def _call(part: dict) -> FunctionCall | None:
+        fc = part.get("functionCall") if isinstance(part, dict) else None
+        if not isinstance(fc, dict) or "name" not in fc:
+            return None
+        sig = part.get("thoughtSignature")
+        return FunctionCall(fc["name"], fc.get("args") or {}, thought_signature=sig if isinstance(sig, str) else None)
+
+    def generate(self, system: str, turns: list[Turn], tools: list[ToolDecl],
+                 timeout: float | None = None) -> LLMReply:
+        parts = self._parts(self._post(self._chat_body(system, turns, tools), timeout))
         texts = [p["text"] for p in parts if isinstance(p, dict) and isinstance(p.get("text"), str)]
-        calls = [
-            FunctionCall(p["functionCall"]["name"], p["functionCall"].get("args") or {},
-                         thought_signature=p.get("thoughtSignature") if isinstance(p.get("thoughtSignature"), str) else None)
-            for p in parts
-            if isinstance(p, dict) and isinstance(p.get("functionCall"), dict) and "name" in p["functionCall"]
-        ]
+        calls = [c for c in (self._call(p) for p in parts) if c is not None]
         return LLMReply("".join(texts) if texts else None, calls)
+
+    def stream(self, system: str, turns: list[Turn], tools: list[ToolDecl],
+               timeout: float | None = None) -> Iterator[StreamPart]:
+        """Yield text deltas and function calls as Gemini produces them. Errors map like generate(), raised before
+        or during iteration, without cause/context so nothing can leak the key."""
+        body = self._chat_body(system, turns, tools)
+        failure: Exception | None = None
+        try:
+            with self._http.stream(
+                "POST", f"{BASE}/{self._model}:streamGenerateContent?alt=sse",
+                headers={"x-goog-api-key": self._key}, json=body,
+                **({"timeout": timeout} if timeout is not None else {}),
+            ) as resp:
+                if resp.status_code == 429:
+                    failure = AIRateLimited(RATE_MSG)
+                elif resp.status_code >= 400:
+                    resp.read()
+                    _log_google_error(resp)
+                    failure = AIUnavailable(UNAVAILABLE_MSG)
+                else:
+                    for line in resp.iter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        payload = line[5:].strip()
+                        if not payload or payload == "[DONE]":
+                            continue
+                        try:
+                            candidates = json.loads(payload)["candidates"]
+                            content = candidates[0].get("content") if candidates else None
+                            parts = content.get("parts") if isinstance(content, dict) else None
+                            if parts is None:
+                                continue  # e.g. a final chunk carrying only finishReason/usage
+                            if not isinstance(parts, list):
+                                raise TypeError
+                        except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+                            failure = AIUnavailable(UNAVAILABLE_MSG)
+                            break
+                        for p in parts:
+                            if not isinstance(p, dict):
+                                continue
+                            if isinstance(p.get("text"), str) and p["text"]:
+                                yield TextDelta(p["text"])
+                            call = self._call(p)
+                            if call is not None:
+                                yield CallPart(call)
+        except httpx.HTTPError:
+            failure = AIUnavailable(UNAVAILABLE_MSG)
+        if failure is not None:
+            raise failure from None
 
     def generate_json(self, system: str, prompt: str, schema: dict, timeout: float | None = None) -> dict | list:
         body = {
