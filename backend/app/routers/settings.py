@@ -38,6 +38,15 @@ def put_section(body: SectionUpdate, session: Session = Depends(get_session)) ->
                             sections=choice.sections, chosen=body.section)
 
 
+@router.delete("/settings/sections/{subject_id}", status_code=204)
+def remove_section(subject_id: int, session: Session = Depends(get_session)) -> None:
+    """Clear the chosen group: the subject's grouped classes are hidden again until a group is picked."""
+    row = session.get(MySection, subject_id)
+    if row is not None:
+        session.delete(row)
+        session.commit()
+
+
 @router.get("/settings/zeus-key", response_model=ZeusKeyStatus)
 def get_zeus_key_status(session: Session = Depends(get_session),
                         settings: Settings = Depends(get_settings)) -> ZeusKeyStatus:

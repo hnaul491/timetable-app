@@ -64,6 +64,12 @@ export const settings = {
     choose: "Choose…",
     all: "All groups",
     saved: "Group saved",
+    remove: "Remove",
+    removeAria: "Remove my group for {subject}",
+    removeTitle: "Remove your group for “{subject}”?",
+    removeBody: "Its group classes (TD/TP) will be hidden from your calendar until you choose a group again.",
+    removeConfirm: "Remove",
+    removed: "Group removed",
   },
   recurring: {
     title: "My repeating events",
