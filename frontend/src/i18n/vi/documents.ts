@@ -39,4 +39,6 @@ export const documents: Messages["documents"] = {
   driveOff: "Tài liệu được lưu trong Google Drive của chính bạn. Hãy kết nối lại Google trong Cài đặt để bật tính năng này.",
   driveOffLink: "Mở Cài đặt",
   reconnect: "Hãy kết nối lại Google để bật tài liệu",
+  cancelled: "Đã hủy",
+  noClass: "Không gắn với buổi học nào",
 };

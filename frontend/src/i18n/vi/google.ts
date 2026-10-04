@@ -35,4 +35,5 @@ export const google: Messages["google"] = {
   disconnectTitle: "Ngắt kết nối Lịch Google?",
   disconnected: "Đã ngắt kết nối Lịch Google",
   disconnectHelp: "Ngắt kết nối sẽ dừng cập nhật. Lịch “My Timetable” vẫn còn trên Google — hãy xoá ở đó nếu bạn không cần.",
+  driveOff: "Tài liệu cần quyền Google Drive. Hãy kết nối lại Google để bật.",
 };

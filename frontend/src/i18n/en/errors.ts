@@ -50,4 +50,11 @@ export const errors = {
   googleUnreachable: "Could not reach Google",
   googleUnexpected: "Google sent an unexpected response",
   calendarGone: 'The "My Timetable" calendar is gone from Google; it will be recreated on the next push.',
+  driveFull: "Your Google Drive is full",
+  driveStatusReason: "Google Drive returned {status} ({reason})",
+  driveStatus: "Google Drive returned {status}",
+  drivePermission: "Google Drive permission is missing — reconnect Google in Settings",
+  driveRateLimited: "Google rate limit reached; try again in a moment",
+  classNotInSubject: "that class does not belong to this subject",
+  uploadNoDocument: "Upload finished without a document",
 };

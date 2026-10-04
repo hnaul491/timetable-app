@@ -33,4 +33,5 @@ export const google = {
   disconnectTitle: "Disconnect Google Calendar?",
   disconnected: "Google Calendar disconnected",
   disconnectHelp: "Disconnecting stops updates. The “My Timetable” calendar stays in Google — delete it there if you don't need it.",
+  driveOff: "Documents need Google Drive access. Reconnect Google to turn them on.",
 };

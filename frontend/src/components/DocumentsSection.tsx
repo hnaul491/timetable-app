@@ -60,9 +60,9 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
 
   const groups = new Map<number | null, DocumentItem[]>();
   for (const doc of shown) groups.set(doc.event_id, [...(groups.get(doc.event_id) ?? []), doc]);
-  // Whole-subject files first, then classes with the latest on top.
+  // Classes with the latest on top, files not linked to a class last.
   const ordered = [...groups.entries()].sort(([a, da], [b, db]) => {
-    if (a === null || b === null) return a === b ? 0 : a === null ? -1 : 1;
+    if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
     return (db[0].event_start ?? "").localeCompare(da[0].event_start ?? "");
   });
 
@@ -78,7 +78,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
       <a
         href={doc.web_view_link}
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
         aria-label={t("documents.openNamed", { name: doc.name })}
         className="flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-2"
       >
@@ -109,6 +109,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
           </button>
         )}
       </div>
+      {google.error && <ErrorPanel error={google.error} onRetry={() => google.refetch()} />}
       {driveOn === false && (
         <p className="rounded-xl bg-subtle px-4 py-3 text-sm text-ink-2">
           {t("documents.driveOff")}{" "}
@@ -146,7 +147,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
             <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
               {groupEvent !== null && list[0].event_start
                 ? `${dayLabel(parisParts(list[0].event_start).date, locale).weekday} ${formatLongDate(parisParts(list[0].event_start).date, locale)}`
-                : t("documents.wholeSubject")}
+                : t("documents.noClass")}
             </h3>
             <ul className="flex flex-col">{list.map(row)}</ul>
           </div>

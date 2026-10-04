@@ -52,4 +52,11 @@ export const errors: Messages["errors"] = {
   googleUnreachable: "Không kết nối được tới Google",
   googleUnexpected: "Google trả về phản hồi không mong muốn",
   calendarGone: 'Lịch "My Timetable" đã bị xoá khỏi Google; sẽ tạo lại ở lần gửi sau.',
+  driveFull: "Google Drive của bạn đã hết dung lượng",
+  driveStatusReason: "Google Drive trả về lỗi {status} ({reason})",
+  driveStatus: "Google Drive trả về lỗi {status}",
+  drivePermission: "Thiếu quyền Google Drive — hãy kết nối lại trong Cài đặt",
+  driveRateLimited: "Google đang giới hạn số yêu cầu; hãy thử lại sau giây lát",
+  classNotInSubject: "Buổi học này không thuộc môn học này",
+  uploadNoDocument: "Tải lên xong nhưng không tạo được tài liệu",
 };

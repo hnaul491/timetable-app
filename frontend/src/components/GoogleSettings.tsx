@@ -141,6 +141,14 @@ export function GoogleSettings() {
               </button>
             </div>
           )}
+          {!s.needs_reconnect && !s.drive_enabled && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-subtle px-4 py-3 text-sm text-ink-2">
+              <span>{t("google.driveOff")}</span>
+              <button type="button" className={primary} onClick={startConnect}>
+                {t("google.reconnect")}
+              </button>
+            </div>
+          )}
           <fieldset className="flex flex-col gap-1.5">
             <legend className="mb-1 text-sm font-semibold text-ink-2">{t("google.sendToGoogle")}</legend>
             {KINDS.map((kind) => (

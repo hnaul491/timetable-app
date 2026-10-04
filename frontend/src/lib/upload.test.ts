@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DocumentItem } from "../types";
-import { uploadFile } from "./upload";
+import { setMessageLocale } from "../i18n/current";
+import { limitName, uploadFile } from "./upload";
 
 const apiFetch = vi.fn();
 vi.mock("./api", async (importOriginal) => ({
@@ -26,7 +27,10 @@ describe("uploadFile", () => {
     puts.length = 0;
     apiFetch.mockReset().mockResolvedValue({ upload_id: "u1", chunk_size: CHUNK });
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    setMessageLocale("en");
+  });
 
   it("sends a 9 MiB file as 3 chunks with offsets and progress", async () => {
     const total = 9 * 1024 * 1024;
@@ -68,6 +72,52 @@ describe("uploadFile", () => {
     }));
     await uploadFile(makeFile(total), { subjectId: 1, eventId: 5, tag: "other" }, () => {});
     expect(offsets).toEqual([0, CHUNK, 2 * CHUNK]);
+  });
+
+  it("reads the expected offset from the raw 409 text even when the UI is Vietnamese", async () => {
+    setMessageLocale("vi");
+    const total = 9 * 1024 * 1024;
+    const offsets: number[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const offset = Number(new URL(url, "http://x").searchParams.get("offset"));
+      offsets.push(offset);
+      if (offsets.length === 1) return json({ detail: `expected offset ${CHUNK}` }, 409);
+      const received = offset + (init.body as Blob).size;
+      return json({ received, document: received >= total ? doc : null });
+    }));
+    await uploadFile(makeFile(total), { subjectId: 1, eventId: null, tag: "other" }, () => {});
+    expect(offsets).toEqual([0, CHUNK, 2 * CHUNK]);
+  });
+
+  it("stops after the first chunk when aborted, sending nothing more", async () => {
+    const total = 9 * 1024 * 1024;
+    const controller = new AbortController();
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(init.signal).toBe(controller.signal);
+      controller.abort();
+      return json({ received: Number(new URL(url, "http://x").searchParams.get("offset")) + (init.body as Blob).size, document: null });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(uploadFile(makeFile(total), { subjectId: 1, eventId: null, tag: "other" }, () => {}, controller.signal)).rejects.toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("uploads a zero-byte file in one empty request", async () => {
+    const fetchMock = vi.fn(async () => json({ received: 0, document: doc }));
+    vi.stubGlobal("fetch", fetchMock);
+    await uploadFile(makeFile(0), { subjectId: 1, eventId: null, tag: "other" }, () => {});
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a long name cut to 255 characters with its extension", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ received: 3, document: doc })));
+    const long = new File(["abc"], `${"a".repeat(300)}.pdf`, { type: "" });
+    await uploadFile(long, { subjectId: 1, eventId: null, tag: "other" }, () => {});
+    const body = JSON.parse(apiFetch.mock.calls[0][1].body);
+    expect(body.name).toHaveLength(255);
+    expect(body.name.endsWith(".pdf")).toBe(true);
+    expect(body.mime_type).toBe("application/octet-stream");
+    expect(limitName("short.txt")).toBe("short.txt");
   });
 
   it("throws an ApiError when the server refuses a chunk", async () => {

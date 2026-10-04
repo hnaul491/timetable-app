@@ -40,11 +40,14 @@ const DETAIL = {
 } as unknown as SubjectDetail;
 
 let calls: [string, RequestInit | undefined][] = [];
-function setup(options: { status?: Partial<GoogleStatus>; docs?: DocumentItem[]; eventId?: number; locale?: "en" | "vi" } = {}) {
+function setup(options: { googleError?: boolean; status?: Partial<GoogleStatus>; docs?: DocumentItem[]; eventId?: number; locale?: "en" | "vi" } = {}) {
   calls = [];
   apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
     calls.push([path, init]);
-    if (path === "/api/google") return { ...google, ...options.status };
+    if (path === "/api/google") {
+      if (options.googleError) throw new Error("google down");
+      return { ...google, ...options.status };
+    }
     if (path.endsWith("/documents")) return options.docs ?? DOCS;
     if (path === "/api/subjects/3") return DETAIL;
     return undefined;
@@ -74,7 +77,9 @@ describe("DocumentsSection", () => {
   it("lists documents grouped by class and filters by tag", async () => {
     setup();
     expect(await screen.findByText("syllabus.pdf")).toBeInTheDocument();
-    expect(screen.getByText("Whole subject")).toBeInTheDocument();
+    expect(screen.getByText("Not linked to a class")).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings.at(-1)).toBe("Not linked to a class");
     expect(screen.getByText(/5 October 2026/)).toBeInTheDocument();
     expect(screen.getByText(/12 October 2026/)).toBeInTheDocument();
     expect(screen.getByText("PDF")).toBeInTheDocument();
@@ -83,7 +88,7 @@ describe("DocumentsSection", () => {
     expect(screen.getByText(/3 MB/)).toBeInTheDocument();
     const open = screen.getByRole("link", { name: "Open lecture1.pptx" });
     expect(open).toHaveAttribute("target", "_blank");
-    expect(open).toHaveAttribute("rel", "noopener");
+    expect(open).toHaveAttribute("rel", "noopener noreferrer");
 
     await userEvent.click(screen.getByRole("button", { name: "Slides" }));
     expect(screen.getByText("lecture1.pptx")).toBeInTheDocument();
@@ -106,6 +111,32 @@ describe("DocumentsSection", () => {
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(calls.some(([path, init]) => path === "/api/documents/1" && init?.method === "DELETE")).toBe(true));
     expect(await screen.findByText("Document deleted")).toBeInTheDocument();
+  });
+
+  it("shows the error with a retry when the Google status cannot be loaded", async () => {
+    setup({ googleError: true });
+    expect(await screen.findByText(/google down/)).toBeInTheDocument();
+  });
+
+  it("Cancel while uploading aborts the upload and marks the file cancelled", async () => {
+    let signal: AbortSignal | undefined;
+    uploadFile.mockImplementation(
+      (_f: File, _m: unknown, _p: unknown, s: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal = s;
+          s.addEventListener("abort", () => reject(s.reason));
+        }),
+    );
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "Upload documents" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.upload(dialog.querySelector<HTMLInputElement>('input[type="file"]')!, new File(["abc"], "a.pdf", { type: "application/pdf" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Upload" }));
+    await waitFor(() => expect(signal).toBeDefined());
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(signal?.aborted).toBe(true);
+    expect(await within(dialog).findByText("Cancelled")).toBeInTheDocument();
+    expect(screen.queryByText(/Could not upload/)).not.toBeInTheDocument();
   });
 
   it("refuses files over 100 MB in the upload dialog", async () => {
@@ -155,7 +186,7 @@ describe("DocumentsSection", () => {
 
   it("renders in Vietnamese", async () => {
     setup({ locale: "vi" });
-    expect(await screen.findByText(translate("vi", "documents.wholeSubject"))).toBeInTheDocument();
+    expect(await screen.findByText(translate("vi", "documents.noClass"))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: translate("vi", "documents.filterExercises") })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: translate("vi", "documents.upload") })).toBeInTheDocument();
     expect(screen.getByText(/5 tháng 10/)).toBeInTheDocument();

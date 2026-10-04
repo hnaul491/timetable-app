@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { formatSize } from "../lib/documents";
@@ -12,7 +12,7 @@ import { useToast } from "./ui/Toast";
 interface Item {
   key: number;
   file: File;
-  status: "ready" | "uploading" | "done" | "error";
+  status: "ready" | "uploading" | "done" | "error" | "cancelled";
   sent: number;
   error?: string;
 }
@@ -31,6 +31,9 @@ export function UploadDialog({ open, onClose, subjectId, eventId }: { open: bool
   const [tag, setTag] = useState<DocumentTag>("slides");
   const [busy, setBusy] = useState(false);
   const nextKey = useRef(0);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  const abort = () => controller.current?.abort();
   const patch = (key: number, change: Partial<Item>) => setItems((all) => all.map((item) => (item.key === key ? { ...item, ...change } : item)));
 
   const add = (list: FileList | null) => {
@@ -45,15 +48,22 @@ export function UploadDialog({ open, onClose, subjectId, eventId }: { open: bool
 
   const start = async () => {
     setBusy(true);
+    const run = new AbortController();
+    controller.current = run;
     let ok = 0;
     let failed = 0;
-    for (const item of items.filter((i) => i.status !== "done")) {
+    const todo = items.filter((i) => i.status !== "done");
+    for (const [index, item] of todo.entries()) {
       patch(item.key, { status: "uploading", sent: 0, error: undefined });
       try {
-        await uploadFile(item.file, { subjectId, eventId: classId === "" ? null : Number(classId), tag }, (sent) => patch(item.key, { sent }));
+        await uploadFile(item.file, { subjectId, eventId: classId === "" ? null : Number(classId), tag }, (sent) => patch(item.key, { sent }), run.signal);
         patch(item.key, { status: "done", sent: item.file.size });
         ok += 1;
       } catch (error) {
+        if (run.signal.aborted) {
+          for (const rest of todo.slice(index)) patch(rest.key, { status: "cancelled" });
+          break;
+        }
         const message = error instanceof Error ? error.message : String(error);
         patch(item.key, { status: "error", error: message });
         toast.error(t("documents.uploadFailed", { name: item.file.name, message }));
@@ -61,9 +71,10 @@ export function UploadDialog({ open, onClose, subjectId, eventId }: { open: bool
       }
     }
     setBusy(false);
+    if (controller.current === run) controller.current = null;
     queryClient.invalidateQueries({ queryKey: ["documents"] });
     if (ok > 0) toast.success(t("documents.uploaded", { count: ok }));
-    if (failed === 0 && ok > 0) {
+    if (failed === 0 && ok > 0 && !run.signal.aborted) {
       setItems([]);
       onClose();
     }
@@ -73,11 +84,14 @@ export function UploadDialog({ open, onClose, subjectId, eventId }: { open: bool
   return (
     <Dialog
       open={open}
-      onClose={() => !busy && onClose()}
+      onClose={() => {
+        abort();
+        onClose();
+      }}
       title={t("documents.uploadTitle")}
       footer={
         <>
-          <button type="button" disabled={busy} onClick={onClose} className="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink disabled:opacity-60">
+          <button type="button" onClick={() => (busy ? abort() : onClose())} className="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink">
             {t("documents.cancel")}
           </button>
           <button
@@ -145,6 +159,7 @@ export function UploadDialog({ open, onClose, subjectId, eventId }: { open: bool
                   <span className="shrink-0 font-mono text-xs text-muted">{formatSize(item.file.size, locale)}</span>
                   {item.status === "done" && <span className="text-xs font-semibold text-success">{t("documents.done")}</span>}
                   {item.status === "error" && <span className="text-xs font-semibold text-danger">{t("documents.failed")}</span>}
+                  {item.status === "cancelled" && <span className="text-xs font-semibold text-muted">{t("documents.cancelled")}</span>}
                 </span>
                 {(item.status === "uploading" || item.status === "done") && (
                   <div role="progressbar" aria-label={item.file.name} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} className="h-1.5 overflow-hidden rounded-full bg-subtle">

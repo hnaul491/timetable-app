@@ -44,6 +44,13 @@ const RULES: Rule[] = [
   { match: /^unexpected error \((\w+)\)$/, key: "errors.unexpected", vars: (m) => ({ type: m[1] }) },
   { match: /^kept (\d+) upcoming classes that disappeared from the feed/, key: "errors.keptMissing", vars: (m) => ({ count: m[1] }) },
   exact("Google Calendar is not connected", "errors.googleNotConnected"),
+  exact("Google Drive returned 403 (storageQuotaExceeded)", "errors.driveFull"),
+  { match: /^Google Drive returned (\d+) \((.*)\)$/, key: "errors.driveStatusReason", vars: (m) => ({ status: m[1], reason: m[2] }) },
+  { match: /^Google Drive returned (\d+)$/, key: "errors.driveStatus", vars: (m) => ({ status: m[1] }) },
+  exact("Google Drive permission is missing — reconnect Google in Settings", "errors.drivePermission"),
+  exact("Google rate limit reached; try again in a moment", "errors.driveRateLimited"),
+  exact("that class does not belong to this subject", "errors.classNotInSubject"),
+  exact("Upload finished without a document", "errors.uploadNoDocument"),
   exact("Reconnect Google to enable documents", "documents.reconnect"),
   { match: /^Google Calendar is not set up on the server yet/, key: "errors.googleNotSetUp" },
   { match: /^Google Calendar refused the connection: (.*)$/, key: "errors.googleRefused", vars: (m) => ({ detail: m[1] }) },
@@ -63,9 +70,11 @@ const RULES: Rule[] = [
   exact('The "My Timetable" calendar is gone from Google; it will be recreated on the next push.', "errors.calendarGone"),
 ];
 
+const STORAGE_FULL = /^Google Drive returned 403 \(storageQuotaExceeded\)$/;
+
 /** Shows a known English server text in the chosen language; unknown texts stay as they are. */
 export function translateServerMessage(text: string, locale: Locale): string {
-  if (locale === "en") return text;
+  if (locale === "en" && !STORAGE_FULL.test(text)) return text; // English keeps the server text, except this one
   for (const rule of RULES) {
     const m = text.match(rule.match);
     if (m) return translate(locale, rule.key, rule.vars?.(m));

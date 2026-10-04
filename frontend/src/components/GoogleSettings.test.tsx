@@ -132,6 +132,19 @@ describe("GoogleSettings", () => {
     expect(google.startGoogleConnect).toHaveBeenCalled();
   });
 
+  it("offers to reconnect when Drive was not allowed", async () => {
+    renderWith({ ...connected, drive_enabled: false });
+    expect(await screen.findByText("Documents need Google Drive access. Reconnect Google to turn them on.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reconnect Google" }));
+    expect(google.startGoogleConnect).toHaveBeenCalled();
+  });
+
+  it("shows no Drive note when Drive is on", async () => {
+    renderWith(connected);
+    await screen.findByText("me@example.com");
+    expect(screen.queryByText(/Documents need Google Drive access/)).not.toBeInTheDocument();
+  });
+
   it("stops pushing when a round makes no progress and shows the rate limit", async () => {
     const msg = "Google rate limit reached; the rest is sent on the next push";
     renderWith(connected, [

@@ -37,4 +37,6 @@ export const documents = {
   driveOff: "Documents are stored in your own Google Drive. Reconnect Google in Settings to turn them on.",
   driveOffLink: "Open Settings",
   reconnect: "Reconnect Google to enable documents",
+  cancelled: "Cancelled",
+  noClass: "Not linked to a class",
 };

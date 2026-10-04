@@ -56,6 +56,19 @@ describe("i18n", () => {
     expect(translateServerMessage("end date must be on or after start date", "en")).toBe("end date must be on or after start date");
   });
 
+  it("translates Drive error texts, with the full-Drive case friendly in both languages", () => {
+    const tr = (text: string) => translateServerMessage(text, "vi");
+    expect(tr("Google Drive returned 500 (backendError)")).toBe("Google Drive trả về lỗi 500 (backendError)");
+    expect(tr("Google Drive returned 502")).toBe("Google Drive trả về lỗi 502");
+    expect(tr("Google Drive permission is missing — reconnect Google in Settings")).toBe("Thiếu quyền Google Drive — hãy kết nối lại trong Cài đặt");
+    expect(tr("Google rate limit reached; try again in a moment")).toBe("Google đang giới hạn số yêu cầu; hãy thử lại sau giây lát");
+    expect(tr("that class does not belong to this subject")).toBe("Buổi học này không thuộc môn học này");
+    expect(tr("Upload finished without a document")).toBe("Tải lên xong nhưng không tạo được tài liệu");
+    expect(tr("Google Drive returned 403 (storageQuotaExceeded)")).toBe("Google Drive của bạn đã hết dung lượng");
+    expect(translateServerMessage("Google Drive returned 403 (storageQuotaExceeded)", "en")).toBe("Your Google Drive is full");
+    expect(translateServerMessage("Google Drive returned 500 (x)", "en")).toBe("Google Drive returned 500 (x)");
+  });
+
   it("translates the specific invalid-feed and session texts", () => {
     const tr = (text: string) => translateServerMessage(text, "vi");
     expect(tr("invalid feed: feed contains no events")).toBe(translate("vi", "errors.emptyFeed"));
