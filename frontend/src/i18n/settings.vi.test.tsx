@@ -10,7 +10,7 @@ import { I18nProvider, translate } from "./index";
 
 const RULE = { id: 5, title: "French (external)", kind: "french_ext", weekdays: [0, 3], start_time: "19:30", end_time: "21:00",
                from_date: "2026-10-19", until_date: "2026-12-17", location: "Alliance", occurrences: 18 };
-const GOOGLE = { configured: true, connected: true, email: "me@example.com", needs_reconnect: false, kinds: ["class"], pending: 2,
+const GOOGLE = { configured: true, connected: true, email: "me@example.com", needs_reconnect: false, kinds: ["class"], pending: 2, drive_enabled: true,
                  last_push_at: null, last_push_error: "Could not reach Google" };
 
 vi.mock("../lib/api", async (importOriginal) => {

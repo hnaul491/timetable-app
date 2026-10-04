@@ -8,6 +8,7 @@ import { useShortcut } from "../lib/shortcuts";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 import { ErrorPanel } from "./Banners";
+import { DocumentsSection } from "./DocumentsSection";
 import { Dialog } from "./ui/Dialog";
 import { useConfirm } from "./ui/Confirm";
 import { SkeletonRows } from "./ui/Skeleton";
@@ -141,6 +142,8 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
                 ))}
             </section>
           )}
+
+          {event.subject_id !== null && <DocumentsSection subjectId={event.subject_id} eventId={event.id} />}
 
           {data.next_event_id !== null && nextStart && onOpen && (
             <button type="button" onClick={() => onOpen(data.next_event_id!)} className="self-start text-sm font-semibold text-accent">

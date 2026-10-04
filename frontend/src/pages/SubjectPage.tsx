@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { DocumentsSection } from "../components/DocumentsSection";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
@@ -104,6 +105,7 @@ export function SubjectPage() {
             })}
           </ol>
         </section>
+        <DocumentsSection subjectId={subject.id} />
         {tasks.length > 0 && (
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-bold">{t("subjects.detail.tasks")}</h2>

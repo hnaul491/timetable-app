@@ -17,7 +17,7 @@ vi.mock("../lib/google", () => google);
 
 const connected: GoogleStatus = {
   configured: true, connected: true, email: "me@example.com", kinds: ["class", "exam", "holiday", "work", "french_ext"],
-  needs_reconnect: false, last_push_at: null, last_push_error: null, pending: 12,
+  needs_reconnect: false, last_push_at: null, last_push_error: null, pending: 12, drive_enabled: true,
 };
 
 function renderWith(status: GoogleStatus, pushes: PushResult[] = []) {

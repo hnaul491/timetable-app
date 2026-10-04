@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { DocumentsSection } from "../components/DocumentsSection";
 import { useConfirm } from "../components/ui/Confirm";
 import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
@@ -281,6 +282,12 @@ function EventPageInner() {
             ))}
             {toggleTask.error && <p className="text-sm text-danger">{(toggleTask.error as Error).message}</p>}
           </section>
+        )}
+
+        {event.subject_id !== null && (
+          <div className="border-t border-line pt-4">
+            <DocumentsSection subjectId={event.subject_id} eventId={event.id} />
+          </div>
         )}
 
         {event.source === "custom" && (

@@ -12,7 +12,9 @@ import { EventPage } from "./EventPage";
 const apiFetch = vi.fn();
 vi.mock("../lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/api")>()),
-  apiFetch: (...args: unknown[]) => apiFetch(...args),
+  // the documents section loads its own data; keep these tests about the note page
+  apiFetch: (path: string, ...rest: unknown[]) =>
+    path.endsWith("/documents") ? Promise.resolve([]) : path === "/api/google" ? Promise.resolve({ connected: false, drive_enabled: false }) : apiFetch(path, ...rest),
 }));
 
 const detail = (over: Partial<EventDetail["event"]> = {}): EventDetail => ({

@@ -44,6 +44,7 @@ const RULES: Rule[] = [
   { match: /^unexpected error \((\w+)\)$/, key: "errors.unexpected", vars: (m) => ({ type: m[1] }) },
   { match: /^kept (\d+) upcoming classes that disappeared from the feed/, key: "errors.keptMissing", vars: (m) => ({ count: m[1] }) },
   exact("Google Calendar is not connected", "errors.googleNotConnected"),
+  exact("Reconnect Google to enable documents", "documents.reconnect"),
   { match: /^Google Calendar is not set up on the server yet/, key: "errors.googleNotSetUp" },
   { match: /^Google Calendar refused the connection: (.*)$/, key: "errors.googleRefused", vars: (m) => ({ detail: m[1] }) },
   exact("That Google token is not valid", "errors.googleTokenInvalid"),
