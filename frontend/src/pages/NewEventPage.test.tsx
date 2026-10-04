@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "../components/ui/Toast";
 import { NewEventPage } from "./NewEventPage";
 
 const apiFetch = vi.fn();
@@ -15,12 +16,15 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/events/new"]}>
-        <Routes>
-          <Route path="/events/new" element={<NewEventPage />} />
-          <Route path="/" element={<p>Calendar home</p>} />
-        </Routes>
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter initialEntries={["/events/new"]}>
+          <Routes>
+            <Route path="/events/new" element={<NewEventPage />} />
+            <Route path="/events/:id" element={<p>Event page</p>} />
+            <Route path="/" element={<p>Calendar home</p>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -37,7 +41,7 @@ async function fillCommon() {
 describe("NewEventPage", () => {
   beforeEach(() => {
     apiFetch.mockReset();
-    apiFetch.mockResolvedValue({});
+    apiFetch.mockResolvedValue({ id: 31 });
   });
 
   it("creates a one-off event with Paris times converted to UTC", async () => {
@@ -49,7 +53,7 @@ describe("NewEventPage", () => {
       body: JSON.stringify({ title: "French (external)", kind: "french_ext", start: "2026-10-26T18:30:00.000Z",
                              end: "2026-10-26T20:00:00.000Z", room: "Alliance" }),
     });
-    expect(await screen.findByText("Calendar home")).toBeInTheDocument();
+    expect(await screen.findByText("Event page")).toBeInTheDocument();
   });
 
   it("creates a weekly rule", async () => {

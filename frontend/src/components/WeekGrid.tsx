@@ -9,6 +9,8 @@ interface Props {
   events: ApiEvent[];
   hourHeight?: number;
   onSelect?: (id: number) => void;
+  /** Called when an empty part of a day is clicked, with minutes since midnight rounded down to 30. */
+  onCreateAt?: (date: string, minutes: number) => void;
 }
 
 type Timed = ApiEvent & Span;
@@ -25,7 +27,7 @@ function bounds(timed: Timed[]): [number, number] {
   return [first, last];
 }
 
-export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
+export function WeekGrid({ days, events, hourHeight = 52, onSelect, onCreateAt }: Props) {
   const locale = useLocale();
   const today = todayParis();
   const { byDay, holidays, firstHour, lastHour } = useMemo(() => {
@@ -79,7 +81,18 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
         {days.map((date) => (
           <div
             key={date}
+            data-date={date}
             className="relative border-l border-subtle"
+            onClick={
+              onCreateAt
+                ? (e) => {
+                    if (e.target !== e.currentTarget) return; // clicks on an event block are not empty-slot clicks
+                    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+                    const minutes = firstHour * 60 + Math.floor(((y / hourHeight) * 60) / 30) * 30;
+                    onCreateAt(date, Math.min(Math.max(minutes, 0), DAY_MIN - 30));
+                  }
+                : undefined
+            }
             style={{
               height,
               backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, var(--tt-subtle) ${hourHeight - 1}px, var(--tt-subtle) ${hourHeight}px)`,

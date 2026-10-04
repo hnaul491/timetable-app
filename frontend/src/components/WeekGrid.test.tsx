@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { ApiEvent } from "../types";
@@ -58,6 +58,17 @@ describe("WeekGrid", () => {
     render(<WeekGrid days={WEEK} events={[event({ id: 42 })]} onSelect={onSelect} />);
     await userEvent.click(screen.getByRole("button", { name: "Open French for Fall 26 T1 GR5" }));
     expect(onSelect).toHaveBeenCalledWith(42);
+  });
+
+  it("reports empty-slot clicks rounded down to 30 minutes, but not clicks on an event", async () => {
+    const onCreateAt = vi.fn();
+    const { container } = render(<WeekGrid days={WEEK} events={[event({ id: 42 })]} onSelect={() => {}} onCreateAt={onCreateAt} />);
+    const column = container.querySelector<HTMLElement>('[data-date="2026-10-21"]')!;
+    column.getBoundingClientRect = () => ({ top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON() {} });
+    fireEvent.click(column, { clientY: 52 + 30 }); // 08:00 + 1h + 37 min -> 09:30
+    expect(onCreateAt).toHaveBeenCalledWith("2026-10-21", 9 * 60 + 30);
+    await userEvent.click(screen.getByRole("button", { name: "Open French for Fall 26 T1 GR5" }));
+    expect(onCreateAt).toHaveBeenCalledTimes(1);
   });
 
   it("shows note, task and important badges", () => {

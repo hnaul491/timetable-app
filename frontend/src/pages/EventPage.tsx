@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { useConfirm } from "../components/ui/Confirm";
+import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { calendarHref } from "../lib/calendarLocation";
@@ -64,7 +66,8 @@ function EventPageInner() {
   const [tab, setTab] = useState<NoteTab>("after");
   const [drafts, setDrafts] = useState<Partial<Record<NoteTab, Draft>>>(() => loadDrafts(id));
   useEffect(() => storeDrafts(id, drafts), [id, drafts]);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const detail = useQuery({ queryKey: ["event", id], queryFn: () => apiFetch<EventDetail>(`/api/events/${id}`) });
 
@@ -84,7 +87,9 @@ function EventPageInner() {
         return next;
       });
       invalidateLists();
+      toast.success(t("event.noteSaved"));
     },
+    onError: (error, v) => toast.error(t("event.noteFailed", { message: error.message }), { retry: () => save.mutate(v) }),
   });
   const [starNotice, setStarNotice] = useState("");
   const star = useMutation({
@@ -92,9 +97,12 @@ function EventPageInner() {
       apiFetch<EventDetail>(`/api/events/${id}/important`, { method: "PUT", body: JSON.stringify({ important }) }),
     onSuccess: (data) => {
       queryClient.setQueryData(["event", id], data);
-      setStarNotice(t(data.event.important ? "event.markedImportant" : "event.noLongerImportant"));
+      const notice = t(data.event.important ? "event.markedImportant" : "event.noLongerImportant");
+      setStarNotice(notice);
+      toast.success(notice);
       invalidateLists();
     },
+    onError: (error, important) => toast.error(t("event.starFailed", { message: error.message }), { retry: () => star.mutate(important) }),
   });
   const toggleTask = useMutation({
     mutationFn: (task: Task) =>
@@ -106,14 +114,27 @@ function EventPageInner() {
       queryClient.invalidateQueries({ queryKey: ["event", id] });
       invalidateLists();
     },
+    onError: (error, task) => toast.error(t("event.taskFailed", { message: error.message }), { retry: () => toggleTask.mutate(task) }),
   });
   const remove = useMutation({
     mutationFn: () => apiFetch(`/api/events/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       invalidateLists();
+      toast.success(t("event.deleted"));
       navigate(calendarHref());
     },
+    onError: (error) => toast.error(t("event.deleteFailed", { message: error.message }), { retry: () => remove.mutate() }),
   });
+  const askDelete = async () => {
+    if (!detail.data || remove.isPending) return;
+    const ok = await confirm({
+      title: t("event.deleteTitle"),
+      body: t(detail.data.event.note_count > 0 ? "event.deleteBodyWithNotes" : "event.deleteBody"),
+      confirmLabel: t("event.deleteEvent"),
+      tone: "danger",
+    });
+    if (ok) remove.mutate();
+  };
 
   if (detail.error) return <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />;
   if (!detail.data) return <p className="text-muted">{t("common.loading")}</p>;
@@ -257,18 +278,11 @@ function EventPageInner() {
           <div className="border-t border-line pt-4">
             <button
               type="button"
-              onClick={() => (confirmDelete ? remove.mutate() : setConfirmDelete(true))}
+              onClick={askDelete}
               className="h-10 rounded-xl border border-danger-line px-4 text-sm font-semibold text-danger"
             >
-              {event.note_count > 0
-                ? confirmDelete
-                  ? t("event.deleteWithNotesConfirm")
-                  : t("event.deleteWithNotes")
-                : confirmDelete
-                  ? t("event.deleteConfirm")
-                  : t("event.deleteEvent")}
+              {event.note_count > 0 ? t("event.deleteWithNotes") : t("event.deleteEvent")}
             </button>
-            {remove.error && <p className="text-sm text-danger">{(remove.error as Error).message}</p>}
           </div>
         )}
       </article>

@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventDetail } from "../types";
+import { ConfirmProvider } from "../components/ui/Confirm";
+import { ToastProvider } from "../components/ui/Toast";
 import { EventPage } from "./EventPage";
 
 const apiFetch = vi.fn();
@@ -33,12 +35,16 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/events/7"]}>
-        <Routes>
-          <Route path="/events/:id" element={<EventPage />} />
-          <Route path="/" element={<p>Calendar home</p>} />
-        </Routes>
-      </MemoryRouter>
+      <ToastProvider>
+        <ConfirmProvider>
+          <MemoryRouter initialEntries={["/events/7"]}>
+            <Routes>
+              <Route path="/events/:id" element={<EventPage />} />
+              <Route path="/" element={<p>Calendar home</p>} />
+            </Routes>
+          </MemoryRouter>
+        </ConfirmProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -93,14 +99,16 @@ describe("EventPage", () => {
     expect(apiFetch).toHaveBeenCalledWith("/api/tasks/3", { method: "PATCH", body: JSON.stringify({ status: "done" }) });
   });
 
-  it("deletes a custom event only after a second click", async () => {
+  it("deletes a custom event only after confirming", async () => {
     apiFetch.mockImplementation(async (path: string, init?: RequestInit) =>
       init?.method === "DELETE" ? { deleted: true } : detail({ source: "custom", kind: "work", subject_name: null, subject_id: null, title: "Work shift" }),
     );
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: "Delete event and its notes" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
     expect(apiFetch).not.toHaveBeenCalledWith("/api/events/7", { method: "DELETE" });
-    await userEvent.click(screen.getByRole("button", { name: "Click again to delete event and notes" }));
+    await userEvent.click(screen.getByRole("button", { name: "Delete event and its notes" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete event" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/events/7", { method: "DELETE" });
     expect(await screen.findByText("Calendar home")).toBeInTheDocument();
   });

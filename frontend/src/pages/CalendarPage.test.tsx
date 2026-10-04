@@ -3,6 +3,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "../components/ui/Confirm";
+import { ToastProvider } from "../components/ui/Toast";
+import { ChromeProvider } from "../lib/chrome";
+import { ShortcutProvider } from "../lib/shortcuts";
 import { calendarHref } from "../lib/calendarLocation";
 import { CalendarPage } from "./CalendarPage";
 
@@ -21,12 +25,20 @@ function renderAt(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/" element={<CalendarPage />} />
-        </Routes>
-        <Where />
-      </MemoryRouter>
+      <ToastProvider>
+        <ConfirmProvider>
+          <ShortcutProvider>
+            <ChromeProvider>
+              <MemoryRouter initialEntries={[path]}>
+                <Routes>
+                  <Route path="/" element={<CalendarPage />} />
+                </Routes>
+                <Where />
+              </MemoryRouter>
+            </ChromeProvider>
+          </ShortcutProvider>
+        </ConfirmProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }

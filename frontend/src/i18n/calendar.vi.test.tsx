@@ -2,6 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "../components/ui/Confirm";
+import { ToastProvider } from "../components/ui/Toast";
+import { ChromeProvider } from "../lib/chrome";
+import { ShortcutProvider } from "../lib/shortcuts";
 import { SyncBanner } from "../components/Banners";
 import { CalendarPage } from "../pages/CalendarPage";
 import { EventPage } from "../pages/EventPage";
@@ -38,11 +42,19 @@ function renderAt(path: string, ui: React.ReactNode, route: string) {
   render(
     <QueryClientProvider client={client}>
       <I18nProvider locale="vi">
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path={route} element={ui} />
-          </Routes>
-        </MemoryRouter>
+        <ToastProvider>
+          <ConfirmProvider>
+            <ShortcutProvider>
+              <ChromeProvider>
+                <MemoryRouter initialEntries={[path]}>
+                  <Routes>
+                    <Route path={route} element={ui} />
+                  </Routes>
+                </MemoryRouter>
+              </ChromeProvider>
+            </ShortcutProvider>
+          </ConfirmProvider>
+        </ToastProvider>
       </I18nProvider>
     </QueryClientProvider>,
   );
@@ -65,7 +77,7 @@ describe("calendar, event and nav in Vietnamese", () => {
     expect(screen.getByRole("button", { name: tv("calendar.header.nextWeek") })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: tv("common.today") })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: tv("calendar.header.viewDay") })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: tv("calendar.header.addEvent") })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: tv("calendar.header.addEvent") })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: tv("calendar.banner.noDataLink") })).toBeInTheDocument();
   });
 
