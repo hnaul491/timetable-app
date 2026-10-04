@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from typing import Annotated, Literal
 
@@ -310,8 +311,28 @@ class PushResultOut(BaseModel):
 Language = Literal["en", "vi"]
 
 
+_KEY = r"(?:[A-Za-z][A-Za-z0-9]{1,15}|\S)"
+SHORTCUT_KEYS = re.compile(rf"(?:(?:Mod\+)?(?:Alt\+)?(?:Shift\+)?{_KEY}|{_KEY} {_KEY})")
+MAX_SHORTCUTS = 200
+
+
 class Preferences(BaseModel):
     language: Language | None = None
+    # id -> keys in the frontend engine's syntax; null turns that shortcut off.
+    shortcuts: dict[str, str | None] = Field(default_factory=dict)
+    single_key_shortcuts: StrictBool = True
+
+    @field_validator("shortcuts")
+    @classmethod
+    def _valid_shortcuts(cls, value: dict[str, str | None]) -> dict[str, str | None]:
+        if len(value) > MAX_SHORTCUTS:
+            raise ValueError(f"at most {MAX_SHORTCUTS} shortcuts")
+        for key, keys in value.items():
+            if not re.fullmatch(r"[a-z0-9-]{1,40}", key):
+                raise ValueError("invalid shortcut id")
+            if keys is not None and (len(keys) > 32 or not SHORTCUT_KEYS.fullmatch(keys)):
+                raise ValueError("invalid shortcut keys")
+        return value
 
 
 class DocumentOut(BaseModel):

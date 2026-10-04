@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../i18n";
-import { ShortcutProvider, useShortcut } from "../lib/shortcuts";
+import { ShortcutProvider, useShortcut, type ShortcutOverrides } from "../lib/shortcuts";
 import { ShortcutHelp } from "./ShortcutHelp";
 
 function Registered({ streaming }: { streaming: boolean }) {
@@ -15,10 +15,10 @@ function Registered({ streaming }: { streaming: boolean }) {
   return null;
 }
 
-function renderAt(path: string, locale: "en" | "vi" = "en", streaming = false) {
+function renderAt(path: string, locale: "en" | "vi" = "en", streaming = false, overrides?: ShortcutOverrides) {
   render(
     <I18nProvider locale={locale}>
-      <ShortcutProvider>
+      <ShortcutProvider overrides={overrides}>
         <MemoryRouter initialEntries={[path]}>
           <Registered streaming={streaming} />
           <ShortcutHelp open onClose={() => {}} />
@@ -58,6 +58,33 @@ describe("ShortcutHelp grouping", () => {
 
   it("lists the stop key only while it is registered", async () => {
     expect(within(await renderAt("/assistant", "en", true)).getByText("Stop the reply")).toBeInTheDocument();
+  });
+
+  it("shows customised keys, hides turned-off entries, and groups unknown ids by prefix", async () => {
+    function Extra() {
+      useShortcut("free-new-thing", "z", () => {}, { label: "shortcuts.freeWeek" });
+      useShortcut("misc-thing", "y", () => {}, { label: "shortcuts.help" });
+      return null;
+    }
+    render(
+      <I18nProvider locale="en">
+        <ShortcutProvider overrides={{ "free-week": "Alt+w", "go-board": null }}>
+          <MemoryRouter initialEntries={["/free-time"]}>
+            <Registered streaming={false} />
+            <Extra />
+            <ShortcutHelp open onClose={() => {}} />
+          </MemoryRouter>
+        </ShortcutProvider>
+      </I18nProvider>,
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText("Go to Board")).toBeNull();
+    const week = within(dialog).getAllByText("This week").map((n) => n.closest("li")!);
+    expect(week.map((li) => li.textContent)).toContain("This weekAltW");
+    const free = within(dialog).getByRole("heading", { name: "Free time" }).closest("section")!;
+    expect(within(free).getAllByText("This week")).toHaveLength(2);
+    const global = within(dialog).getByRole("heading", { name: "Everywhere" }).closest("section")!;
+    expect(within(global).getByText("Show shortcuts")).toBeInTheDocument();
   });
 
   it("has Vietnamese group names and hint", async () => {

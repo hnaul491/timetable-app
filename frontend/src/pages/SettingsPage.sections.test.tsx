@@ -72,6 +72,7 @@ describe("Settings sections (desktop)", () => {
       ["google", () => expect(screen.getByRole("heading", { level: 3, name: "Google Calendar" })).toBeInTheDocument()],
       ["ai", () => expect(screen.getByRole("heading", { level: 3, name: "AI assistant" })).toBeInTheDocument()],
       ["backup", () => expect(screen.getByRole("heading", { level: 3, name: "Backup" })).toBeInTheDocument()],
+      ["shortcuts", () => expect(screen.getByRole("heading", { level: 3, name: "Shortcuts" })).toBeInTheDocument()],
     ];
     for (const [id, check] of markers) {
       const view = mount(`/settings/${id}`);
@@ -95,10 +96,10 @@ describe("Settings sections (desktop)", () => {
     await waitFor(() => expect(path()).toBe("/settings/general"));
   });
 
-  it("lists the six sections with their status lines", async () => {
+  it("lists the seven sections with their status lines", async () => {
     mount("/settings/general");
     const nav = within(list());
-    expect(nav.getAllByRole("link")).toHaveLength(6);
+    expect(nav.getAllByRole("link")).toHaveLength(7);
     expect(await nav.findByText("Dark · English")).toBeInTheDocument();
     expect(await nav.findByText("Synced 2 h ago")).toBeInTheDocument();
     expect(await nav.findByText("2 subjects · 1 hidden")).toBeInTheDocument();
@@ -106,7 +107,7 @@ describe("Settings sections (desktop)", () => {
     expect(await nav.findByText("Off")).toBeInTheDocument();
     expect(await nav.findByText("Never")).toBeInTheDocument();
     const dots = list().querySelectorAll("[data-dot]");
-    expect([...dots].map((d) => d.getAttribute("data-dot"))).toEqual(["none", "ok", "none", "warn", "none", "none"]);
+    expect([...dots].map((d) => d.getAttribute("data-dot"))).toEqual(["none", "ok", "none", "warn", "none", "none", "none"]);
   });
 
   it("navigates between sections from the list", async () => {
@@ -152,6 +153,16 @@ describe("Settings finder", () => {
     expect(screen.queryByText(/Press Enter/)).toBeNull();
   });
 
+  it("finds the Shortcuts section by English and Vietnamese words", async () => {
+    mount("/settings/general");
+    const box = screen.getByRole("searchbox", { name: "Find a setting" });
+    await userEvent.type(box, "keyboard");
+    expect(within(list()).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/settings/shortcuts"]);
+    await userEvent.clear(box);
+    await userEvent.type(box, "phim tat");
+    expect(within(list()).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/settings/shortcuts"]);
+  });
+
   it("keeps the current section without a hint when it still matches", async () => {
     mount("/settings/backup");
     await userEvent.type(screen.getByRole("searchbox", { name: "Find a setting" }), "drive");
@@ -185,7 +196,7 @@ describe("Settings finder", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Appearance" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     expect(box).toHaveValue("");
-    expect(within(list()).getAllByRole("link")).toHaveLength(6);
+    expect(within(list()).getAllByRole("link")).toHaveLength(7);
     expect(screen.queryByText(/No setting matches/)).toBeNull();
   });
 });
@@ -199,7 +210,7 @@ describe("Settings on a phone", () => {
     mount("/settings", "en", ["/start"]);
     expect(path()).toBe("/settings");
     expect(screen.queryByRole("searchbox")).toBeNull();
-    expect(within(list()).getAllByRole("link")).toHaveLength(6);
+    expect(within(list()).getAllByRole("link")).toHaveLength(7);
     expect(await within(list()).findByText("Synced 2 h ago")).toBeInTheDocument();
 
     await userEvent.click(within(list()).getByRole("link", { name: /Backup/ }));

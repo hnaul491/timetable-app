@@ -8,7 +8,7 @@ import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
 import { I18nProvider } from "../i18n";
 import { ApiError } from "../lib/api";
-import { ShortcutProvider } from "../lib/shortcuts";
+import { ShortcutProvider, type ShortcutOverrides } from "../lib/shortcuts";
 import { chatSendResponse, expiredAction, studyBlocksAction, taskAction } from "../test/aiContract";
 import type { ChatMessage, PendingAction } from "../types";
 import { AssistantPage } from "./AssistantPage";
@@ -58,7 +58,7 @@ function route(extra: (path: string, init?: RequestInit) => unknown = () => unde
   });
 }
 
-function renderPage(locale: "en" | "vi" = "en", url = "/", help = false) {
+function renderPage(locale: "en" | "vi" = "en", url = "/", help = false, overrides?: ShortcutOverrides) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, "invalidateQueries");
   render(
@@ -66,7 +66,7 @@ function renderPage(locale: "en" | "vi" = "en", url = "/", help = false) {
       <I18nProvider locale={locale}>
         <ToastProvider>
           <ConfirmProvider>
-            <ShortcutProvider>
+            <ShortcutProvider overrides={overrides}>
               <MemoryRouter initialEntries={[url]}>
                 <AssistantPage />
                 {help && <ShortcutHelp open onClose={() => {}} />}
@@ -475,6 +475,22 @@ describe("AssistantPage", () => {
       await userEvent.keyboard("{Escape}");
       expect(signal?.aborted).toBe(true);
       expect(await screen.findByText("Stopped")).toBeInTheDocument();
+    });
+
+    it("a customised stop key replaces Escape, also inside the box", async () => {
+      let signal: AbortSignal | undefined;
+      fetchMock.mockImplementation(async (u: string, init: RequestInit) => {
+        signal = init.signal as AbortSignal;
+        return hang([frame("delta", { text: "Partial" })])(u, init);
+      });
+      route();
+      renderPage("en", "/", false, { "assistant-stop": "Mod+." });
+      await userEvent.type(await screen.findByRole("textbox", { name: "Message the assistant" }), "hi{Enter}");
+      await screen.findByText("Partial");
+      await userEvent.keyboard("{Escape}");
+      expect(signal?.aborted).toBe(false);
+      await userEvent.keyboard("{Control>}.{/Control}");
+      expect(signal?.aborted).toBe(true);
     });
 
     it("Escape from the page (focus outside the box) also stops", async () => {

@@ -12,6 +12,7 @@ export const settings: Messages["settings"] = {
     google: "Google",
     ai: "Trợ lý AI",
     backup: "Sao lưu",
+    shortcuts: "Phím tắt",
   },
   status: {
     synced: "Đã đồng bộ {when}",
@@ -30,6 +31,8 @@ export const settings: Messages["settings"] = {
     aiOff: "Tắt",
     backupNever: "Chưa sao lưu",
     backupDownloadOnly: "Chỉ tải xuống",
+    shortcutsCustom: { one: "{count} đã đổi", other: "{count} đã đổi" },
+    shortcutsDefault: "Mặc định",
   },
   syncStatus: { running: "đang chạy", ok: "thành công", partial: "một phần", failed: "thất bại", auth_failed: "liên kết hết hạn" },
   appearance: {

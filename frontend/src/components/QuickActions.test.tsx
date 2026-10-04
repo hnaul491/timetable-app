@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { ChromeProvider, useChrome } from "../lib/chrome";
-import { ShortcutProvider, useShortcut } from "../lib/shortcuts";
+import { ShortcutProvider, useShortcut, type ShortcutOverrides } from "../lib/shortcuts";
 import { Layout } from "./Layout";
 
 function Marker() {
@@ -20,12 +20,12 @@ function Marker() {
   );
 }
 
-function setup(path = "/", locale: "en" | "vi" = "en") {
+function setup(path = "/", locale: "en" | "vi" = "en", overrides?: ShortcutOverrides) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <I18nProvider locale={locale}>
-        <ShortcutProvider>
+        <ShortcutProvider overrides={overrides}>
           <ChromeProvider>
             <MemoryRouter initialEntries={[path]}>
               <Routes>
@@ -154,6 +154,22 @@ describe("quick-action button", () => {
     expect(item).toHaveAttribute("aria-keyshortcuts", "N");
     expect(item.querySelector("kbd")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByRole("menuitem", { name: "New task" })).not.toHaveAttribute("aria-keyshortcuts");
+  });
+
+  it("hints show customised keys and vanish when the shortcut is off", async () => {
+    const user = userEvent.setup();
+    const custom = setup("/", "en", { "cal-new": "Mod+j" });
+    await user.click(fab());
+    const item = screen.getByRole("menuitem", { name: "New event" });
+    expect(item).toHaveAttribute("aria-keyshortcuts", "Ctrl J");
+    expect(item.querySelector("kbd")).toHaveTextContent("Ctrl J");
+    custom.unmount();
+
+    setup("/", "en", { "cal-new": null });
+    await user.click(fab());
+    const off = screen.getByRole("menuitem", { name: "New event" });
+    expect(off).not.toHaveAttribute("aria-keyshortcuts");
+    expect(off.querySelector("kbd")).toBeNull();
   });
 
   it("is hidden below md on the assistant page only", () => {

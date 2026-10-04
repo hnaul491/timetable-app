@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocale, useT } from "../../i18n";
 import { apiFetch } from "../../lib/api";
+import { useShortcutSettings } from "../../lib/shortcutPrefs";
 import { useTheme } from "../../lib/theme";
 import { formatLongDate, parisParts } from "../../lib/time";
 import type { AiStatus, GoogleStatus, SubjectSummary, SyncStatus } from "../../types";
@@ -26,6 +27,8 @@ export function useSettingsStatus(now: Date = new Date()): Record<SectionId, Sec
   const google = useQuery({ queryKey: ["google"], queryFn: () => apiFetch<GoogleStatus>("/api/google") });
   const ai = useQuery({ queryKey: ["ai-status"], queryFn: () => apiFetch<AiStatus>("/api/ai/status") });
   const backup = useQuery({ queryKey: ["backup"], queryFn: () => apiFetch<BackupStatus>("/api/backup/status") });
+
+  const shortcutPrefs = useShortcutSettings();
 
   const ago = (iso: string) => {
     const minutes = Math.max(0, Math.round((now.getTime() - new Date(iso).getTime()) / 60000));
@@ -83,5 +86,10 @@ export function useSettingsStatus(now: Date = new Date()): Record<SectionId, Sec
         ? { text: t("backup.lastAt", { date: formatLongDate(parisParts(b.last_at).date, locale) }), dot: "ok" }
         : { text: t("settings.status.backupNever"), dot: "none" };
 
-  return { general, school, subjects: subjectsStatus, google: googleStatus, ai: aiStatus, backup: backupStatus };
+  const customised = Object.keys(shortcutPrefs.overrides).length;
+  const shortcutsStatus: SectionStatus = !shortcutPrefs.loaded
+    ? { text: "", dot: "none" }
+    : { text: customised > 0 ? t("settings.status.shortcutsCustom", { count: customised }) : t("settings.status.shortcutsDefault"), dot: "none" };
+
+  return { general, school, subjects: subjectsStatus, google: googleStatus, ai: aiStatus, backup: backupStatus, shortcuts: shortcutsStatus };
 }

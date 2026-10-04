@@ -10,7 +10,8 @@ import { apiFetch } from "../lib/api";
 import { translateServerMessage } from "../i18n/serverMessages";
 import { aiErrorText, sendFailedText } from "../lib/aiError";
 import { streamChat } from "../lib/chatStream";
-import { useShortcut } from "../lib/shortcuts";
+import { comboFromEvent } from "../lib/shortcutKeys";
+import { useShortcut, useShortcutList } from "../lib/shortcuts";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { formatLongDate, parisParts } from "../lib/time";
 import type { AiStatus, ChatMessage, EventDetail, PendingAction, SubjectDetail } from "../types";
@@ -265,11 +266,13 @@ export function AssistantPage() {
     }
   };
   const stop = () => abortRef.current?.abort();
+  const shortcutList = useShortcutList();
   useShortcut("assistant-focus", "i", () => composer?.focus(), { label: "shortcuts.assistantFocus", enabled });
   useShortcut("assistant-stop", "Escape", stop, { label: "shortcuts.assistantStop", enabled: streaming });
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // The engine ignores plain keys while typing, and focus stays in the box during a reply.
-    if (e.key === "Escape" && streaming) {
+    const stopKeys = shortcutList.find((s) => s.id === "assistant-stop");
+    if (streaming && stopKeys && !stopKeys.disabled && comboFromEvent(e.nativeEvent) === stopKeys.keys) {
       e.preventDefault();
       stop();
       return;

@@ -53,6 +53,19 @@ describe("useSettingsStatus", () => {
     expect(result.current.backup).toEqual({ text: "Last Drive backup: 4 October 2026", dot: "ok" });
   });
 
+  it("counts customised shortcuts, or says Default", async () => {
+    data["/api/preferences"] = { language: null, shortcuts: {}, single_key_shortcuts: true };
+    const plain = statusFor();
+    await waitFor(() => expect(plain.result.current.shortcuts).toEqual({ text: "Default", dot: "none" }));
+
+    data["/api/preferences"] = { language: null, shortcuts: { a: "m", b: null }, single_key_shortcuts: true };
+    const two = statusFor();
+    await waitFor(() => expect(two.result.current.shortcuts.text).toBe("2 customised"));
+    data["/api/preferences"] = { language: null, shortcuts: { a: "m" }, single_key_shortcuts: true };
+    const one = statusFor("vi");
+    await waitFor(() => expect(one.result.current.shortcuts.text).toBe("1 đã đổi"));
+  });
+
   it("speaks Vietnamese", async () => {
     const { result } = statusFor("vi");
     await waitFor(() => expect(result.current.school.text).not.toBe(""));

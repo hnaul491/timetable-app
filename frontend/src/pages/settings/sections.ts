@@ -1,6 +1,6 @@
 import type { MessageKey } from "../../i18n";
 
-export const SECTION_IDS = ["general", "school", "subjects", "google", "ai", "backup"] as const;
+export const SECTION_IDS = ["general", "school", "subjects", "google", "ai", "backup", "shortcuts"] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export function isSectionId(value: string | undefined): value is SectionId {
@@ -21,6 +21,7 @@ export const SECTIONS: SectionDef[] = [
   { id: "google", title: "settings.sections.google", keywords: "google calendar drive documents connect reconnect disconnect lich tai lieu ket noi" },
   { id: "ai", title: "settings.sections.ai", keywords: "ai assistant gemini model limit fallback tro ly mo hinh gioi han" },
   { id: "backup", title: "settings.sections.backup", keywords: "backup export download drive json restore sao luu xuat tai xuong" },
+  { id: "shortcuts", title: "settings.sections.shortcuts", keywords: "shortcut shortcuts keyboard key keys hotkey phim tat ban phim" },
 ];
 
 export const stripAccents = (s: string) =>
