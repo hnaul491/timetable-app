@@ -134,6 +134,7 @@ class Task(Base):
 class WeekReview(Base):
     __tablename__ = "week_review"
 
+    semester_id: Mapped[int] = mapped_column(ForeignKey("semester.id"), primary_key=True)
     week_start: Mapped[date] = mapped_column(Date, primary_key=True)
     reviewed_at: Mapped[datetime] = mapped_column(DateTime)
 

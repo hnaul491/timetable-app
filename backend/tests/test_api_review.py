@@ -108,3 +108,26 @@ def test_starred_class_without_text_is_in_important(client, session, semester):
     client.put(f"/api/events/{starred.id}/important", headers=AUTH, json={"important": True})
     body = client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()
     assert [(n["event_id"], n["body"]) for n in body["important"]] == [(starred.id, "")]
+
+
+def test_review_marks_are_per_semester(client, session, semester):
+    from app.models import Semester
+    client.post("/api/review/2026-10-19/done", headers=AUTH)
+    other = Semester(code="S2", name="Other", is_active=False)
+    session.add(other)
+    session.commit()
+    semester.is_active = False
+    other.is_active = True
+    session.commit()
+    assert client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()["reviewed_at"] is None
+    assert client.post("/api/review/2026-10-19/done", headers=AUTH).status_code == 200
+    semester.is_active = True
+    other.is_active = False
+    session.commit()
+    assert client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()["reviewed_at"] == "2026-10-15T12:00:00Z"
+
+
+def test_marking_a_week_needs_an_active_semester(client, session, semester):
+    semester.is_active = False
+    session.commit()
+    assert client.post("/api/review/2026-10-19/done", headers=AUTH).status_code == 409

@@ -31,8 +31,8 @@ def get_review(week_start: date | None = None, session: Session = Depends(get_se
     start = _monday(week_start) if week_start else default_week_start(today)
     end = start + timedelta(days=6)
     previous = start - timedelta(days=7)
-    mark = session.get(WeekReview, start)
     semester = active_semester(session)
+    mark = session.get(WeekReview, (semester.id, start)) if semester else None
     week = week_events(session, semester.id, start) if semester else []
     last_week = week_events(session, semester.id, previous) if semester else []
     notes = important_notes(session, semester.id, paris_midnight_utc(previous),
@@ -59,9 +59,12 @@ def get_review(week_start: date | None = None, session: Session = Depends(get_se
 def mark_reviewed(week_start: date, session: Session = Depends(get_session),
                   now: datetime = Depends(get_now)) -> ReviewMarkOut:
     start = _monday(week_start)
-    mark = session.get(WeekReview, start)
+    semester = active_semester(session)
+    if semester is None:
+        raise HTTPException(status_code=409, detail="no active semester")
+    mark = session.get(WeekReview, (semester.id, start))
     if mark is None:
-        mark = WeekReview(week_start=start, reviewed_at=now)
+        mark = WeekReview(semester_id=semester.id, week_start=start, reviewed_at=now)
         session.add(mark)
     else:
         mark.reviewed_at = now
