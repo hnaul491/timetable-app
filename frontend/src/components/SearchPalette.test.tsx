@@ -149,24 +149,30 @@ describe("SearchPalette", () => {
     expect(screen.getByTestId("path").textContent).toBe("/?event=7&date=2026-10-20");
   });
 
-  it("navigates for each kind of result", async () => {
+  // one search per test: typing five searches in a row ran past the 5 s test timeout under load
+  const openResult = async (user: ReturnType<typeof userEvent.setup>, name: RegExp) => {
+    await user.keyboard("/");
+    await user.type(await screen.findByRole("combobox", { name: "Search" }), "python");
+    await user.click(await screen.findByRole("option", { name }));
+  };
+
+  it.each([
+    ["a subject", /Python Programming/, "/subjects/3"],
+    ["a note", /Remember python/, "/events/7"],
+    ["a task with a class", /Python homework/, "/events/7"],
+    ["a task without a class", /Python reading/, "/board"],
+  ])("navigates for %s", async (_kind, name, path) => {
     const user = userEvent.setup();
     setup();
-    const open = async (name: RegExp) => {
-      await user.keyboard("/");
-      await user.type(await screen.findByRole("combobox", { name: "Search" }), "python");
-      await user.click(await screen.findByRole("option", { name }));
-    };
-    await open(/Python Programming/);
-    expect(screen.getByTestId("path").textContent).toBe("/subjects/3");
-    await open(/Remember python/);
-    expect(screen.getByTestId("path").textContent).toBe("/events/7");
-    await open(/Python homework/);
-    expect(screen.getByTestId("path").textContent).toBe("/events/7");
-    await open(/Python reading/);
-    expect(screen.getByTestId("path").textContent).toBe("/board");
+    await openResult(user, name);
+    expect(screen.getByTestId("path").textContent).toBe(path);
+  });
+
+  it("opens a document in a new tab", async () => {
+    const user = userEvent.setup();
+    setup();
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
-    await open(/python-slides/);
+    await openResult(user, /python-slides/);
     expect(openSpy).toHaveBeenCalledWith("https://drive.example/f", "_blank", "noopener,noreferrer");
   });
 
