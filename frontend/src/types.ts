@@ -199,6 +199,8 @@ export interface DocumentItem {
 export interface AiStatus {
   enabled: boolean;
   model: string | null;
+  models?: { id: string; label: string; note: string }[];
+  auto_fallback?: boolean;
 }
 
 export interface AiSuggestion {

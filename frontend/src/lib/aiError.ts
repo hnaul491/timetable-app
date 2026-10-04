@@ -6,3 +6,9 @@ export function aiErrorText(error: Error, t: (key: MessageKey, vars?: Vars) => s
   if (error instanceof ApiError && (error.status === 502 || error.status === 504)) return t("ai.unavailable");
   return error.message;
 }
+
+/** "Could not send: <message>", plus a pointer to the model picker when the message is the rate-limit one. */
+export function sendFailedText(message: string, t: (key: MessageKey, vars?: Vars) => string): string {
+  const text = t("ai.sendFailed", { message });
+  return message === "AI limit reached, try again later" || message === t("ai.limit") ? `${text} ${t("ai.pickModelHint")}` : text;
+}

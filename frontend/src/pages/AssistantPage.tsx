@@ -8,7 +8,7 @@ import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { translateServerMessage } from "../i18n/serverMessages";
-import { aiErrorText } from "../lib/aiError";
+import { aiErrorText, sendFailedText } from "../lib/aiError";
 import { streamChat } from "../lib/chatStream";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { formatLongDate, parisParts } from "../lib/time";
@@ -150,7 +150,7 @@ export function AssistantPage() {
     onSuccess: (answer, message) => commit(message, answer.message),
     onError: (error, message) => {
       setText((cur) => cur || message);
-      toast.error(t("ai.sendFailed", { message: aiErrorText(error, t) }));
+      toast.error(sendFailedText(aiErrorText(error, t), t));
     },
     onSettled: () => setSending(null),
   });
@@ -221,7 +221,7 @@ export function AssistantPage() {
             ended = true;
             setLive(null);
             setText((cur) => cur || body);
-            toast.error(t("ai.sendFailed", { message: translateServerMessage(msg, locale) || t("ai.unavailable") }));
+            toast.error(sendFailedText(translateServerMessage(msg, locale) || t("ai.unavailable"), t));
           },
         },
         controller.signal,
@@ -242,7 +242,7 @@ export function AssistantPage() {
         setLive((l) => l && { ...l, stopped: true }); // keep what arrived, marked as cut off
         setText((cur) => cur || body);
         queryClient.invalidateQueries({ queryKey: ["chat"] });
-        toast.error(t("ai.sendFailed", { message: aiErrorText(error as Error, t) }));
+        toast.error(sendFailedText(aiErrorText(error as Error, t), t));
       }
     } finally {
       busyRef.current = false;

@@ -351,9 +351,22 @@ class DocumentPatch(BaseModel):
     event_id: int | None = None
 
 
+class AiModelOut(BaseModel):
+    id: str
+    label: str
+    note: str
+
+
 class AiStatus(BaseModel):
     enabled: bool
     model: str
+    models: list[AiModelOut]
+    auto_fallback: bool
+
+
+class AiSettingsIn(BaseModel):
+    model: str | None = None
+    auto_fallback: bool | None = None
 
 
 class SuggestIn(BaseModel):

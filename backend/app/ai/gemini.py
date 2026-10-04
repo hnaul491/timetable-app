@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 import httpx
 
-from app.ai.provider import (AIRateLimited, AIUnavailable, CallPart, FunctionCall, LLMReply, StreamPart, TextDelta,
+from app.ai.provider import (AIModelMissing, AIRateLimited, AIUnavailable, CallPart, FunctionCall, LLMReply, StreamPart, TextDelta,
                              ToolDecl, Turn)
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class GeminiProvider:
                 failure = AIRateLimited(RATE_MSG)
             elif resp.status_code >= 400:
                 _log_google_error(resp)
-                failure = AIUnavailable(UNAVAILABLE_MSG)
+                failure = (AIModelMissing if resp.status_code == 404 else AIUnavailable)(UNAVAILABLE_MSG)
             else:
                 try:
                     data = resp.json()
@@ -160,7 +160,7 @@ class GeminiProvider:
                 elif resp.status_code >= 400:
                     resp.read()
                     _log_google_error(resp)
-                    failure = AIUnavailable(UNAVAILABLE_MSG)
+                    failure = (AIModelMissing if resp.status_code == 404 else AIUnavailable)(UNAVAILABLE_MSG)
                 else:
                     finish = None
                     for payload in _sse_payloads(resp.iter_lines()):

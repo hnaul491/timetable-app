@@ -306,3 +306,16 @@ def test_stream_multiline_data_joined_with_newline():
             'data: [{"text": "hi"}]}}]}\n\n')
     p, _ = make(sse_handler(body))
     assert list(p.stream("S", [Turn("user", text="x")], [])) == [TextDelta("hi")]
+
+
+def test_404_maps_to_model_missing():
+    from app.ai.provider import AIModelMissing
+    body = {"error": {"status": "NOT_FOUND", "message": f"model gone {KEY}"}}
+    p, _ = make(lambda r: httpx.Response(404, json=body))
+    with pytest.raises(AIModelMissing) as e:
+        p.generate("S", [Turn("user", text="x")], [])
+    assert isinstance(e.value, AIUnavailable) and str(e.value) == "The assistant is not available right now"
+    assert KEY not in str(e.value)
+    p, _ = make(lambda r: httpx.Response(404, json=body))
+    with pytest.raises(AIModelMissing):
+        list(p.stream("S", [Turn("user", text="x")], []))
