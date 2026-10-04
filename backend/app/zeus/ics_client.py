@@ -2,6 +2,7 @@ import re
 
 import httpx
 
+GROUP_RE = re.compile(r"/group/(\d+)/ics/")
 KEY_RE = re.compile(r"[A-Za-z0-9_-]{4,128}")
 LINK_RE = re.compile(r"/ics/([^/?#\s]+)")
 
@@ -19,6 +20,11 @@ def extract_key(value: str) -> str:
     if not KEY_RE.fullmatch(key):
         raise ValueError("not a valid Zeus ICS link or key")
     return key
+
+
+def extract_group_id(value: str) -> int | None:
+    match = GROUP_RE.search(value.strip())
+    return int(match.group(1)) if match else None
 
 
 def build_ics_url(base_url: str, group_id: int, key: str) -> str:

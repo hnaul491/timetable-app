@@ -46,12 +46,46 @@ def test_choose_unknown_section_is_422(client, session, semester):
 
 
 def test_put_zeus_key_accepts_full_link_and_never_returns_it(client, session, settings, semester):
-    assert client.get("/api/settings/zeus-key", headers=AUTH).json() == {"configured": False}
+    assert client.get("/api/settings/zeus-key", headers=AUTH).json() == {"configured": False, "group_mismatch": None}
     link = "https://zeus.ionis-it.com/api/group/802/ics/AbC123xyZ9?startDate=2026-10-10"
     resp = client.put("/api/settings/zeus-key", json={"value": link}, headers=AUTH)
-    assert resp.json() == {"configured": True}
-    assert client.get("/api/settings/zeus-key", headers=AUTH).json() == {"configured": True}
+    assert resp.json() == {"configured": True, "group_mismatch": None}
+    assert client.get("/api/settings/zeus-key", headers=AUTH).json() == {"configured": True, "group_mismatch": None}
     assert SecretStore(session, settings.token_encryption_key).get(ZEUS_KEY_NAME) == "AbC123xyZ9"
+
+
+GROUP_LINK = "https://zeus.ionis-it.com/api/group/{gid}/ics/AbC123xyZ9"
+
+
+def test_put_zeus_key_link_sets_missing_group(client, session, semester):
+    semester.zeus_group_id = None
+    session.commit()
+    resp = client.put("/api/settings/zeus-key", json={"value": GROUP_LINK.format(gid=905)}, headers=AUTH)
+    assert resp.json() == {"configured": True, "group_mismatch": None}
+    session.refresh(semester)
+    assert semester.zeus_group_id == 905
+
+
+def test_put_zeus_key_link_same_group(client, session, semester):
+    resp = client.put("/api/settings/zeus-key", json={"value": GROUP_LINK.format(gid=802)}, headers=AUTH)
+    assert resp.json() == {"configured": True, "group_mismatch": None}
+    session.refresh(semester)
+    assert semester.zeus_group_id == 802
+
+
+def test_put_zeus_key_link_different_group_reports_mismatch(client, session, semester):
+    resp = client.put("/api/settings/zeus-key", json={"value": GROUP_LINK.format(gid=905)}, headers=AUTH)
+    assert resp.json() == {"configured": True,
+                           "group_mismatch": {"link_group": 905, "semester_group": 802}}
+    session.refresh(semester)
+    assert semester.zeus_group_id == 802
+
+
+def test_put_zeus_key_bare_key_leaves_group(client, session, semester):
+    resp = client.put("/api/settings/zeus-key", json={"value": "AbC123xyZ9"}, headers=AUTH)
+    assert resp.json() == {"configured": True, "group_mismatch": None}
+    session.refresh(semester)
+    assert semester.zeus_group_id == 802
 
 
 def test_put_zeus_key_rejects_garbage(client, semester):

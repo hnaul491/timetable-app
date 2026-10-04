@@ -53,8 +53,14 @@ class ZeusKeyUpdate(BaseModel):
     value: str
 
 
+class ZeusGroupMismatch(BaseModel):
+    link_group: int
+    semester_group: int
+
+
 class ZeusKeyStatus(BaseModel):
     configured: bool
+    group_mismatch: ZeusGroupMismatch | None = None
 
 
 class SyncRunOut(BaseModel):
