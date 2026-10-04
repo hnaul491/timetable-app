@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.deps import get_fetcher, get_gcal_factory
 from app.gcal.api import GoogleAuthError, GoogleError
-from app.models import AppSecret, Event, GoogleAccount, Subject
+from app.models import AppSecret, AppSetting, Event, GoogleAccount, Subject
 from tests.conftest import AUTH
 from tests.gcal_fakes import FakeCalendar
 
@@ -191,3 +191,35 @@ def test_reconnect_keeps_the_calendar_and_refreshes_scopes(client, settings, ses
     assert account.calendar_id == calendar_id and calendar_id
     assert drive_scope in account.scopes.split()
     assert not any(c[0] == "create_calendar" for c in second.calls)
+
+
+def test_reconnect_after_disconnect_reuses_the_calendar(client, settings, session, semester):
+    fake = FakeCalendar()
+    configure(client, settings, fake)
+    seed(session, semester)
+    connect(client)
+    client.post("/api/google/push", headers=AUTH)
+    client.delete("/api/google", headers=AUTH)
+    session.expire_all()
+    assert session.get(AppSetting, "gcal_last_calendar_id").value == "cal1"
+    assert connect(client).status_code == 200
+    session.expire_all()
+    assert session.get(GoogleAccount, 1).calendar_id == "cal1"
+    assert fake.calendars == {"cal1": "My Timetable"}
+    assert [c for c in fake.calls if c[0] == "create_calendar"] == [("create_calendar", "cal1")]
+    result = client.post("/api/google/push", headers=AUTH).json()
+    assert (result["status"], result["done"]) == ("ok", 2)
+
+
+def test_reconnect_with_a_gone_calendar_recreates_it(client, settings, session, semester):
+    configure(client, settings, FakeCalendar())
+    seed(session, semester)
+    connect(client)
+    client.delete("/api/google", headers=AUTH)
+    fresh = FakeCalendar()  # the old calendar no longer exists in Google
+    configure(client, settings, fresh)
+    connect(client)
+    assert client.post("/api/google/push", headers=AUTH).json()["status"] == "failed"
+    result = client.post("/api/google/push", headers=AUTH).json()
+    assert (result["status"], result["done"]) == ("ok", 2)
+    assert len(fresh.calendars) == 1 and len(fresh.events) == 2

@@ -13,7 +13,7 @@ from app.gcal.api import (ACCOUNT_ID, ALL_KINDS, CALENDAR_NAME, DEFAULT_KINDS, R
                           GcalFactory, GoogleError)
 from app.gdrive.api import DRIVE_SCOPE
 from app.gcal.push import _close, plan_ops, reset_calendar, run_push
-from app.models import AppSecret, GoogleAccount
+from app.models import AppSecret, AppSetting, GoogleAccount
 from app.schemas import GoogleConnectIn, GoogleKindsIn, GoogleStatusOut, PushResultOut
 from app.secret_store import SecretStore
 from app.timeutil import iso_utc
@@ -21,6 +21,7 @@ from app.timeutil import iso_utc
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 
 PUSH_BUDGET_S = 35.0
+LAST_CALENDAR_KEY = "gcal_last_calendar_id"
 
 
 def _status(session: Session, settings: Settings, now: datetime) -> GoogleStatusOut:
@@ -64,7 +65,13 @@ def connect(body: GoogleConnectIn, user: CurrentUser = Depends(require_user),
     gcal = factory(refresh_token)
     try:
         if account.calendar_id is None:
-            account.calendar_id = gcal.create_calendar(CALENDAR_NAME, TIME_ZONE)
+            last = session.get(AppSetting, LAST_CALENDAR_KEY)
+            if last is not None and isinstance(last.value, str) and last.value:
+                # Disconnect keeps the app-created calendar: reuse it. If it is gone, the first push recreates it.
+                account.calendar_id = last.value
+                session.delete(last)
+            else:
+                account.calendar_id = gcal.create_calendar(CALENDAR_NAME, TIME_ZONE)
         account.scopes = _granted_scopes(gcal)
     except GoogleError as exc:
         session.rollback()
@@ -102,6 +109,12 @@ def disconnect(session: Session = Depends(get_session), settings: Settings = Dep
         _revoke_quietly(session, settings, factory)
     account = session.get(GoogleAccount, ACCOUNT_ID)
     if account is not None:
+        if account.calendar_id:
+            last = session.get(AppSetting, LAST_CALENDAR_KEY)
+            if last is None:
+                session.add(AppSetting(key=LAST_CALENDAR_KEY, value=account.calendar_id))
+            else:
+                last.value = account.calendar_id
         reset_calendar(session, account)
         session.delete(account)
     session.execute(delete(AppSecret).where(AppSecret.name == REFRESH_TOKEN_NAME))
