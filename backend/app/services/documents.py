@@ -174,13 +174,16 @@ def send_chunk(session: Session, drive: GoogleDrive, upload: DocumentUpload, dat
 
 # --- output ------------------------------------------------------------------------------------
 
+def _link(d: Document) -> str:
+    return d.web_view_link or f"https://drive.google.com/file/d/{d.drive_file_id}/view"
+
+
 def document_outs(session: Session, documents: list[Document]) -> list[DocumentOut]:
     ids = {d.event_id for d in documents if d.event_id is not None}
     starts = dict(session.execute(select(Event.id, Event.start_at).where(Event.id.in_(ids))).all()) if ids else {}
     return [
         DocumentOut(id=d.id, subject_id=d.subject_id, event_id=d.event_id,
                     event_start=iso_utc(starts[d.event_id]) if d.event_id in starts else None,
-                    name=d.name, mime_type=d.mime_type, size=d.size, tag=d.tag, web_view_link=d.web_view_link,
-                    created_at=iso_utc(d.created_at))
+                    name=d.name, mime_type=d.mime_type, size=d.size, tag=d.tag, web_view_link=_link(d), created_at=iso_utc(d.created_at))
         for d in documents
     ]

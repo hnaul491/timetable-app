@@ -324,3 +324,12 @@ def test_received_is_what_drive_kept(client, settings, session, subject):
     last = put(client, upload_id, data[262144:], 262144)
     assert last.json()["document"]["size"] == len(data)
     assert drive.contents["file1"] == data
+
+
+def test_empty_web_view_link_falls_back_to_the_drive_viewer(client, settings, session, subject):
+    configure(client, settings, FakeDrive())
+    document = upload(client, subject)
+    session.get(Document, document["id"]).web_view_link = ""
+    session.commit()
+    listed = client.get(f"/api/subjects/{subject.id}/documents", headers=AUTH).json()
+    assert listed[0]["web_view_link"] == "https://drive.google.com/file/d/file1/view"
