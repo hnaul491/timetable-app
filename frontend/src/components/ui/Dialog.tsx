@@ -26,17 +26,19 @@ function lockPage(): () => void {
   };
 }
 
-export type DialogSize = "sm" | "md" | "side";
+export type DialogSize = "sm" | "md" | "side" | "xl";
 
 const PANEL: Record<DialogSize, string> = {
   sm: "w-full max-w-sm rounded-2xl",
   md: "w-full max-w-lg rounded-2xl max-h-[90vh]",
   side: "w-full max-h-[85vh] rounded-t-2xl md:max-h-none md:h-full md:max-w-md md:rounded-none md:rounded-l-2xl",
+  xl: "h-full w-full md:h-[90vh] md:w-[90vw] md:rounded-2xl",
 };
 const PLACE: Record<DialogSize, string> = {
   sm: "items-center justify-center p-4",
   md: "items-end justify-center p-0 md:items-center md:p-4",
   side: "items-end justify-center md:items-stretch md:justify-end",
+  xl: "items-stretch justify-center p-0 md:items-center",
 };
 
 export function Dialog({ open, onClose, title, size = "md", children, footer }: {

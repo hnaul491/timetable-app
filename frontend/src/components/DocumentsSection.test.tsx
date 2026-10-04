@@ -100,7 +100,7 @@ describe("DocumentsSection", () => {
     expect(screen.getByText("PPT")).toBeInTheDocument();
     expect(screen.getByText("DOC")).toBeInTheDocument();
     expect(screen.getByText(/3 MB/)).toBeInTheDocument();
-    const open = screen.getByRole("link", { name: "Open lecture1.pptx" });
+    const open = screen.getByRole("link", { name: "Open lecture1.pptx in Drive" });
     expect(open).toHaveAttribute("target", "_blank");
     expect(open).toHaveAttribute("rel", "noopener noreferrer");
 

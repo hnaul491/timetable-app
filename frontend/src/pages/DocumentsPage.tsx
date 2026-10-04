@@ -2,13 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { DocumentPreview, OpenInDriveIcon } from "../components/DocumentPreview";
 import { UploadDialog } from "../components/UploadDialog";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
-import { docBadge, formatSize } from "../lib/documents";
+import { docBadge, formatSize, previewOfListItem, type PreviewDoc } from "../lib/documents";
 import { dayLabel, formatLongDate, parisParts } from "../lib/time";
 import { useDeleteDocument } from "../lib/useDeleteDocument";
+import { useDocPreview } from "../lib/useDocPreview";
 import { stripAccents } from "./settings/sections";
 import type { AllDocuments, DocListItem, DocumentTag, GoogleStatus } from "../types";
 
@@ -57,6 +59,7 @@ export function DocumentsPage() {
   const [sort, setSort] = useState<Sort>("newest");
   const [showEmpty, setShowEmpty] = useState(false);
   const [collapsed, setCollapsed] = useState<number[]>(readCollapsed);
+  const preview = useDocPreview();
   const [uploadFor, setUploadFor] = useState<number | null>(null);
 
   const google = useQuery({ queryKey: ["google"], queryFn: () => apiFetch<GoogleStatus>("/api/google") });
@@ -87,6 +90,8 @@ export function DocumentsPage() {
       .filter((s) => (s.hasAny ? s.docs.length > 0 : showEmpty));
   }, [data.data, query, tag, sort, showEmpty, locale]);
 
+  // the list the user opens a file from: the files on screen, in order (collapsed subjects are skipped)
+  const visible: PreviewDoc[] = sections.filter((s) => !collapsed.includes(s.subject.id)).flatMap((s) => s.docs.map(previewOfListItem));
   const row = (doc: DocListItem) => {
     const start = doc.event ? parisParts(doc.event.start).date : null;
     return (
@@ -99,7 +104,13 @@ export function DocumentsPage() {
           {docBadge(doc)}
         </span>
         <span className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
-          <a href={doc.web_view_link} target="_blank" rel="noopener noreferrer" className="truncate text-sm font-semibold text-ink hover:text-accent">
+          <a
+            href={doc.web_view_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => preview.onOpen(e, visible, visible.findIndex((d) => d.id === doc.id))}
+            className="truncate text-sm font-semibold text-ink hover:text-accent"
+          >
             {doc.name}
           </a>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
@@ -113,6 +124,7 @@ export function DocumentsPage() {
             <span>{t("documents.page.uploadedOn", { date: formatLongDate(parisParts(doc.created_at).date, locale) })}</span>
           </span>
         </span>
+        <OpenInDriveIcon doc={doc} />
         <button
           type="button"
           aria-label={t("documents.deleteNamed", { name: doc.name })}
@@ -268,6 +280,7 @@ export function DocumentsPage() {
         </label>
       )}
       {body()}
+      <DocumentPreview docs={preview.docs} index={preview.index} onIndex={preview.setIndex} onClose={preview.close} />
       {driveOn && uploadFor !== null && subjectsList.length > 0 && (
         <UploadDialog open onClose={() => setUploadFor(null)} subjectId={uploadFor} eventId={null} subjects={subjectsList} />
       )}

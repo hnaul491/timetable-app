@@ -193,6 +193,7 @@ export interface DocumentItem {
   size: number;
   tag: DocumentTag;
   web_view_link: string;
+  preview_url?: string | null;
   created_at: string;
 }
 
@@ -212,6 +213,7 @@ export interface DocListItem {
   mime_type: string;
   size: number;
   web_view_link: string;
+  preview_url?: string | null;
   created_at: string;
 }
 

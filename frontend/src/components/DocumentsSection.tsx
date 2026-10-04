@@ -3,11 +3,13 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
-import { docBadge, formatSize } from "../lib/documents";
+import { docBadge, formatSize, previewOfItem } from "../lib/documents";
 import { useDeleteDocument } from "../lib/useDeleteDocument";
+import { useDocPreview } from "../lib/useDocPreview";
 import { dayLabel, formatLongDate, parisParts } from "../lib/time";
 import type { AllDocuments, DocumentItem, DocumentTag, GoogleStatus } from "../types";
 import { ErrorPanel } from "./Banners";
+import { DocumentPreview, OpenInDriveIcon } from "./DocumentPreview";
 import { UploadDialog } from "./UploadDialog";
 import { SkeletonRows } from "./ui/Skeleton";
 
@@ -29,6 +31,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
   const locale = useLocale();
   const [filter, setFilter] = useState<Filter>("all");
   const [uploading, setUploading] = useState(false);
+  const preview = useDocPreview();
   const compact = eventId !== undefined;
   const headingId = `documents-heading-${subjectId}-${eventId ?? "all"}`;
 
@@ -55,24 +58,27 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
     return (db[0].event_start ?? "").localeCompare(da[0].event_start ?? "");
   });
 
+  // previous / next walk the files in the order they are shown
+  const flat = compact ? shown : ordered.flatMap(([, list]) => list);
+  const previews = flat.map(previewOfItem);
   const row = (doc: DocumentItem) => (
     <li key={doc.id} className="flex items-center gap-3 border-b border-subtle py-2.5">
       <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-[11px] font-bold text-accent-strong">{docBadge(doc)}</span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-semibold">{doc.name}</span>
+        <a
+          href={doc.web_view_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => preview.onOpen(e, previews, flat.indexOf(doc))}
+          className="truncate text-sm font-semibold hover:text-accent"
+        >
+          {doc.name}
+        </a>
         <span className="text-xs text-muted">
           {t(TAG_LABEL[doc.tag])} · {formatSize(doc.size, locale)}
         </span>
       </span>
-      <a
-        href={doc.web_view_link}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={t("documents.openNamed", { name: doc.name })}
-        className="flex h-9 items-center rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink hover:bg-surface-2"
-      >
-        {t("documents.open")}
-      </a>
+      <OpenInDriveIcon doc={doc} />
       <button
         type="button"
         aria-label={t("documents.deleteNamed", { name: doc.name })}
@@ -147,6 +153,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
           </div>
         ))
       )}
+      <DocumentPreview docs={preview.docs} index={preview.index} onIndex={preview.setIndex} onClose={preview.close} />
       {driveOn && uploading && <UploadDialog open onClose={() => setUploading(false)} subjectId={subjectId} eventId={eventId ?? null} />}
     </section>
   );

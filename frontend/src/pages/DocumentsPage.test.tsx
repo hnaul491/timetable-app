@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +24,7 @@ const gen = { id: 2, name: "GenAI 101", color: "#E65C2E", hidden: true };
 const unused = { id: 3, name: "Cơ sở dữ liệu", color: "#2EE65C", hidden: false };
 const doc = (over: Partial<DocListItem>): DocListItem => ({
   id: 1, subject: db, event: null, tag: "other", name: "syllabus.pdf", mime_type: "application/pdf", size: 2048,
-  web_view_link: "https://drive.example/1", created_at: "2026-10-01T10:00:00Z", ...over,
+  web_view_link: "https://drive.example/1", preview_url: "https://drive.google.com/file/d/PREVIEW1234/preview", created_at: "2026-10-01T10:00:00Z", ...over,
 });
 const DATA: AllDocuments = {
   documents: [
@@ -286,5 +286,22 @@ describe("DocumentsPage", () => {
     expect(screen.getByRole("combobox", { name: translate("vi", "documents.page.sortLabel") })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: translate("vi", "documents.filterSlides") })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: translate("vi", "documents.page.openFolderNamed", { name: "Relational Databases" }) })).toBeInTheDocument();
+  });
+
+  it("opens a file in the preview dialog, walks the visible list and keeps Drive links on the rows", async () => {
+    setup();
+    const row = await screen.findByRole("link", { name: "Lecture 1.pptx" });
+    expect(row).toHaveAttribute("href", "https://drive.example/1");
+    expect(screen.getByRole("link", { name: "Open Lecture 1.pptx in Drive" })).toHaveAttribute("target", "_blank");
+    expect(fireEvent.click(row, { ctrlKey: true })).toBe(true);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await userEvent.click(row);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByTitle("Lecture 1.pptx")).toHaveAttribute("src", "https://drive.google.com/file/d/PREVIEW1234/preview");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Next" }));
+    expect(within(dialog).getByTitle("syllabus.pdf")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Next" }));
+    expect(within(dialog).getByTitle("Bài tập tuần 1.docx")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Next" })).toBeDisabled();
   });
 });

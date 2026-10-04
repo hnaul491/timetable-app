@@ -1,7 +1,7 @@
 import type { MessageKey } from "../i18n";
 
-export type ShortcutGroup = "everywhere" | "calendar" | "settings" | "freeTime" | "assistant" | "event" | "panel" | "other";
-export const SHORTCUT_GROUPS: ShortcutGroup[] = ["everywhere", "calendar", "settings", "freeTime", "assistant", "event", "panel", "other"];
+export type ShortcutGroup = "everywhere" | "calendar" | "settings" | "freeTime" | "assistant" | "documents" | "event" | "panel" | "other";
+export const SHORTCUT_GROUPS: ShortcutGroup[] = ["everywhere", "calendar", "settings", "freeTime", "assistant", "documents", "event", "panel", "other"];
 
 export const GROUP_TITLE: Record<ShortcutGroup, MessageKey> = {
   everywhere: "shortcuts.groupGlobal",
@@ -9,6 +9,7 @@ export const GROUP_TITLE: Record<ShortcutGroup, MessageKey> = {
   settings: "shortcuts.groupSettings",
   freeTime: "shortcuts.groupFreeTime",
   assistant: "shortcuts.groupAssistant",
+  documents: "shortcuts.groupDocuments",
   event: "shortcuts.settings.groups.event",
   panel: "shortcuts.settings.groups.panel",
   other: "shortcuts.settings.groups.other",
@@ -75,6 +76,8 @@ export const SHORTCUT_CATALOG: CatalogEntry[] = [
   { id: "free-day-7", keys: "7", label: "shortcuts.freeDay7", group: "freeTime" },
   { id: "assistant-focus", keys: "i", label: "shortcuts.assistantFocus", group: "assistant" },
   { id: "assistant-stop", keys: "Escape", label: "shortcuts.assistantStop", group: "assistant" },
+  { id: "doc-prev", keys: "ArrowLeft", label: "shortcuts.docPrev", group: "documents" },
+  { id: "doc-next", keys: "ArrowRight", label: "shortcuts.docNext", group: "documents" },
   { id: "note-save", keys: "Mod+s", label: "shortcuts.save", group: "event" },
   { id: "form-save", keys: "Mod+s", label: "shortcuts.save", group: "panel" },
   { id: "panel-delete", keys: "Mod+d", label: "shortcuts.delete", group: "panel" },
