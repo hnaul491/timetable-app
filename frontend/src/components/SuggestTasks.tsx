@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
+import { aiErrorText } from "../lib/aiError";
 import { apiFetch } from "../lib/api";
 import { invalidateTaskViews } from "../lib/invalidate";
 import type { AiStatus, AiSuggestion, NoteTab } from "../types";
@@ -9,6 +10,7 @@ import { useToast } from "./ui/Toast";
 /** "Suggest tasks" under the class note editor: the assistant proposes, the user adds. */
 export function SuggestTasks({ eventId, subjectId, tab }: { eventId: number; subjectId: number | null; tab: NoteTab }) {
   const t = useT();
+  const locale = useLocale();
   const toast = useToast();
   const queryClient = useQueryClient();
   const status = useQuery({ queryKey: ["ai-status"], queryFn: () => apiFetch<AiStatus>("/api/ai/status") });
@@ -16,9 +18,9 @@ export function SuggestTasks({ eventId, subjectId, tab }: { eventId: number; sub
   const enabled = status.data?.enabled === true;
 
   const suggest = useMutation({
-    mutationFn: () => apiFetch<{ suggestions: AiSuggestion[] }>("/api/ai/suggest", { method: "POST", body: JSON.stringify({ event_id: eventId, tab }) }),
+    mutationFn: () => apiFetch<{ suggestions: AiSuggestion[] }>("/api/ai/suggest", { method: "POST", body: JSON.stringify({ event_id: eventId, tab, locale }) }),
     onSuccess: (data) => setItems(data.suggestions),
-    onError: (error) => toast.error(t("ai.suggestFailed", { message: error.message }), { retry: () => suggest.mutate() }),
+    onError: (error) => toast.error(t("ai.suggestFailed", { message: aiErrorText(error, t) }), { retry: () => suggest.mutate() }),
   });
   const add = useMutation({
     mutationFn: (s: AiSuggestion) =>

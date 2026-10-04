@@ -7,10 +7,13 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
+import { aiErrorText } from "../lib/aiError";
 import { invalidateTaskViews } from "../lib/invalidate";
 import type { AiStatus, ChatMessage, PendingAction } from "../types";
 
 const PRIVACY_KEY = "timetable:ai-privacy";
+const MAX_LENGTH = 2000;
+const COUNTER_FROM = 1800;
 const QUICK: MessageKey[] = ["ai.quickDue", "ai.quickFree", "ai.quickQuiz", "ai.quickSummary"];
 
 function privacyDismissed(): boolean {
@@ -22,7 +25,8 @@ function privacyDismissed(): boolean {
 }
 
 /** Plain-text paragraphs and bullet lists; the text is never interpreted as HTML. */
-function RichText({ text }: { text: string }) {
+function RichText({ text }: { text: unknown }) {
+  if (typeof text !== "string") return null;
   const blocks: { bullets: boolean; lines: string[] }[] = [];
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
@@ -73,17 +77,19 @@ export function AssistantPage() {
 
   const send = useMutation({
     mutationFn: (message: string) =>
-      apiFetch<ChatMessage>("/api/chat", { method: "POST", body: JSON.stringify({ message, context: { path: location.pathname }, locale }) }),
+      apiFetch<{ message: ChatMessage }>("/api/chat", { method: "POST", body: JSON.stringify({ message, context: { path: location.pathname }, locale }) }),
     onSuccess: (answer, message) => {
       queryClient.setQueryData<{ messages: ChatMessage[] }>(["chat"], (old) => {
         const list = old?.messages ?? [];
         const mine: ChatMessage = { id: -Date.now(), role: "user", content: message, actions: [] };
-        return { messages: [...list, mine, answer] };
+        return { messages: [...list, mine, answer.message] };
       });
+      // pick up the stored ids of both messages
+      queryClient.invalidateQueries({ queryKey: ["chat"] });
     },
     onError: (error, message) => {
       setText((cur) => cur || message);
-      toast.error(t("ai.sendFailed", { message: error.message }));
+      toast.error(t("ai.sendFailed", { message: aiErrorText(error, t) }));
     },
     onSettled: () => setSending(null),
   });
@@ -238,10 +244,15 @@ export function AssistantPage() {
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
               rows={2}
-              maxLength={4000}
+              maxLength={MAX_LENGTH}
               placeholder={t("ai.placeholder")}
               className="min-w-0 flex-1 rounded-xl border border-line-strong p-3 text-sm"
             />
+            {text.length > COUNTER_FROM && (
+              <span className="self-center text-xs text-muted" aria-live="polite">
+                {t("ai.charsLeft", { count: MAX_LENGTH - text.length })}
+              </span>
+            )}
             <button type="submit" disabled={!text.trim() || send.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60">
               {t("ai.send")}
             </button>

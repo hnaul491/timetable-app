@@ -208,8 +208,8 @@ export interface AiSuggestion {
 
 export interface PendingAction {
   id: number;
-  kind: "task" | "event" | "note" | "study_block";
-  status: "pending" | "confirmed" | "dismissed";
+  kind: "task" | "event" | "note" | "study_blocks" | (string & {});
+  status: "pending" | "confirmed" | "dismissed" | "expired";
   summary: string;
   payload: Record<string, unknown>;
   expires_at: string | null;

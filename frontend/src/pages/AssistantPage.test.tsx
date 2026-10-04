@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import { ToastProvider } from "../components/ui/Toast";
 import { I18nProvider } from "../i18n";
 import { ApiError } from "../lib/api";
 import { ShortcutProvider } from "../lib/shortcuts";
+import { chatSendResponse, expiredAction, studyBlocksAction, taskAction } from "../test/aiContract";
 import type { ChatMessage, PendingAction } from "../types";
 import { AssistantPage } from "./AssistantPage";
 
@@ -17,19 +18,24 @@ vi.mock("../lib/api", async (importOriginal) => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
 }));
 
-const action = (over: Partial<PendingAction> = {}): PendingAction => ({
-  id: 11, kind: "task", status: "pending", summary: "Revise chapter 3", payload: { title: "Revise chapter 3" }, expires_at: null, ...over,
-});
+const action = (over: Partial<PendingAction> = {}): PendingAction => ({ ...taskAction, ...over });
 const reply = (over: Partial<ChatMessage> = {}): ChatMessage => ({ id: 2, role: "assistant", content: "Here is a plan.\n- Read notes\n- Do ex 3", actions: [action()], ...over });
 
 let history: ChatMessage[];
 let enabled: boolean;
+let sendAnswer: () => ChatMessage;
 function route(extra: (path: string, init?: RequestInit) => unknown = () => undefined) {
   apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
     const custom = extra(path, init);
     if (custom !== undefined) return custom;
     if (path === "/api/ai/status") return { enabled, model: "gemini-2.5-flash" };
     if (path === "/api/chat" && (!init || !init.method)) return { messages: history };
+    if (path === "/api/chat" && init?.method === "POST") {
+      // like the real server: the exchange is stored, the answer is {message}
+      const answer = sendAnswer();
+      history = [...history, { id: 100, role: "user", content: JSON.parse(String(init.body)).message, actions: [] }, answer];
+      return chatSendResponse(answer);
+    }
     return undefined;
   });
 }
@@ -61,13 +67,15 @@ describe("AssistantPage", () => {
     localStorage.clear();
     history = [];
     enabled = true;
+    sendAnswer = () => reply();
   });
 
   it("sends a message and shows the reply as text with its action card", async () => {
-    route((path, init) => (path === "/api/chat" && init?.method === "POST" ? reply({ content: "Hi <b>x</b>\n- Read notes" }) : undefined));
+    sendAnswer = () => reply({ id: 101, content: "Hi <b>x</b>\n- Read notes" });
+    route();
     renderPage();
     await userEvent.type(await screen.findByRole("textbox", { name: "Message the assistant" }), "plan my week{Enter}");
-    expect(await screen.findByText("Revise chapter 3")).toBeInTheDocument();
+    expect(await screen.findByText("Task: Revise chapter 3")).toBeInTheDocument();
     expect(screen.getByText("plan my week")).toBeInTheDocument();
     expect(screen.getByText("Read notes").closest("li")).not.toBeNull();
     expect(screen.getByText(/Hi <b>x<\/b>/)).toBeInTheDocument(); // rendered as text, not HTML
@@ -123,7 +131,8 @@ describe("AssistantPage", () => {
   });
 
   it("quick prompts send their text; the privacy notice is dismissible per device", async () => {
-    route((path, init) => (path === "/api/chat" && init?.method === "POST" ? reply({ actions: [] }) : undefined));
+    sendAnswer = () => reply({ actions: [] });
+    route();
     renderPage();
     expect(await screen.findByText(/sent to Google/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
@@ -144,6 +153,51 @@ describe("AssistantPage", () => {
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Clear chat" }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/api/chat", expect.objectContaining({ method: "DELETE" })));
+  });
+
+  it("renders a study_blocks action and an unknown kind without throwing", async () => {
+    history = [reply({ actions: [studyBlocksAction, action({ id: 20, kind: "mystery", summary: "Something new", payload: {} })] })];
+    route();
+    renderPage();
+    expect(await screen.findByText("Study blocks")).toBeInTheDocument();
+    expect(screen.getByText("2 study blocks for Relational Databases")).toBeInTheDocument();
+    expect(screen.getByText("Suggestion")).toBeInTheDocument();
+    expect(screen.getByText("Something new")).toBeInTheDocument();
+  });
+
+  it("an expired action has no buttons", async () => {
+    history = [reply({ actions: [expiredAction] })];
+    route();
+    renderPage();
+    expect(await screen.findByText("Expired")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
+  });
+
+  it("tolerates a message whose content is not a string", async () => {
+    history = [reply({ content: null as unknown as string, actions: [] })];
+    route();
+    renderPage();
+    expect(await screen.findByRole("textbox", { name: "Message the assistant" })).toBeInTheDocument();
+  });
+
+  it("shows the translated unavailable text on a gateway timeout", async () => {
+    route((path, init) => {
+      if (path === "/api/chat" && init?.method === "POST") throw new ApiError(504, "Gateway Timeout");
+      return undefined;
+    });
+    renderPage();
+    await userEvent.type(await screen.findByRole("textbox", { name: "Message the assistant" }), "hello{Enter}");
+    expect(await screen.findByText(/The assistant is not available right now/)).toBeInTheDocument();
+  });
+
+  it("limits the composer to 2000 characters and counts down near the end", async () => {
+    route();
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "Message the assistant" });
+    expect(box).toHaveAttribute("maxlength", "2000");
+    expect(screen.queryByText(/characters left/)).toBeNull();
+    fireEvent.change(box, { target: { value: "x".repeat(1850) } });
+    expect(screen.getByText("150 characters left")).toBeInTheDocument();
   });
 
   it("renders in Vietnamese", async () => {

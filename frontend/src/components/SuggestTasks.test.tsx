@@ -43,7 +43,7 @@ describe("SuggestTasks", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Suggest tasks" }));
     expect(await screen.findByText("Redo exercise 4")).toBeInTheDocument();
     const suggest = apiFetch.mock.calls.find((c) => c[0] === "/api/ai/suggest")!;
-    expect(JSON.parse(suggest[1].body)).toEqual({ event_id: 7, tab: "after" });
+    expect(JSON.parse(suggest[1].body)).toEqual({ event_id: 7, tab: "after", locale: "en" });
     await userEvent.click(screen.getAllByRole("button", { name: "Add" })[0]);
     await waitFor(() => {
       const post = apiFetch.mock.calls.find((c) => c[0] === "/api/tasks")!;
@@ -65,6 +65,15 @@ describe("SuggestTasks", () => {
     enabled = false;
     setup();
     await waitFor(() => expect(screen.getByRole("button", { name: "Suggest tasks" })).toBeDisabled());
+  });
+
+  it("sends the interface language", async () => {
+    setup("vi");
+    await userEvent.click(await screen.findByRole("button", { name: "Gợi ý công việc" }));
+    await waitFor(() => {
+      const suggest = apiFetch.mock.calls.find((c) => c[0] === "/api/ai/suggest")!;
+      expect(JSON.parse(suggest[1].body).locale).toBe("vi");
+    });
   });
 
   it("renders in Vietnamese", async () => {

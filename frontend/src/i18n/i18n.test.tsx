@@ -80,6 +80,14 @@ describe("i18n", () => {
   });
 
   it("unknown server texts are kept", () => {
+    expect(translateServerMessage("this action has expired", "vi")).toBe("Hành động này đã hết hạn");
+    expect(translateServerMessage("this action was already confirmed", "vi")).toBe("Hành động này đã được thêm rồi");
+    expect(translateServerMessage("this action was already weird", "vi")).toBe("Hành động này đã được xử lý (weird)");
+    expect(translateServerMessage("this class no longer exists", "vi")).toBe("Lớp học này không còn tồn tại");
+    expect(translateServerMessage("this subject no longer exists", "vi")).toBe("Môn học này không còn tồn tại");
+    expect(translateServerMessage("the note would become too long", "vi")).toBe("Ghi chú sẽ quá dài");
+    expect(translateServerMessage("unknown event", "vi")).toBe("Không tìm thấy sự kiện");
+    expect(translateServerMessage("event does not belong to this subject", "vi")).toBe("Sự kiện không thuộc môn học này");
     expect(translateServerMessage("something new from the server", "vi")).toBe("something new from the server");
   });
 });
