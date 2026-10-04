@@ -24,6 +24,22 @@ RATE_MSG = "AI limit reached, try again later"
 UNAVAILABLE_MSG = "The assistant is not available right now"
 # an empty candidate that finished normally is an empty answer, not an outage
 _EMPTY_FINISH = ("STOP", None)
+# a stream ending with any other finishReason (SAFETY, MALFORMED_FUNCTION_CALL, ...) is a failure
+_OK_FINISH = ("STOP", None, "MAX_TOKENS")
+
+
+def _sse_payloads(lines: Iterator[str]) -> Iterator[str]:
+    """Join the consecutive `data:` lines of each SSE event with "\n" (per the SSE spec); a blank line ends an event."""
+    data: list[str] = []
+    for line in lines:
+        if line == "":
+            if data:
+                yield "\n".join(data)
+                data = []
+        elif line.startswith("data:"):
+            data.append(line[5:].removeprefix(" "))
+    if data:
+        yield "\n".join(data)
 
 
 def _content(turn: Turn) -> dict:
@@ -117,6 +133,16 @@ class GeminiProvider:
         calls = [c for c in (self._call(p) for p in parts) if c is not None]
         return LLMReply("".join(texts) if texts else None, calls)
 
+    @staticmethod
+    def _stream_error(error) -> Exception:
+        """An in-band {"error": {...}} chunk: log its status and message (never the key), map like an HTTP error."""
+        error = error if isinstance(error, dict) else {}
+        status, message = str(error.get("status", "")), str(error.get("message", ""))[:300]
+        logger.warning("Gemini stream error: %s %s %s", error.get("code", ""), status, message)
+        if status == "RESOURCE_EXHAUSTED" or error.get("code") == 429:
+            return AIRateLimited(RATE_MSG)
+        return AIUnavailable(UNAVAILABLE_MSG)
+
     def stream(self, system: str, turns: list[Turn], tools: list[ToolDecl],
                timeout: float | None = None) -> Iterator[StreamPart]:
         """Yield text deltas and function calls as Gemini produces them. Errors map like generate(), raised before
@@ -136,15 +162,24 @@ class GeminiProvider:
                     _log_google_error(resp)
                     failure = AIUnavailable(UNAVAILABLE_MSG)
                 else:
-                    for line in resp.iter_lines():
-                        if not line.startswith("data:"):
-                            continue
-                        payload = line[5:].strip()
+                    finish = None
+                    for payload in _sse_payloads(resp.iter_lines()):
+                        payload = payload.strip()
                         if not payload or payload == "[DONE]":
                             continue
                         try:
-                            candidates = json.loads(payload)["candidates"]
-                            content = candidates[0].get("content") if candidates else None
+                            data = json.loads(payload)
+                            if "error" in data:
+                                failure = self._stream_error(data["error"])
+                                break
+                            block = (data.get("promptFeedback") or {}).get("blockReason")
+                            candidates = data.get("candidates")
+                            if block or not candidates:
+                                logger.warning("Gemini stream blocked: blockReason=%s", block)
+                                failure = AIUnavailable(UNAVAILABLE_MSG)
+                                break
+                            finish = candidates[0].get("finishReason") or finish
+                            content = candidates[0].get("content")
                             parts = content.get("parts") if isinstance(content, dict) else None
                             if parts is None:
                                 continue  # e.g. a final chunk carrying only finishReason/usage
@@ -161,6 +196,9 @@ class GeminiProvider:
                             call = self._call(p)
                             if call is not None:
                                 yield CallPart(call)
+                    if failure is None and finish not in _OK_FINISH:
+                        logger.warning("Gemini stream ended with finishReason=%s", finish)
+                        failure = AIUnavailable(UNAVAILABLE_MSG)
         except httpx.HTTPError:
             failure = AIUnavailable(UNAVAILABLE_MSG)
         if failure is not None:

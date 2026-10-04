@@ -257,3 +257,52 @@ def test_stream_garbled_chunk_is_unavailable():
     p, _ = make(sse_handler("data: {not json\n\n"))
     with pytest.raises(AIUnavailable):
         list(p.stream("S", [Turn("user", text="x")], []))
+
+
+def raw_sse(*events):
+    return "".join(f"data: {json.dumps(e)}\n\n" for e in events)
+
+
+def finish_chunk(reason, parts=()):
+    return {"candidates": [{"content": {"role": "model", "parts": list(parts)}, "finishReason": reason}]}
+
+
+@pytest.mark.parametrize("reason", ["SAFETY", "MALFORMED_FUNCTION_CALL", "RECITATION"])
+def test_stream_bad_finish_reason_is_unavailable(reason):
+    p, _ = make(sse_handler(raw_sse(finish_chunk(reason))))
+    with pytest.raises(AIUnavailable):
+        list(p.stream("S", [Turn("user", text="x")], []))
+
+
+def test_stream_stop_and_max_tokens_are_fine():
+    from app.ai.provider import TextDelta
+    for reason in ("STOP", "MAX_TOKENS"):
+        p, _ = make(sse_handler(raw_sse(finish_chunk(reason, [{"text": "a"}]))))
+        assert list(p.stream("S", [Turn("user", text="x")], [])) == [TextDelta("a")]
+
+
+def test_stream_empty_candidates_and_block_reason_are_unavailable():
+    for event in ({"candidates": []}, {"promptFeedback": {"blockReason": "SAFETY"}}):
+        p, _ = make(sse_handler(raw_sse(event)))
+        with pytest.raises(AIUnavailable):
+            list(p.stream("S", [Turn("user", text="x")], []))
+
+
+def test_stream_in_band_error_logged_and_mapped(caplog):
+    err = {"error": {"code": 500, "status": "INTERNAL", "message": f"oops {'x' * 400}"}}
+    p, _ = make(sse_handler(raw_sse(err)))
+    with caplog.at_level("WARNING"), pytest.raises(AIUnavailable) as info:
+        list(p.stream("S", [Turn("user", text="x")], []))
+    assert "INTERNAL" in caplog.text and "x" * 301 not in caplog.text and KEY not in caplog.text
+    assert info.value.__cause__ is None
+    p, _ = make(sse_handler(raw_sse({"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": "quota"}})))
+    with pytest.raises(AIRateLimited):
+        list(p.stream("S", [Turn("user", text="x")], []))
+
+
+def test_stream_multiline_data_joined_with_newline():
+    from app.ai.provider import TextDelta
+    body = ('data: {"candidates": [{"content": {"parts":\n'.replace("\n", "") + "\n"
+            'data: [{"text": "hi"}]}}]}\n\n')
+    p, _ = make(sse_handler(body))
+    assert list(p.stream("S", [Turn("user", text="x")], [])) == [TextDelta("hi")]
