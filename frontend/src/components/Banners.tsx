@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase";
 import { formatTime, parisParts } from "../lib/time";
 import type { GoogleStatus, SyncStatus } from "../types";
 
-function Banner({ tone, children }: { tone: "warn" | "error"; children: ReactNode }) {
+export function Banner({ tone, children }: { tone: "warn" | "error"; children: ReactNode }) {
   const styles = tone === "warn" ? "border-warn-line bg-warn-soft text-warn" : "border-danger-line bg-danger-soft text-danger";
   return <div className={`rounded-xl border px-4 py-3 text-sm ${styles}`}>{children}</div>;
 }

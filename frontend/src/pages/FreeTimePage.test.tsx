@@ -16,7 +16,8 @@ vi.mock("../lib/api", async (importOriginal) => ({
 
 const result = (over: Partial<FreeTimeResult> = {}): FreeTimeResult => ({
   window: { from: "06:00", to: "08:00" }, start: "2026-10-01", end: "2026-10-07", buffer: 0, min_free: null,
-  counted_days: 3, free_days: 1,
+  counted_days: 3, uncovered_days: 0, free_days: 1,
+  semester: { id: 1, name: "SE S1 2026", start: "2026-09-01", end: "2027-01-30" }, missing_sections: [],
   by_weekday: [
     { weekday: 0, free: 0, total: 1 }, { weekday: 1, free: 0, total: 0 }, { weekday: 2, free: 1, total: 1 },
     { weekday: 3, free: 0, total: 1 }, { weekday: 4, free: 0, total: 0 }, { weekday: 5, free: 0, total: 0 }, { weekday: 6, free: 0, total: 0 },
@@ -202,9 +203,71 @@ describe("FreeTimePage", () => {
     expect(screen.getByText(/free from 06:00 to 08:00/)).toHaveTextContent("keeping 30 min to get to class");
     expect(within(screen.getByTestId("wd-2")).getByText("1/1")).toBeInTheDocument();
     expect(screen.queryByTestId("wd-1")).not.toBeInTheDocument();
-    const cells = screen.getAllByRole("button", { name: /, (free|busy|45m|not counted)/i });
+    const cells = screen.getAllByRole("button", { name: /, (free|busy|45 min free|not counted)/i });
     expect(cells.map((c) => c.getAttribute("data-status"))).toEqual(["busy", "off", "partial", "free"]);
     expect(within(cells[2]).getByText("45m")).toBeInTheDocument();
+  });
+
+  it("keeps the big number to checked days and shows the outside-semester notice and ? cells", async () => {
+    const days = result().days.map((d) => ({ ...d }));
+    days[3] = { ...days[3], status: "unknown", counts: false };
+    apiFetch.mockImplementation(async (path: string) => (path.startsWith("/api/semesters") ? [] : result({ days, uncovered_days: 1, free_days: 0 })));
+    renderPage();
+    expect(await screen.findByTestId("free-big")).toHaveTextContent("0 of 2 days");
+    expect(screen.getByText("1 days are outside SE S1 2026 and are not counted.")).toBeInTheDocument();
+    const cell = screen.getByRole("button", { name: /outside the semester/ });
+    expect(cell).toHaveAttribute("data-status", "unknown");
+    expect(within(cell).getByText("?")).toBeInTheDocument();
+    expect(cell.className).toContain("border-dashed");
+  });
+
+  it("links to Settings when there is no active semester", async () => {
+    const days = result().days.map((d) => ({ ...d, status: "unknown" as const, counts: false }));
+    apiFetch.mockImplementation(async (path: string) => (path.startsWith("/api/semesters") ? [] : result({ days, uncovered_days: 3, free_days: 0, semester: null })));
+    renderPage();
+    expect(await screen.findByTestId("free-big")).toHaveTextContent("0 of 0 days");
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings/school");
+  });
+
+  it("shows the missing sections notice with a link to Settings", async () => {
+    apiFetch.mockImplementation(async (path: string) => (path.startsWith("/api/semesters") ? [] : result({ missing_sections: [{ subject_id: 4, name: "French" }, { subject_id: null, name: "Tutorat" }] })));
+    renderPage();
+    await screen.findByTestId("free-big");
+    expect(screen.getByText(/French, Tutorat/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Choose your groups" })).toHaveAttribute("href", "/settings/school");
+  });
+
+  it("describes the response period, not the form, in the summary", async () => {
+    const user = userEvent.setup();
+    let pending = false;
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path.startsWith("/api/semesters")) return [];
+      if (pending) return new Promise(() => {});
+      return result({ start: "2026-10-01", end: "2026-10-31" });
+    });
+    renderPage();
+    await screen.findByTestId("free-big");
+    expect(screen.getByText(/free from 06:00 to 08:00 in October 2026/)).toBeInTheDocument();
+    pending = true;
+    await user.selectOptions(screen.getByLabelText("Period"), "week");
+    // the form moved on, the old response is still on screen: the sentence keeps its own dates
+    expect(screen.getByText(/free from 06:00 to 08:00 from 1 October 2026 to 31 October 2026/)).toBeInTheDocument();
+  });
+
+  it("recomputes today when the tab becomes visible after midnight", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-30T12:00:00Z") });
+    try {
+      renderPage();
+      await screen.findByTestId("free-big");
+      expect(lastParams().get("start")).toBe("2026-10-01");
+      vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      await waitFor(() => expect(lastParams().get("start")).toBe("2026-11-01"), { timeout: 3000 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows blocker detail on focus and opens the calendar on click", async () => {
@@ -215,6 +278,8 @@ describe("FreeTimePage", () => {
     const busy = screen.getAllByRole("button", { name: /busy/ })[0];
     act(() => busy.focus());
     expect(screen.getByTestId("free-detail")).toHaveTextContent(/Databases TP 0[67]:30–0[89]:00 \(\+30 min travel\)/);
+    act(() => screen.getByRole("button", { name: /45 min free/ }).focus());
+    expect(screen.getByTestId("free-detail")).toHaveTextContent("longest free stretch 45 min");
     await user.click(busy);
     expect(screen.getByTestId("where")).toHaveTextContent("/?date=2026-10-01");
   });
@@ -268,5 +333,7 @@ describe("FreeTimePage", () => {
     expect(screen.getByTestId("free-big")).toHaveTextContent("1 trên 3 ngày");
     expect(screen.getByText(/rảnh từ 06:00 đến 08:00/)).toBeInTheDocument();
     expect(screen.getByText("Theo thứ trong tuần")).toBeInTheDocument();
+    const partial = screen.getByRole("button", { name: /rảnh 45 phút/ });
+    expect(within(partial).getByText("45 ph")).toBeInTheDocument();
   });
 });

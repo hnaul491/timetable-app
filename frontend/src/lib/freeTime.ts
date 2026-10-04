@@ -22,7 +22,7 @@ export interface Blocker {
   end: string;
   kind: string;
 }
-export type DayStatus = "free" | "partial" | "busy" | "off";
+export type DayStatus = "free" | "partial" | "busy" | "off" | "unknown";
 export interface FreeDay {
   date: string;
   weekday: number;
@@ -39,7 +39,11 @@ export interface FreeTimeResult {
   buffer: number;
   min_free: number | null;
   counted_days: number;
+  /** Counted days outside the active semester (or all of them without one): shown as "?", never as free. */
+  uncovered_days: number;
   free_days: number;
+  semester: { id: number; name: string; start: string | null; end: string | null } | null;
+  missing_sections: { subject_id: number | null; name: string }[];
   by_weekday: { weekday: number; free: number; total: number }[];
   days: FreeDay[];
 }
@@ -84,19 +88,19 @@ export function computeRange(form: FreeTimeForm, today: string, semesterEnd: str
   }
 }
 
-export type FreeTimeErrors = Partial<Record<"time" | "buffer" | "minFree" | "range" | "weekdays", "timeOrder" | "buffer" | "minFree" | "weekdays" | "dates" | "rangeOrder" | "rangeLong" | "noSemester">>;
+export type FreeTimeErrors = Partial<Record<"time" | "buffer" | "minFree" | "range" | "weekdays", "timeOrder" | "buffer" | "minFree" | "weekdays" | "dates" | "rangeOrder" | "rangeLong" | "noSemester" | "semesterEnded">>;
 
 const isInt = (s: string) => /^\d+$/.test(s.trim());
 
 /** Error message keys (under freeTime.errors) per invalid field; an empty object means the query can be sent. */
-export function validate(form: FreeTimeForm, range: Range | null): FreeTimeErrors {
+export function validate(form: FreeTimeForm, range: Range | null, semesterReason: "noSemester" | "semesterEnded" = "semesterEnded"): FreeTimeErrors {
   const errors: FreeTimeErrors = {};
   if (!form.from || !form.to || form.from >= form.to) errors.time = "timeOrder";
   const buffer = form.buffer.trim();
   if (!isInt(buffer) || Number(buffer) > MAX_BUFFER) errors.buffer = "buffer";
   if (form.useMinFree && (!isInt(form.minFree) || Number(form.minFree) < 1 || Number(form.minFree) > 1440)) errors.minFree = "minFree";
   if (form.weekdays.length === 0) errors.weekdays = "weekdays";
-  if (!range) errors.range = form.period === "semester" ? "noSemester" : "dates";
+  if (!range) errors.range = form.period === "semester" ? semesterReason : "dates";
   else if (range.end < range.start) errors.range = "rangeOrder";
   else if (daysBetween(range.start, range.end) > MAX_DAYS) errors.range = "rangeLong";
   return errors;

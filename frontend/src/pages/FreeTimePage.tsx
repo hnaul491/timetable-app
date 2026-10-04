@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router";
-import { ErrorPanel } from "../components/Banners";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router";
+import { Banner, ErrorPanel, MissingSectionsBanner } from "../components/Banners";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { INTL_LOCALE } from "../i18n/locale";
@@ -27,9 +27,10 @@ const CELL_STYLE: Record<FreeDay["status"], string> = {
   partial: "bg-warn-soft text-warn",
   busy: "bg-subtle text-muted",
   off: "border-dashed border-line bg-transparent text-muted opacity-60",
+  unknown: "border-dashed border-line bg-transparent text-muted",
 };
 const LEGEND_DOT: Record<FreeDay["status"], string> = {
-  free: "bg-success", partial: "bg-warn", busy: "bg-line-strong", off: "border border-dashed border-muted",
+  free: "bg-success", partial: "bg-warn", busy: "bg-line-strong", off: "border border-dashed border-muted", unknown: "border border-dashed border-warn",
 };
 
 function weekdayName(index: number, locale: "en" | "vi", style: "short" | "long"): string {
@@ -53,21 +54,36 @@ export function FreeTimePage() {
   const t = useT();
   const locale = useLocale();
   const navigate = useNavigate();
-  const today = useMemo(() => todayParis(), []);
+  const [today, setToday] = useState(() => todayParis());
   const [form, setForm] = useState<FreeTimeForm>(() => loadForm(today));
   const [focused, setFocused] = useState<string | null>(null);
   const set = (patch: Partial<FreeTimeForm>) => setForm((f) => ({ ...f, ...patch }));
 
   const semesters = useQuery({ queryKey: ["semesters"], queryFn: () => apiFetch<Semester[]>("/api/semesters") });
-  const semesterEnd = semesters.data?.find((s) => s.is_active)?.end_date ?? null;
+  const activeSemester = semesters.data?.find((s) => s.is_active);
+  const semesterEnd = activeSemester?.end_date ?? null;
   const semesterPending = form.period === "semester" && semesters.isPending;
 
   const range = computeRange(form, today, semesterEnd);
-  const errors = validate(form, range);
+  const errors = validate(form, range, activeSemester ? "semesterEnded" : "noSemester");
   const valid = Object.keys(errors).length === 0 && !semesterPending && range !== null;
   const queryString = valid ? buildQuery(form, range as Range) : null;
 
   useEffect(() => saveForm(form), [form]);
+
+  // A tab left open past midnight must not keep yesterday's "this week / this month / rest of semester".
+  useEffect(() => {
+    const refresh = () => setToday(todayParis());
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   // Typing fires on every keystroke; only the value that stays for 300 ms is sent.
   const [debounced, setDebounced] = useState<string | null>(queryString);
@@ -205,11 +221,13 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
   const intl = INTL_LOCALE[locale];
   const longDate = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString(intl, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
   const cellDate = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString(intl, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-  const monthName = new Date(`${range.start}T12:00:00Z`).toLocaleDateString(intl, { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthName = new Date(`${data.start}T12:00:00Z`).toLocaleDateString(intl, { month: "long", year: "numeric", timeZone: "UTC" });
 
+  // The sentence describes the response; the form may already have moved on while a new answer loads.
+  const samePeriod = data.start === range.start && data.end === range.end;
   const summary =
     t("freeTime.summaryWindow", { from: data.window.from, to: data.window.to }) +
-    t(`freeTime.summaryPeriod.${form.period}` as MessageKey, { month: monthName, start: longDate(data.start), end: longDate(data.end) }) +
+    t(`freeTime.summaryPeriod.${samePeriod ? form.period : "custom"}` as MessageKey, { month: monthName, start: longDate(data.start), end: longDate(data.end) }) +
     (data.buffer > 0 ? t("freeTime.summaryBuffer", { minutes: data.buffer }) : "") +
     (data.min_free ? t("freeTime.summaryMinFree", { minutes: data.min_free }) : "") +
     ".";
@@ -217,6 +235,7 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
   const detail = (day: FreeDay): string => {
     const head = cellDate(day.date);
     if (day.status === "off") return `${head} · ${t("freeTime.detailOff")}`;
+    if (day.status === "unknown") return `${head} · ${t("freeTime.detailUnknown")}`;
     if (day.status === "free") return `${head} · ${t("freeTime.detailFree", { from: data.window.from, to: data.window.to })}`;
     const parts = day.blockers.map(
       (b) => `${b.title} ${formatTime(b.start)}–${formatTime(b.end)}${data.buffer > 0 ? ` (${t("freeTime.detailTravel", { minutes: data.buffer })})` : ""}`,
@@ -226,14 +245,34 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
   };
   const focusedDay = data.days.find((d) => d.date === focused);
   const lead = data.days[0]?.weekday ?? 0;
-  const label = (day: FreeDay) => (day.status === "free" ? t("freeTime.cell.free") : day.status === "partial" ? `${day.longest_free}m` : day.status === "busy" ? t("freeTime.cell.busy") : "");
+  const label = (day: FreeDay) =>
+    day.status === "free" ? t("freeTime.cell.free")
+    : day.status === "partial" ? t("freeTime.cell.partialShort", { minutes: day.longest_free })
+    : day.status === "busy" ? t("freeTime.cell.busy")
+    : day.status === "unknown" ? "?"
+    : "";
+  const ariaStatus = (day: FreeDay) =>
+    day.status === "partial" ? t("freeTime.cell.partialLabel", { minutes: day.longest_free })
+    : day.status === "off" ? t("freeTime.legend.off")
+    : day.status === "unknown" ? t("freeTime.cell.unknownLabel")
+    : label(day);
+  const checked = data.counted_days - data.uncovered_days;
 
   return (
     <>
       {retry}
+      {data.semester === null ? (
+        <Banner tone="warn">
+          {t("freeTime.notice.noSemesterBefore")}{" "}
+          <Link to="/settings/school" className="font-semibold underline">{t("freeTime.notice.noSemesterLink")}</Link>.
+        </Banner>
+      ) : data.uncovered_days > 0 ? (
+        <Banner tone="warn">{t("freeTime.notice.outside", { count: data.uncovered_days, name: data.semester.name })}</Banner>
+      ) : null}
+      <MissingSectionsBanner names={data.missing_sections.map((m) => m.name)} />
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
         <div className="text-[40px] font-extrabold leading-tight tracking-tight tabular-nums max-md:text-[32px]" data-testid="free-big">
-          <span>{data.free_days}</span> <small className="text-lg font-bold text-muted">{t("freeTime.daysOf", { total: data.counted_days })}</small>
+          <span>{data.free_days}</span> <small className="text-lg font-bold text-muted">{t("freeTime.daysOf", { total: checked })}</small>
         </div>
         <p className="max-w-[60ch] text-ink-2">{summary}</p>
       </div>
@@ -262,7 +301,7 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
                 key={day.date}
                 type="button"
                 data-status={day.status}
-                aria-label={t("freeTime.cellLabel", { date: cellDate(day.date), status: day.status === "partial" ? `${day.longest_free}m` : day.status === "off" ? t("freeTime.legend.off") : label(day) })}
+                aria-label={t("freeTime.cellLabel", { date: cellDate(day.date), status: ariaStatus(day) })}
                 onClick={() => onOpen(day.date)}
                 onMouseEnter={() => onFocus(day.date)}
                 onFocus={() => onFocus(day.date)}
@@ -274,7 +313,7 @@ function Results({ data, form, range, focused, onFocus, onOpen, retry }: {
             ))}
           </div>
           <div className="flex flex-wrap gap-3 text-xs text-ink-2">
-            {(["free", "partial", "busy", "off"] as const).map((s) => (
+            {(["free", "partial", "busy", "off", "unknown"] as const).map((s) => (
               <span key={s}>
                 <i className={`mr-1.5 inline-block size-2.5 rounded-[3px] align-[-1px] ${LEGEND_DOT[s]}`} />
                 {t(`freeTime.legend.${s}` as MessageKey)}

@@ -21,6 +21,7 @@ export function RecurringList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring"] });
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      queryClient.invalidateQueries({ queryKey: ["free-time"] });
       queryClient.invalidateQueries({ queryKey: ["event"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success(t("settings.recurring.deleted"));

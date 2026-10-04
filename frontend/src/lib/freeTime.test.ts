@@ -43,7 +43,8 @@ describe("validate", () => {
     expect(validate(form(), { start: "2026-10-05", end: "2026-10-04" }).range).toBe("rangeOrder");
     expect(validate(form(), { start: "2026-01-01", end: "2026-07-19" }).range).toBeUndefined(); // exactly 200 days
     expect(validate(form(), { start: "2026-01-01", end: "2026-07-20" }).range).toBe("rangeLong");
-    expect(validate(form({ period: "semester" }), null).range).toBe("noSemester");
+    expect(validate(form({ period: "semester" }), null).range).toBe("semesterEnded");
+    expect(validate(form({ period: "semester" }), null, "noSemester").range).toBe("noSemester");
     expect(validate(form({ period: "custom" }), null).range).toBe("dates");
   });
   it("needs a weekday", () => expect(validate(form({ weekdays: [] }), range).weekdays).toBe("weekdays"));
