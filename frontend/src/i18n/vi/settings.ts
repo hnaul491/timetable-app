@@ -37,6 +37,7 @@ export const settings: Messages["settings"] = {
     help: 'Thêm sự kiện mới bằng "Thêm sự kiện" trên lịch. Khi xoá, các buổi có ghi chú vẫn được giữ lại.',
     none: "Chưa có.",
     occurrences: "{count} sự kiện",
+    editAria: "Sửa {title}",
     deleteAria: "Xoá {title}",
     deleteTitle: "Xoá “{title}”?",
     deleteBody: "Các buổi có ghi chú vẫn được giữ lại.",

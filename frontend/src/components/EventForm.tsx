@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useT, type MessageKey } from "../i18n";
+import { useLocale, useT, type MessageKey } from "../i18n";
+import { translateServerMessage } from "../i18n/serverMessages";
 import { apiFetch } from "../lib/api";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { useShortcut } from "../lib/shortcuts";
@@ -27,15 +28,19 @@ interface Props {
   initial?: Partial<FormValues>;
   /** When set, the form edits that custom event instead of creating one. */
   eventId?: number;
+  /** When set, the form edits that weekly repeating rule (PUT /api/recurring/{id}). */
+  ruleId?: number;
   /** The id of the saved event, or null when a weekly rule was created (it makes many events). */
   onDone: (eventId: number | null) => void;
   onCancel?: () => void;
 }
 
-export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
+export function EventForm({ initial, eventId, ruleId, onDone, onCancel }: Props) {
   const t = useT();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const editing = eventId !== undefined;
+  const ruleMode = ruleId !== undefined;
   const [form, setForm] = useState<FormValues>(() => {
     const date = initial?.date ?? todayParis();
     return {
@@ -45,7 +50,7 @@ export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
       start: "09:00",
       end: "10:00",
       room: "",
-      repeat: false,
+      repeat: ruleId !== undefined,
       weekdays: [weekdayIndex(date)],
       until: addDays(date, 84),
       ...initial,
@@ -56,9 +61,9 @@ export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
 
   const save = useMutation({
     mutationFn: async (): Promise<number | null> => {
-      if (form.repeat && !editing) {
-        await apiFetch("/api/recurring", {
-          method: "POST",
+      if (ruleMode || (form.repeat && !editing)) {
+        await apiFetch(ruleMode ? `/api/recurring/${ruleId}` : "/api/recurring", {
+          method: ruleMode ? "PUT" : "POST",
           body: JSON.stringify({
             title: form.title.trim(),
             kind: form.kind,
@@ -95,7 +100,7 @@ export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
     if (save.isPending) return;
     if (!form.title.trim()) return setError(t("event.errTitle"));
     if (!form.date || !form.start || !form.end) return setError(t("event.errTimes"));
-    const repeat = form.repeat && !editing;
+    const repeat = ruleMode || (form.repeat && !editing);
     if (repeat && !form.until) return setError(t("event.errUntil"));
     if (form.start === form.end) return setError(t("event.errSameTime"));
     if (repeat && form.weekdays.length === 0) return setError(t("event.errWeekday"));
@@ -131,8 +136,8 @@ export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
       </label>
       <div className="grid grid-cols-3 gap-3">
         <label className={labelCls}>
-          {t("event.fieldDate")}
-          <input type="date" className={field} value={form.date} onChange={(e) => set(e.target.value ? { date: e.target.value, weekdays: [weekdayIndex(e.target.value)] } : { date: "" })} />
+          {t(ruleMode ? "event.fieldFrom" : "event.fieldDate")}
+          <input type="date" className={field} value={form.date} onChange={(e) => set(e.target.value ? (ruleMode ? { date: e.target.value } : { date: e.target.value, weekdays: [weekdayIndex(e.target.value)] }) : { date: "" })} />
         </label>
         <label className={labelCls}>
           {t("event.fieldStart")}
@@ -147,13 +152,13 @@ export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
         {t("event.fieldPlace")}
         <input className={field} value={form.room} onChange={(e) => set({ room: e.target.value })} maxLength={200} />
       </label>
-      {!editing && (
+      {!editing && !ruleMode && (
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={form.repeat} onChange={(e) => set({ repeat: e.target.checked })} />
           {t("event.repeatWeekly")}
         </label>
       )}
-      {form.repeat && !editing && (
+      {(ruleMode || (form.repeat && !editing)) && (
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-1.5 text-sm font-semibold text-ink-2">{t("event.repeatOn")}</legend>
           <div className="flex flex-wrap gap-2">
@@ -170,7 +175,8 @@ export function EventForm({ initial, eventId, onDone, onCancel }: Props) {
           </label>
         </fieldset>
       )}
-      {(error || save.error) && <p role="alert" className="text-sm text-danger">{error ?? t("event.saveFailed", { message: (save.error as Error).message })}</p>}
+      {ruleMode && <p className="text-sm text-muted">{t("event.ruleNote")}</p>}
+      {(error || save.error) && <p role="alert" className="text-sm text-danger">{error ?? t("event.saveFailed", { message: translateServerMessage((save.error as Error).message, locale) })}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="submit" disabled={save.isPending} className="h-11 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50">
           {t("event.saveEvent")}

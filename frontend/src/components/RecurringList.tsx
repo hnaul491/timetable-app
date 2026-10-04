@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import type { RecurringRule } from "../types";
+import { RuleEditDialog } from "./RuleEditDialog";
 import { useConfirm } from "./ui/Confirm";
 import { useToast } from "./ui/Toast";
 
@@ -12,6 +14,7 @@ export function RecurringList() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const [editing, setEditing] = useState<number | null>(null);
   const rules = useQuery({ queryKey: ["recurring"], queryFn: () => apiFetch<RecurringRule[]>("/api/recurring") });
   const remove = useMutation({
     mutationFn: (id: number) => apiFetch(`/api/recurring/${id}`, { method: "DELETE" }),
@@ -40,13 +43,14 @@ export function RecurringList() {
       <p className="text-sm text-muted">{t("settings.recurring.help")}</p>
       {rules.data?.length === 0 && <p className="text-sm">{t("settings.recurring.none")}</p>}
       {rules.data?.map((rule) => (
-        <RuleRow key={rule.id} rule={rule} onDelete={() => void askDelete(rule)} />
+        <RuleRow key={rule.id} rule={rule} onEdit={() => setEditing(rule.id)} onDelete={() => void askDelete(rule)} />
       ))}
+      {editing !== null && <RuleEditDialog ruleId={editing} onClose={() => setEditing(null)} />}
     </section>
   );
 }
 
-function RuleRow({ rule, onDelete }: { rule: RecurringRule; onDelete: () => void }) {
+function RuleRow({ rule, onEdit, onDelete }: { rule: RecurringRule; onEdit: () => void; onDelete: () => void }) {
   const t = useT();
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
@@ -57,6 +61,14 @@ function RuleRow({ rule, onDelete }: { rule: RecurringRule; onDelete: () => void
           {rule.location ? ` · ${rule.location}` : ""} · {t("settings.recurring.occurrences", { count: rule.occurrences })}
         </span>
       </span>
+      <button
+        type="button"
+        aria-label={t("settings.recurring.editAria", { title: rule.title })}
+        onClick={onEdit}
+        className="h-9 rounded-lg px-3 text-sm font-semibold text-accent"
+      >
+        {t("common.edit")}
+      </button>
       <button
         type="button"
         aria-label={t("settings.recurring.deleteAria", { title: rule.title })}

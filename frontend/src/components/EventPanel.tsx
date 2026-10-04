@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
@@ -9,6 +9,7 @@ import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 import { ErrorPanel } from "./Banners";
 import { DocumentsSection } from "./DocumentsSection";
+import { RuleEditDialog } from "./RuleEditDialog";
 import { Dialog } from "./ui/Dialog";
 import { useConfirm } from "./ui/Confirm";
 import { SkeletonRows } from "./ui/Skeleton";
@@ -28,6 +29,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
   const confirm = useConfirm();
   const toast = useToast();
   const asking = useRef(false);
+  const [editingSeries, setEditingSeries] = useState(false);
 
   const detail = useQuery({ queryKey: ["event", String(eventId)], queryFn: () => apiFetch<EventDetail>(`/api/events/${eventId}`) });
 
@@ -155,6 +157,11 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
             <Link to={`/events/${event.id}`} className={action}>
               {t("event.openFullPage")}
             </Link>
+            {data.recurring_rule_id !== null && (
+              <button type="button" onClick={() => setEditingSeries(true)} className={action}>
+                {t("event.editSeries")}
+              </button>
+            )}
             {own && (
               <>
                 <button type="button" onClick={() => onEdit(event.id)} className={action}>
@@ -168,6 +175,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
           </div>
         </div>
       )}
+      {editingSeries && data?.recurring_rule_id != null && <RuleEditDialog ruleId={data.recurring_rule_id} onClose={() => setEditingSeries(false)} />}
     </Dialog>
   );
 }
