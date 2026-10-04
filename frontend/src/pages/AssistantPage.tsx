@@ -8,12 +8,21 @@ import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { aiErrorText } from "../lib/aiError";
+import { streamChat } from "../lib/chatStream";
 import { invalidateTaskViews } from "../lib/invalidate";
 import type { AiStatus, ChatMessage, PendingAction } from "../types";
 
 const PRIVACY_KEY = "timetable:ai-privacy";
 const MAX_LENGTH = 2000;
 const COUNTER_FROM = 1800;
+const STEP_KEYS: Record<string, MessageKey> = {
+  events: "ai.stepEvents",
+  tasks: "ai.stepTasks",
+  notes: "ai.stepNotes",
+  subjects: "ai.stepSubjects",
+  free_slots: "ai.stepFreeSlots",
+  proposal: "ai.stepProposal",
+};
 const QUICK: MessageKey[] = ["ai.quickDue", "ai.quickFree", "ai.quickQuiz", "ai.quickSummary"];
 
 function privacyDismissed(): boolean {
@@ -64,6 +73,9 @@ export function AssistantPage() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [hidePrivacy, setHidePrivacy] = useState(privacyDismissed);
+  const [live, setLive] = useState<{ user: string; text: string; steps: string[]; stopped: boolean } | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const status = useQuery({ queryKey: ["ai-status"], queryFn: () => apiFetch<AiStatus>("/api/ai/status") });
@@ -73,20 +85,24 @@ export function AssistantPage() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: "end" });
-  }, [messages.length, sending]);
+  }, [messages.length, sending, live?.text, live?.steps.length]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const commit = (message: string, answer: ChatMessage) => {
+    queryClient.setQueryData<{ messages: ChatMessage[] }>(["chat"], (old) => {
+      const list = old?.messages ?? [];
+      const mine: ChatMessage = { id: -Date.now(), role: "user", content: message, actions: [] };
+      return { messages: [...list, mine, answer] };
+    });
+    // pick up the stored ids of both messages
+    queryClient.invalidateQueries({ queryKey: ["chat"] });
+  };
 
   const send = useMutation({
     mutationFn: (message: string) =>
       apiFetch<{ message: ChatMessage }>("/api/chat", { method: "POST", body: JSON.stringify({ message, context: { path: location.pathname }, locale }) }),
-    onSuccess: (answer, message) => {
-      queryClient.setQueryData<{ messages: ChatMessage[] }>(["chat"], (old) => {
-        const list = old?.messages ?? [];
-        const mine: ChatMessage = { id: -Date.now(), role: "user", content: message, actions: [] };
-        return { messages: [...list, mine, answer.message] };
-      });
-      // pick up the stored ids of both messages
-      queryClient.invalidateQueries({ queryKey: ["chat"] });
-    },
+    onSuccess: (answer, message) => commit(message, answer.message),
     onError: (error, message) => {
       setText((cur) => cur || message);
       toast.error(t("ai.sendFailed", { message: aiErrorText(error, t) }));
@@ -124,13 +140,62 @@ export function AssistantPage() {
     if (ok) clear.mutate();
   };
 
-  const submit = (message: string) => {
+  const submit = async (message: string) => {
     const body = message.trim();
-    if (!body || send.isPending) return;
+    if (!body || send.isPending || streaming) return;
     setText("");
-    setSending(body);
-    send.mutate(body);
+    setLive({ user: body, text: "", steps: [], stopped: false });
+    setStreaming(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let gotDelta = false;
+    let ended = false; // done or error event received
+    let acc = "";
+    try {
+      await streamChat(
+        { message: body, context: { path: location.pathname }, locale },
+        {
+          onStatus: (step) => setLive((l) => l && (l.steps.includes(step) ? l : { ...l, steps: [...l.steps, step] })),
+          onDelta: (delta) => {
+            gotDelta = true;
+            acc += delta;
+            setLive((l) => l && { ...l, text: acc });
+          },
+          onDone: (answer) => {
+            ended = true;
+            commit(body, answer);
+            setLive(null);
+          },
+          onError: (msg) => {
+            ended = true;
+            setLive(null);
+            setText((cur) => cur || body);
+            toast.error(t("ai.sendFailed", { message: msg || t("ai.unavailable") }));
+          },
+        },
+        controller.signal,
+      );
+    } catch (error) {
+      if (controller.signal.aborted) {
+        setLive((l) => l && { ...l, stopped: true });
+        queryClient.invalidateQueries({ queryKey: ["chat"] });
+      } else if (!gotDelta && !ended) {
+        // the stream never produced anything: use the non-streaming endpoint
+        setLive(null);
+        setSending(body);
+        send.mutate(body);
+      } else {
+        setLive(null);
+        setText((cur) => cur || body);
+        queryClient.invalidateQueries({ queryKey: ["chat"] });
+        toast.error(t("ai.sendFailed", { message: aiErrorText(error as Error, t) }));
+      }
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
+    }
   };
+  const stop = () => abortRef.current?.abort();
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
     if (e.shiftKey && !e.ctrlKey && !e.metaKey) return;
@@ -184,7 +249,7 @@ export function AssistantPage() {
           <div className="flex flex-col gap-3" aria-live="polite">
             {chat.error && <p className="text-sm text-danger">{t("ai.loadFailed", { message: chat.error.message })}</p>}
             {chat.isPending && <Skeleton className="h-16 w-2/3" />}
-            {chat.data && messages.length === 0 && !sending && <p className="text-sm text-muted">{t("ai.empty")}</p>}
+            {chat.data && messages.length === 0 && !sending && !live && <p className="text-sm text-muted">{t("ai.empty")}</p>}
             {messages.map((m) => (
               <div key={m.id} className={`flex flex-col gap-2 ${m.role === "user" ? "items-end" : "items-start"}`}>
                 <div
@@ -208,6 +273,43 @@ export function AssistantPage() {
                 )}
               </div>
             ))}
+            {live && (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-col items-end">
+                  <div className="max-w-[85%] rounded-2xl bg-accent px-4 py-2.5 text-sm break-words text-on-accent">
+                    <RichText text={live.user} />
+                  </div>
+                </div>
+                {streaming && live.steps.length > 0 && (
+                  <ul aria-label={t("ai.typing")} className="flex flex-wrap gap-1.5">
+                    {live.steps.map((s) => (
+                      <li key={s} className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs text-ink-2">
+                        {STEP_KEYS[s] ? t(STEP_KEYS[s]) : s}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {live.text || live.stopped ? (
+                  <div className="max-w-[85%] self-start rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm break-words">
+                    <span className="sr-only">{t("ai.assistant")}: </span>
+                    <RichText text={live.text} />
+                    {streaming && <span aria-hidden="true" className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-ink-2 motion-reduce:animate-none" />}
+                    {live.stopped && <p className="mt-1 text-xs text-muted">{t("ai.stopped")}</p>}
+                  </div>
+                ) : (
+                  streaming && (
+                    <p role="status" className="self-start text-sm text-muted">
+                      {t("ai.typing")}
+                    </p>
+                  )
+                )}
+                {streaming && (
+                  <button type="button" onClick={stop} className="h-9 self-start rounded-lg border border-line px-3 text-sm font-semibold text-ink-2 hover:bg-subtle">
+                    {t("ai.stop")}
+                  </button>
+                )}
+              </div>
+            )}
             {sending && (
               <div className="flex flex-col items-end gap-2">
                 <div className="max-w-[85%] rounded-2xl bg-accent px-4 py-2.5 text-sm break-words text-on-accent">
@@ -221,7 +323,7 @@ export function AssistantPage() {
             <div ref={endRef} />
           </div>
 
-          {messages.length === 0 && !sending && (
+          {messages.length === 0 && !sending && !live && (
             <div role="group" aria-label={t("ai.quickPromptsLabel")} className="flex flex-wrap gap-2">
               {QUICK.map((k) => (
                 <button key={k} type="button" onClick={() => submit(t(k))} className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink-2 hover:bg-subtle">
@@ -253,7 +355,7 @@ export function AssistantPage() {
                 {t("ai.charsLeft", { count: MAX_LENGTH - text.length })}
               </span>
             )}
-            <button type="submit" disabled={!text.trim() || send.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60">
+            <button type="submit" disabled={!text.trim() || send.isPending || streaming} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60">
               {t("ai.send")}
             </button>
           </form>
