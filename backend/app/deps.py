@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.ai.gemini import GeminiProvider
+from app.ai.models import FallbackProvider, auto_fallback, selected_model
 from app.ai.provider import LLMProvider
 from app.config import Settings, get_settings
 from app.db import get_session
@@ -51,12 +52,19 @@ def get_drive_factory(settings: Settings = Depends(get_settings)) -> DriveFactor
     return make
 
 
-def get_llm(settings: Settings = Depends(get_settings)) -> Iterator[LLMProvider | None]:
+def get_llm(settings: Settings = Depends(get_settings),
+            session: Session = Depends(get_session)) -> Iterator[LLMProvider | None]:
     if not settings.ai_enabled:
         yield None
         return
+    model = selected_model(session, settings.gemini_model)
+    fallback = auto_fallback(session)
     http = httpx.Client(timeout=30)
+
+    def make(model_id: str) -> LLMProvider:
+        return GeminiProvider(settings.gemini_api_key, model_id, http=http)
+
     try:
-        yield GeminiProvider(settings.gemini_api_key, settings.gemini_model, http=http)
+        yield FallbackProvider(model, make) if fallback else make(model)
     finally:
         http.close()

@@ -177,7 +177,7 @@ def test_status_without_key(client):
 def test_status_with_key(client, settings):
     settings.gemini_api_key = "k-secret"
     body = client.get("/api/ai/status", headers=AUTH).json()
-    assert body == {"enabled": True, "model": settings.gemini_model}
+    assert body["enabled"] is True and body["model"] == settings.gemini_model
     assert "k-secret" not in str(body)
 
 

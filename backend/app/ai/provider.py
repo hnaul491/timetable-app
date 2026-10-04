@@ -15,6 +15,10 @@ class AIUnavailable(AIError):
     pass
 
 
+class AIModelMissing(AIUnavailable):
+    """The model id is unknown or retired (HTTP 404): another model may still work."""
+
+
 @dataclass
 class ToolDecl:
     name: str

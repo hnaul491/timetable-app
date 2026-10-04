@@ -8,6 +8,8 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.ai.assistant import run_chat, stream_chat
+from app.ai.models import (FALLBACK_KEY, MODEL_IDS, MODEL_KEY, MODELS, auto_fallback, save_setting,
+                           selected_model)
 from app.ai.provider import AIError, AIRateLimited, LLMProvider
 from app.ai.suggest import suggest_tasks
 from app.auth import require_user
@@ -18,7 +20,7 @@ from app.models import ChatMessage, Event, Note, PendingAction, Subject
 from app.routers.custom_events import add_custom_event
 from app.routers.notes import load_event
 from app.routers.tasks import add_task
-from app.schemas import (ActionResult, AiStatus, ChatHistory, ChatIn, ChatReply, CustomEventIn,
+from app.schemas import (ActionResult, AiSettingsIn, AiStatus, ChatHistory, ChatIn, ChatReply, CustomEventIn,
                          SuggestIn, SuggestOut, TaskCreate)
 from app.services.chat_out import message_out
 from app.services.events_query import describe_event
@@ -45,9 +47,27 @@ def _ai_error(exc: AIError) -> HTTPException:
     return HTTPException(status_code=502, detail=UNAVAILABLE)
 
 
+def _status(session: Session, settings: Settings) -> AiStatus:
+    return AiStatus(enabled=settings.ai_enabled, model=selected_model(session, settings.gemini_model),
+                    models=MODELS, auto_fallback=auto_fallback(session))
+
+
 @router.get("/ai/status", response_model=AiStatus)
-def status(settings: Settings = Depends(get_settings)) -> AiStatus:
-    return AiStatus(enabled=settings.ai_enabled, model=settings.gemini_model)
+def status(session: Session = Depends(get_session), settings: Settings = Depends(get_settings)) -> AiStatus:
+    return _status(session, settings)
+
+
+@router.put("/ai/settings", response_model=AiStatus)
+def put_settings(body: AiSettingsIn, session: Session = Depends(get_session),
+                 settings: Settings = Depends(get_settings)) -> AiStatus:
+    if body.model is not None and body.model not in MODEL_IDS:
+        raise HTTPException(status_code=422, detail="unknown model")
+    if body.model is not None:
+        save_setting(session, MODEL_KEY, body.model)
+    if body.auto_fallback is not None:
+        save_setting(session, FALLBACK_KEY, body.auto_fallback)
+    session.commit()
+    return _status(session, settings)
 
 
 @router.post("/ai/suggest", response_model=SuggestOut)
