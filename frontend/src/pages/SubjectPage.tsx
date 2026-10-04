@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
+import { AskAiLink } from "../components/AskAiLink";
 import { ErrorPanel } from "../components/Banners";
 import { DocumentsSection } from "../components/DocumentsSection";
 import { Skeleton } from "../components/ui/Skeleton";
@@ -47,6 +48,7 @@ export function SubjectPage() {
             <span className="text-sm text-ink-2">
               {t("subjects.detail.stats", { sessions: subject.sessions, done: subject.sessions_done, notes: subject.note_count, open: subject.open_tasks })}
             </span>
+            <AskAiLink subject={subject.id} className="self-start text-sm font-semibold text-accent" />
           </div>
           {subject.exam_start && (
             <div className="flex flex-col gap-0.5 rounded-xl bg-danger-soft px-4 py-2.5 text-danger">
