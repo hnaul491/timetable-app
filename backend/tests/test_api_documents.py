@@ -544,3 +544,27 @@ def test_a_non_google_view_link_is_never_sent(client, session, semester):
     assert _link(doc) == "https://drive.google.com/file/d/abc/view"
     doc.web_view_link = "https://docs.google.com/presentation/d/abc/edit"
     assert _link(doc) == "https://docs.google.com/presentation/d/abc/edit"
+
+
+# --- preview_url ------------------------------------------------------------------------------
+
+def test_preview_url_built_from_the_stored_id_in_every_list(client, settings, session, semester, subject):
+    event = add_event(session, semester, subject)
+    d = add_doc(session, subject, "a.pdf", event=event)
+    d.drive_file_id = "1AbC_def-GHI234"
+    session.commit()
+    expected = "https://drive.google.com/file/d/1AbC_def-GHI234/preview"
+    assert client.get("/api/documents", headers=AUTH).json()["documents"][0]["preview_url"] == expected
+    assert client.get(f"/api/subjects/{subject.id}/documents", headers=AUTH).json()[0]["preview_url"] == expected
+    assert client.get(f"/api/events/{event.id}/documents", headers=AUTH).json()[0]["preview_url"] == expected
+
+
+def test_preview_url_is_null_for_an_odd_id(client, session, semester, subject):
+    add_doc(session, subject, "a.pdf")  # id "f-a.pdf-1" has a dot
+    short = add_doc(session, subject, "b.pdf")
+    short.drive_file_id = "short"
+    session.commit()
+    docs = client.get("/api/documents", headers=AUTH).json()["documents"]
+    assert [d["preview_url"] for d in docs] == [None, None]
+    listed = client.get(f"/api/subjects/{subject.id}/documents", headers=AUTH).json()
+    assert [d["preview_url"] for d in listed] == [None, None]

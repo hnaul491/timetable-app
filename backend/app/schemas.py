@@ -378,6 +378,7 @@ class DocumentOut(BaseModel):
     size: int
     tag: str
     web_view_link: str
+    preview_url: str | None = None
     created_at: str
 
 
@@ -403,6 +404,7 @@ class DocListItem(BaseModel):
     mime_type: str
     size: int
     web_view_link: str
+    preview_url: str | None = None
     created_at: str
 
 

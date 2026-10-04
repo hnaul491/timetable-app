@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta
 
@@ -241,13 +242,20 @@ def _link(d: Document) -> str:
     return f"https://drive.google.com/file/d/{d.drive_file_id}/view"
 
 
+def _preview(d: Document) -> str | None:
+    # built only from the stored id, and only when it looks like a Drive id
+    if d.drive_file_id and re.fullmatch(r"[A-Za-z0-9_-]{10,200}", d.drive_file_id):
+        return f"https://drive.google.com/file/d/{d.drive_file_id}/preview"
+    return None
+
+
 def document_outs(session: Session, documents: list[Document]) -> list[DocumentOut]:
     ids = {d.event_id for d in documents if d.event_id is not None}
     starts = dict(session.execute(select(Event.id, Event.start_at).where(Event.id.in_(ids))).all()) if ids else {}
     return [
         DocumentOut(id=d.id, subject_id=d.subject_id, event_id=d.event_id,
                     event_start=iso_utc(starts[d.event_id]) if d.event_id in starts else None,
-                    name=d.name, mime_type=d.mime_type, size=d.size, tag=d.tag, web_view_link=_link(d), created_at=iso_utc(d.created_at))
+                    name=d.name, mime_type=d.mime_type, size=d.size, tag=d.tag, web_view_link=_link(d), preview_url=_preview(d), created_at=iso_utc(d.created_at))
         for d in documents
     ]
 
@@ -275,7 +283,7 @@ def all_documents(session: Session) -> AllDocumentsOut:
     items = [
         DocListItem(id=d.id, subject=DocSubjectOut(id=s.id, name=s.display_name, color=s.color, hidden=s.hidden),
                     event=DocEventOut(id=d.event_id, title=s.display_name, start=iso_utc(start)) if d.event_id is not None and start is not None else None,
-                    tag=d.tag, name=d.name, mime_type=d.mime_type, size=d.size, web_view_link=_link(d),
+                    tag=d.tag, name=d.name, mime_type=d.mime_type, size=d.size, web_view_link=_link(d), preview_url=_preview(d),
                     created_at=iso_utc(d.created_at))
         for d, s, start in rows
     ]
