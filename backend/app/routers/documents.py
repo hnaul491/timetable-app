@@ -12,7 +12,7 @@ from app.deps import get_drive_factory, get_now
 from app.gcal.api import ACCOUNT_ID, REFRESH_TOKEN_NAME, GoogleError, GoogleNotFound
 from app.gdrive.api import DriveFactory
 from app.models import Document, DocumentUpload, Event, GoogleAccount, Subject
-from app.schemas import DocumentOut, DocumentPatch, UploadChunkOut, UploadStartIn, UploadStartOut
+from app.schemas import AllDocumentsOut, DocumentOut, DocumentPatch, UploadChunkOut, UploadStartIn, UploadStartOut
 from app.secret_store import SecretStore
 from app.services import documents as docs
 
@@ -30,6 +30,11 @@ def _listing(session: Session, *conditions: object) -> list[DocumentOut]:
     rows = session.scalars(select(Document).where(*conditions).order_by(Document.created_at.desc(),
                                                                        Document.id.desc())).all()
     return docs.document_outs(session, list(rows))
+
+
+@router.get("/documents", response_model=AllDocumentsOut)
+def all_documents(session: Session = Depends(get_session)) -> AllDocumentsOut:
+    return docs.all_documents(session)
 
 
 @router.get("/subjects/{subject_id}/documents", response_model=list[DocumentOut])

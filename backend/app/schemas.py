@@ -381,6 +381,42 @@ class DocumentOut(BaseModel):
     created_at: str
 
 
+class DocSubjectOut(BaseModel):
+    id: int
+    name: str
+    color: str
+    hidden: bool
+
+
+class DocEventOut(BaseModel):
+    id: int
+    title: str
+    start: str
+
+
+class DocListItem(BaseModel):
+    id: int
+    subject: DocSubjectOut
+    event: DocEventOut | None
+    tag: str
+    name: str
+    mime_type: str
+    size: int
+    web_view_link: str
+    created_at: str
+
+
+class DocFolderSubject(DocSubjectOut):
+    folder_url: str | None
+
+
+class AllDocumentsOut(BaseModel):
+    documents: list[DocListItem]
+    subjects: list[DocFolderSubject]
+    root_url: str | None
+    semester_url: str | None
+
+
 class UploadStartIn(BaseModel):
     subject_id: int
     event_id: int | None = None

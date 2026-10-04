@@ -456,3 +456,82 @@ def test_merge_without_drive_touches_nothing(client, settings, session, semester
     client.app.dependency_overrides[get_drive_factory] = lambda: (lambda token: drive)
     assert client.post(f"/api/subjects/{subject.id}/merge", headers=AUTH, json={"into_id": other.id}).status_code == 200
     assert not [c for c in drive.calls if c[0] == "move"]
+
+
+# --- GET /api/documents (the all-documents page) ----------------------------------------------
+
+def add_doc(session, subject, name="a.pdf", event=None, tag="slides", at=datetime(2026, 10, 14, 9)):
+    d = Document(subject_id=subject.id, event_id=event.id if event else None, drive_file_id=f"f-{name}-{subject.id}",
+                 name=name, mime_type="application/pdf", size=2048, tag=tag, web_view_link=f"https://drive/{name}",
+                 created_at=at)
+    session.add(d)
+    session.commit()
+    return d
+
+
+def test_all_documents_requires_login(client):
+    assert client.get("/api/documents").status_code == 401
+
+
+def test_all_documents_shape_and_joins(client, session, semester, subject):
+    event = add_event(session, semester, subject)
+    add_doc(session, subject, "old.pdf", at=datetime(2026, 10, 1))
+    add_doc(session, subject, "new.pdf", event=event, tag="exercises")
+    body = client.get("/api/documents", headers=AUTH).json()
+    assert [d["name"] for d in body["documents"]] == ["new.pdf", "old.pdf"]
+    first = body["documents"][0]
+    assert first["subject"] == {"id": subject.id, "name": "Relational Databases", "color": "#2E55E6", "hidden": False}
+    assert first["event"] == {"id": event.id, "title": "Relational Databases", "start": "2026-10-19T11:00:00Z"}
+    assert first["tag"] == "exercises" and first["size"] == 2048 and first["mime_type"] == "application/pdf"
+    assert first["web_view_link"] == "https://drive/new.pdf" and first["created_at"].startswith("2026-10-14")
+    assert body["documents"][1]["event"] is None
+
+
+def test_all_documents_scoped_to_active_semester_and_includes_hidden(client, session, semester, subject):
+    from app.models import Semester
+    other = Semester(code="S2", name="Other", is_active=False)
+    session.add(other)
+    session.commit()
+    foreign = Subject(semester_id=other.id, display_name="Foreign", aliases=[])
+    hidden = Subject(semester_id=semester.id, display_name="Secret", aliases=[], hidden=True)
+    session.add_all([foreign, hidden])
+    session.commit()
+    add_doc(session, foreign, "x.pdf")
+    add_doc(session, hidden, "h.pdf")
+    body = client.get("/api/documents", headers=AUTH).json()
+    assert [d["name"] for d in body["documents"]] == ["h.pdf"]
+    assert body["documents"][0]["subject"]["hidden"] is True
+    assert {s["name"] for s in body["subjects"]} == {"Relational Databases", "Secret"}
+
+
+def test_all_documents_folder_urls(client, session, semester, subject):
+    base = "https://drive.google.com/drive/folders/"
+    empty = client.get("/api/documents", headers=AUTH).json()
+    assert empty["root_url"] is None and empty["semester_url"] is None
+    assert empty["subjects"][0]["folder_url"] is None
+    subject.drive_folder_id = "SUBF"
+    semester.drive_folder_id = "SEMF"
+    session.add(AppSetting(key="drive_root_folder", value="ROOTF"))
+    session.commit()
+    body = client.get("/api/documents", headers=AUTH).json()
+    assert body["root_url"] == base + "ROOTF" and body["semester_url"] == base + "SEMF"
+    assert body["subjects"] == [{"id": subject.id, "name": "Relational Databases", "color": "#2E55E6", "hidden": False,
+                                 "folder_url": base + "SUBF"}]
+
+
+def test_all_documents_no_active_semester(client, session, semester):
+    semester.is_active = False
+    session.commit()
+    body = client.get("/api/documents", headers=AUTH).json()
+    assert body == {"documents": [], "subjects": [], "root_url": None, "semester_url": None}
+
+
+def test_all_documents_uses_a_fixed_number_of_queries(client, session, semester, subject, engine):
+    from sqlalchemy import event as sa_event
+    ev = add_event(session, semester, subject)
+    for i in range(5):
+        add_doc(session, subject, f"{i}.pdf", event=ev)
+    count = []
+    sa_event.listen(engine, "before_cursor_execute", lambda *a: count.append(1))
+    client.get("/api/documents", headers=AUTH)
+    assert len(count) <= 6

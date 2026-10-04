@@ -11,7 +11,7 @@ from app.gcal.api import ACCOUNT_ID, REFRESH_TOKEN_NAME, GoogleAuthError, Google
 from app.gcal.push import _close
 from app.gdrive.api import DRIVE_SCOPE, DriveFactory, GoogleDrive
 from app.models import AppSetting, Document, DocumentUpload, Event, GoogleAccount, Semester, Subject
-from app.schemas import DocumentOut, UploadStartIn
+from app.schemas import AllDocumentsOut, DocEventOut, DocFolderSubject, DocListItem, DocSubjectOut, DocumentOut, UploadStartIn
 from app.secret_store import SecretStore, decrypt_text, encrypt_text
 from app.timeutil import iso_utc
 
@@ -247,3 +247,37 @@ def document_outs(session: Session, documents: list[Document]) -> list[DocumentO
                     name=d.name, mime_type=d.mime_type, size=d.size, tag=d.tag, web_view_link=_link(d), created_at=iso_utc(d.created_at))
         for d in documents
     ]
+
+
+FOLDER_URL = "https://drive.google.com/drive/folders/"
+
+
+def _folder_url(folder_id: str | None) -> str | None:
+    return FOLDER_URL + folder_id if folder_id else None
+
+
+def all_documents(session: Session) -> AllDocumentsOut:
+    """Every document of the active semester with its subject and class, plus the Drive folder links. No Google calls."""
+    semester = session.scalar(select(Semester).where(Semester.is_active.is_(True)))
+    if semester is None:
+        return AllDocumentsOut(documents=[], subjects=[], root_url=None, semester_url=None)
+    subjects = session.scalars(select(Subject).where(Subject.semester_id == semester.id).order_by(Subject.display_name)).all()
+    rows = session.execute(
+        select(Document, Subject, Event.start_at)
+        .join(Subject, Subject.id == Document.subject_id)
+        .outerjoin(Event, Event.id == Document.event_id)
+        .where(Subject.semester_id == semester.id)
+        .order_by(Document.created_at.desc(), Document.id.desc())
+    ).all()
+    items = [
+        DocListItem(id=d.id, subject=DocSubjectOut(id=s.id, name=s.display_name, color=s.color, hidden=s.hidden),
+                    event=DocEventOut(id=d.event_id, title=s.display_name, start=iso_utc(start)) if d.event_id is not None and start is not None else None,
+                    tag=d.tag, name=d.name, mime_type=d.mime_type, size=d.size, web_view_link=_link(d),
+                    created_at=iso_utc(d.created_at))
+        for d, s, start in rows
+    ]
+    return AllDocumentsOut(
+        documents=items,
+        subjects=[DocFolderSubject(id=s.id, name=s.display_name, color=s.color, hidden=s.hidden, folder_url=_folder_url(s.drive_folder_id))
+                  for s in subjects],
+        root_url=_folder_url(_root_id(session)), semester_url=_folder_url(semester.drive_folder_id))
