@@ -1,4 +1,5 @@
 import type { Messages } from "../types";
+import { ai } from "./ai";
 import { board } from "./board";
 import { calendar } from "./calendar";
 import { common } from "./common";
@@ -13,4 +14,4 @@ import { shortcuts } from "./shortcuts";
 import { subjects } from "./subjects";
 import { ui } from "./ui";
 
-export const vi: Messages = { common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts };
+export const vi: Messages = { ai, common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts };

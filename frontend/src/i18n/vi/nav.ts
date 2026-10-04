@@ -6,6 +6,7 @@ export const nav: Messages["nav"] = {
   board: "Bảng việc",
   subjects: "Môn học",
   review: "Ôn tập",
+  assistant: "Trợ lý",
   settings: "Cài đặt",
   semester: "Học kỳ",
   selectSemester: "Chọn học kỳ",

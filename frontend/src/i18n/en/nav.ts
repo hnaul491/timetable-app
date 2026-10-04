@@ -4,6 +4,7 @@ export const nav = {
   board: "Board",
   subjects: "Subjects",
   review: "Review",
+  assistant: "Assistant",
   settings: "Settings",
   semester: "Semester",
   selectSemester: "Select semester",

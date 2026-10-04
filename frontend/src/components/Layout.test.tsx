@@ -66,6 +66,13 @@ describe("Layout shortcuts", () => {
     expect(screen.getByTestId("path")).toHaveTextContent("/board");
   });
 
+  it("g then a navigates to the assistant", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.keyboard("ga");
+    expect(screen.getByTestId("path")).toHaveTextContent("/assistant");
+  });
+
   it("? opens the shortcuts dialog", async () => {
     const user = userEvent.setup();
     setup();

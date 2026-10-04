@@ -195,3 +195,29 @@ export interface DocumentItem {
   web_view_link: string;
   created_at: string;
 }
+
+export interface AiStatus {
+  enabled: boolean;
+  model: string | null;
+}
+
+export interface AiSuggestion {
+  title: string;
+  due_date?: string | null;
+}
+
+export interface PendingAction {
+  id: number;
+  kind: "task" | "event" | "note" | "study_block";
+  status: "pending" | "confirmed" | "dismissed";
+  summary: string;
+  payload: Record<string, unknown>;
+  expires_at: string | null;
+}
+
+export interface ChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  actions: PendingAction[];
+}
