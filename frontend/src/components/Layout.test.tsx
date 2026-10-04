@@ -59,6 +59,21 @@ describe("Layout shortcuts", () => {
     expect(rail!.textContent).toBe("");
   });
 
+  it("the sidebar stays in place while the page scrolls and its toggle sits at the top", async () => {
+    const user = userEvent.setup();
+    setup();
+    const sidebar = screen.getAllByRole("navigation", { name: "Main" }).find((n) => n.className.includes("md:flex"))!;
+    expect(sidebar.className).toMatch(/\bsticky\b/);
+    expect(sidebar.className).toMatch(/\btop-0\b/);
+    expect(sidebar.className).toMatch(/\bh-screen\b/);
+    const toggle = screen.getByRole("button", { name: "Collapse sidebar" });
+    const firstLink = screen.getAllByRole("link", { name: "Calendar" }).find((a) => sidebar.contains(a))!;
+    expect(toggle.compareDocumentPosition(firstLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(toggle);
+    expect(localStorage.getItem("timetable:sidebar")).toBe("collapsed");
+    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+  });
+
   it("g then b navigates to the board", async () => {
     const user = userEvent.setup();
     setup();

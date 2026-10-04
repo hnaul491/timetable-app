@@ -59,10 +59,23 @@ export function Layout() {
   return (
     <div className="min-h-screen md:flex">
       {!fullScreen && (
-      <nav aria-label={t("nav.main")} className={`hidden shrink-0 flex-col gap-5 border-r border-line bg-surface py-5 md:flex ${collapsed ? "w-16 px-2" : "w-60 px-4"}`}>
-        <div className={`flex items-center gap-2.5 ${collapsed ? "justify-center" : "px-2"}`}>
-          <div className="flex size-7 items-center justify-center rounded-lg bg-accent text-sm font-bold text-on-accent">T</div>
+      <nav aria-label={t("nav.main")} className={`sticky top-0 hidden h-screen self-start shrink-0 flex-col gap-5 overflow-y-auto border-r border-line bg-surface py-5 md:flex ${collapsed ? "w-16 px-2" : "w-60 px-4"}`}>
+        <div className={`flex items-center gap-2.5 ${collapsed ? "flex-col" : "pl-2"}`}>
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-on-accent">T</div>
           {!collapsed && <span className="text-[17px] font-bold">Timetable</span>}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
+            title={`${collapsed ? t("nav.expand") : t("nav.collapse")} ([)`}
+            className={`flex size-8 items-center justify-center rounded-lg text-muted hover:bg-subtle hover:text-ink ${collapsed ? "" : "ml-auto"}`}
+          >
+            <Icon>
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+              {collapsed ? <path d="M13 10l2 2-2 2" /> : <path d="M15 10l-2 2 2 2" />}
+            </Icon>
+          </button>
         </div>
         {!collapsed && semesters.data && (
           <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
@@ -111,16 +124,6 @@ export function Layout() {
         >
           <Icon><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Icon>
           {!collapsed && t("search.open")}
-        </button>
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
-          title={collapsed ? t("nav.expand") : t("nav.collapse")}
-          className={`mt-auto flex h-10 items-center gap-3 rounded-lg text-sm font-medium text-ink-2 hover:bg-subtle ${collapsed ? "justify-center" : "px-3"}`}
-        >
-          <Icon>{collapsed ? <path d="M9 6l6 6-6 6" /> : <path d="M15 6l-6 6 6 6" />}</Icon>
-          {!collapsed && t("nav.collapse")}
         </button>
       </nav>
       )}
