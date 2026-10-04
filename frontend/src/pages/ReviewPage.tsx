@@ -2,6 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { Skeleton } from "../components/ui/Skeleton";
+import { useToast } from "../components/ui/Toast";
 import { apiFetch } from "../lib/api";
 import { useLocale, useT, type Locale } from "../i18n";
 import { INTL_LOCALE } from "../i18n/locale";
@@ -38,6 +40,7 @@ export function ReviewPage() {
   const t = useT();
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [weekStart, setWeekStart] = useState<string | null>(null);
   const review = useQuery({
     queryKey: ["review", weekStart],
@@ -51,21 +54,36 @@ export function ReviewPage() {
     mutationFn: (task: Task) => apiFetch(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ status: "done" }) }),
     onSuccess: () => {
       invalidateTaskViews(queryClient);
+      toast.success(t("review.toast.taskDone"));
     },
+    onError: (error, task) => toast.error(error.message, { retry: () => tick.mutate(task) }),
   });
   const mark = useMutation({
     mutationFn: (start: string) => apiFetch(`/api/review/${start}/done`, { method: "POST" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["review"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["review"] });
+      toast.success(t("review.toast.reviewed"));
+    },
+    onError: (error, start) => toast.error(error.message, { retry: () => mark.mutate(start) }),
   });
 
   const r = review.data ?? lastShown.current;
   if (!r) {
-    return review.error ? <ErrorPanel error={review.error} onRetry={() => review.refetch()} /> : <p className="text-sm text-muted">{t("review.loading")}</p>;
+    return review.error ? <ErrorPanel error={review.error} onRetry={() => review.refetch()} /> : (
+      <div role="status" className="flex flex-col gap-4">
+        <span className="sr-only">{t("review.loading")}</span>
+        <Skeleton className="h-10 w-72" />
+        <div aria-hidden="true" className="grid gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-36 w-full" />
+          ))}
+        </div>
+      </div>
+    );
   }
   const days = Array.from({ length: 7 }, (_, i) => addDays(r.week_start, i));
   // Step from the week asked for, so arrows still work after a failed week.
   const shownWeek = weekStart ?? r.week_start;
-  const error = (tick.error ?? mark.error) as Error | null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,7 +108,6 @@ export function ReviewPage() {
           </button>
         )}
       </header>
-      {error && <p className="text-sm text-danger">{error.message}</p>}
 
       {review.error && !review.data ? (
         <ErrorPanel error={review.error} onRetry={() => review.refetch()} />

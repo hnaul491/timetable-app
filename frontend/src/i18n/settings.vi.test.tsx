@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { RecurringList } from "../components/RecurringList";
+import { ConfirmProvider } from "../components/ui/Confirm";
 import { GoogleSettings } from "../components/GoogleSettings";
 import { SettingsPage } from "../pages/SettingsPage";
 import { I18nProvider, translate } from "./index";
@@ -30,7 +31,9 @@ function wrap(ui: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <I18nProvider locale="vi">{ui}</I18nProvider>
+      <I18nProvider locale="vi">
+        <ConfirmProvider>{ui}</ConfirmProvider>
+      </I18nProvider>
     </QueryClientProvider>,
   );
 }
@@ -47,11 +50,11 @@ describe("settings in Vietnamese", () => {
     expect(screen.getByRole("heading", { name: vi_("settings.groups.title") })).toBeInTheDocument();
   });
 
-  it("translates repeating events with a confirm step", async () => {
+  it("translates repeating events with a confirm dialog", async () => {
     wrap(<RecurringList />);
     expect(await screen.findByText(new RegExp(`${vi_("settings.days.mon")}, ${vi_("settings.days.thu")} · 19:30`))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: vi_("settings.recurring.deleteAria", { title: RULE.title }) }));
-    expect(screen.getByRole("button", { name: vi_("settings.recurring.deleteConfirmAria", { title: RULE.title }) })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: vi_("settings.recurring.deleteTitle", { title: RULE.title }) })).toBeInTheDocument();
   });
 
   it("translates Google settings including the server error text", async () => {

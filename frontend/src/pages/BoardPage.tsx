@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { useConfirm } from "../components/ui/Confirm";
+import { Skeleton } from "../components/ui/Skeleton";
+import { useToast } from "../components/ui/Toast";
 import { apiFetch } from "../lib/api";
 import { useT, type MessageKey } from "../i18n";
 import { invalidateTaskViews } from "../lib/invalidate";
@@ -17,6 +20,8 @@ const field = "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm
 export function BoardPage() {
   const t = useT();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => apiFetch<Task[]>("/api/tasks") });
   const [subject, setSubject] = useState("all");
   const [title, setTitle] = useState("");
@@ -26,7 +31,11 @@ export function BoardPage() {
   const move = useMutation({
     mutationFn: (v: { id: number; status: TaskStatus }) =>
       apiFetch(`/api/tasks/${v.id}`, { method: "PATCH", body: JSON.stringify({ status: v.status }) }),
-    onSuccess: refresh,
+    onSuccess: (_data, v) => {
+      refresh();
+      toast.success(t("board.toast.moved", { column: t(COLUMNS.find((c) => c.status === v.status)?.label ?? "board.todo") }));
+    },
+    onError: (error, v) => toast.error(error.message, { retry: () => move.mutate(v) }),
   });
   const add = useMutation({
     mutationFn: () => apiFetch("/api/tasks", { method: "POST", body: JSON.stringify({ title: title.trim(), due_date: due || null }) }),
@@ -34,9 +43,21 @@ export function BoardPage() {
       setTitle("");
       setDue("");
       refresh();
+      toast.success(t("board.toast.added"));
     },
+    onError: (error) => toast.error(error.message, { retry: () => add.mutate() }),
   });
-  const remove = useMutation({ mutationFn: (id: number) => apiFetch(`/api/tasks/${id}`, { method: "DELETE" }), onSuccess: refresh });
+  const remove = useMutation({
+    mutationFn: (id: number) => apiFetch(`/api/tasks/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      refresh();
+      toast.success(t("board.toast.deleted"));
+    },
+    onError: (error, id) => toast.error(error.message, { retry: () => remove.mutate(id) }),
+  });
+  const askDelete = async (task: Task) => {
+    if (await confirm({ title: t("board.deleteTitle", { title: task.title }), confirmLabel: t("common.delete"), tone: "danger" })) remove.mutate(task.id);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -44,11 +65,26 @@ export function BoardPage() {
   };
 
   if (tasks.error && !tasks.data) return <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />;
-  if (!tasks.data) return <p className="text-sm text-muted">{t("board.loading")}</p>;
+  if (!tasks.data)
+    return (
+      <div role="status" className="flex flex-col gap-4">
+        <span className="sr-only">{t("board.loading")}</span>
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-16 w-full" />
+        <div aria-hidden="true" className="grid items-start gap-4 md:grid-cols-3">
+          {COLUMNS.map((col) => (
+            <div key={col.status} className="flex flex-col gap-2.5 rounded-2xl bg-subtle p-3">
+              <Skeleton className="h-5 w-24 bg-surface" />
+              <Skeleton className="h-28 w-full bg-surface" />
+              <Skeleton className="h-28 w-full bg-surface" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   const all = tasks.data;
   const subjects = [...new Set(all.map((t) => t.subject_name).filter((s): s is string => Boolean(s)))].sort();
   const visible = all.filter((t) => subject === "all" || t.subject_name === subject);
-  const mutationError = (move.error ?? add.error ?? remove.error) as Error | null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -83,7 +119,6 @@ export function BoardPage() {
           {t("board.addTask")}
         </button>
       </form>
-      {mutationError && <p className="text-sm text-danger">{mutationError.message}</p>}
       {tasks.error && tasks.data && <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />}
 
       <div className="grid items-start gap-4 md:grid-cols-3">
@@ -97,7 +132,7 @@ export function BoardPage() {
                 <span className="rounded-full bg-surface px-2 text-xs font-semibold text-ink-2">{cards.length}</span>
               </h2>
               {cards.map((t) => (
-                <TaskCard key={t.id} task={t} pending={move.isPending && move.variables?.id === t.id} onMove={(status) => move.mutate({ id: t.id, status })} onDelete={() => remove.mutate(t.id)} />
+                <TaskCard key={t.id} task={t} pending={move.isPending && move.variables?.id === t.id} onMove={(status) => move.mutate({ id: t.id, status })} onDelete={() => void askDelete(t)} />
               ))}
             </section>
           );
@@ -109,7 +144,6 @@ export function BoardPage() {
 
 function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: boolean; onMove: (s: TaskStatus) => void; onDelete: () => void }) {
   const t = useT();
-  const [confirm, setConfirm] = useState(false);
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3">
       <div className="flex flex-wrap gap-1.5">
@@ -142,12 +176,11 @@ function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: bo
         {task.source === "manual" && (
           <button
             type="button"
-            aria-label={confirm ? t("board.card.confirmDeleteAria", { title: task.title }) : t("board.card.deleteAria", { title: task.title })}
-            onClick={() => (confirm ? onDelete() : setConfirm(true))}
-            onBlur={() => setConfirm(false)}
+            aria-label={t("board.card.deleteAria", { title: task.title })}
+            onClick={onDelete}
             className="h-9 rounded-lg px-2 text-sm font-semibold text-danger"
           >
-            {confirm ? t("board.card.confirmDelete") : t("common.delete")}
+            {t("common.delete")}
           </button>
         )}
       </div>

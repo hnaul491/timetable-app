@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ErrorPanel } from "../components/Banners";
 import { GoogleSettings } from "../components/GoogleSettings";
+import { useToast } from "../components/ui/Toast";
 import { AppearanceSettings } from "../components/AppearanceSettings";
 import { RecurringList } from "../components/RecurringList";
 import { SemesterSettings } from "../components/SemesterSettings";
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const locale = useLocale();
   const statusLabel = (status: SyncRun["status"]) => t(`settings.syncStatus.${status}`);
   const queryClient = useQueryClient();
+  const toast = useToast();
   const keyStatus = useQuery({ queryKey: ["zeus-key"], queryFn: () => apiFetch<{ configured: boolean }>("/api/settings/zeus-key") });
   const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => apiFetch<SectionChoice[]>("/api/settings/sections") });
@@ -30,16 +32,27 @@ export function SettingsPage() {
     onSuccess: () => {
       setLink("");
       queryClient.invalidateQueries({ queryKey: ["zeus-key"] });
+      toast.success(t("settings.zeus.keySaved"));
     },
+    onError: (error, value) => toast.error(error.message, { retry: () => saveKey.mutate(value) }),
   });
   const syncNow = useMutation({
     mutationFn: () => apiFetch<SyncRun>("/api/sync", { method: "POST" }),
+    onSuccess: (run) => {
+      if (run.status === "ok" || run.status === "partial") toast.success(t("settings.zeus.syncDone", { count: run.fetched }));
+      else toast.error(run.error ? translateServerMessage(run.error, locale) : t("settings.zeus.syncFailed"), { retry: () => syncNow.mutate() });
+    },
+    onError: (error) => toast.error(error.message, { retry: () => syncNow.mutate() }),
     onSettled: () => queryClient.invalidateQueries(),
   });
   const pick = useMutation({
     mutationFn: (body: { subject_id: number; section: string }) =>
       apiFetch("/api/settings/sections", { method: "PUT", body: JSON.stringify(body) }),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success(t("settings.groups.saved"));
+    },
+    onError: (error, body) => toast.error(error.message, { retry: () => pick.mutate(body) }),
   });
 
   const submit = (e: FormEvent) => {
@@ -79,7 +92,6 @@ export function SettingsPage() {
             <p className="text-xs text-muted">
               {t("settings.zeus.help")}
             </p>
-            {saveKey.error && <p className="text-sm text-danger">{(saveKey.error as Error).message}</p>}
             <p className="text-sm">{keyStatus.data?.configured ? t("settings.zeus.saved") : t("settings.zeus.notSaved")}</p>
           </form>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
@@ -93,12 +105,10 @@ export function SettingsPage() {
               {syncNow.isPending ? t("settings.zeus.syncing") : t("settings.zeus.syncNow")}
             </button>
           </div>
-          {syncNow.error && <p className="text-sm text-danger">{(syncNow.error as Error).message}</p>}
         </section>
         <section className={card}>
           <h2 className="text-base font-bold">{t("settings.groups.title")}</h2>
           <p className="text-sm text-muted">{t("settings.groups.help")}</p>
-          {pick.error && <p className="text-sm text-danger">{(pick.error as Error).message}</p>}
           {sections.data?.length === 0 && <p className="text-sm">{t("settings.groups.none")}</p>}
           {sections.data?.map((choice) => (
             <label key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">

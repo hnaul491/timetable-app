@@ -6,6 +6,9 @@ import { apiFetch } from "../lib/api";
 import { forgetProviderToken, startGoogleConnect, takeConnectFlag, takeProviderRefreshToken } from "../lib/google";
 import { formatTime, parisParts } from "../lib/time";
 import type { GoogleKind, GoogleStatus, PushResult } from "../types";
+import { useConfirm } from "./ui/Confirm";
+import { Skeleton } from "./ui/Skeleton";
+import { useToast } from "./ui/Toast";
 
 const KINDS: GoogleKind[] = ["class", "exam", "holiday", "work", "french_ext", "other"];
 const MAX_ROUNDS = 15;
@@ -27,9 +30,10 @@ export function GoogleSettings() {
   const t = useT();
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [notice, setNotice] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState(false);
   const handled = useRef(false);
   const status = useQuery({ queryKey: ["google"], queryFn: () => apiFetch<GoogleStatus>("/api/google") });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["google"] });
@@ -52,9 +56,18 @@ export function GoogleSettings() {
     onSuccess: () => {
       setProgress(null);
       refresh();
+      toast.success(t("google.disconnected"));
     },
-    onSettled: () => setConfirm(false),
   });
+  const askDisconnect = async () => {
+    const ok = await confirm({
+      title: t("google.disconnectTitle"),
+      body: t("google.disconnectHelp"),
+      confirmLabel: t("google.disconnect"),
+      tone: "danger",
+    });
+    if (ok) disconnect.mutate();
+  };
   const push = useMutation({
     mutationFn: async () => {
       let sent = 0;
@@ -66,6 +79,11 @@ export function GoogleSettings() {
       }
       return null;
     },
+    onSuccess: (result) => {
+      if (result?.status === "failed") toast.error(summary(t, locale, 0, result), { retry: () => push.mutate() });
+      else if (result) toast.success(summary(t, locale, result.done, result));
+    },
+    onError: (error) => toast.error(error.message, { retry: () => push.mutate() }),
     onSettled: refresh,
   });
 
@@ -92,7 +110,11 @@ export function GoogleSettings() {
         {t("google.title")}
       </h2>
       {!s ? (
-        <p className="text-sm text-muted">{t("common.loading")}</p>
+        <div role="status" className="flex flex-col gap-2">
+          <span className="sr-only">{t("common.loading")}</span>
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-4 w-full" />
+        </div>
       ) : !s.configured ? (
         <p className="text-sm text-muted">{t("google.notConfigured")}</p>
       ) : !s.connected ? (
@@ -145,11 +167,10 @@ export function GoogleSettings() {
             <button
               type="button"
               className={secondary}
-              onClick={() => (confirm ? disconnect.mutate() : setConfirm(true))}
-              onBlur={() => setConfirm(false)}
+              onClick={() => void askDisconnect()}
               disabled={disconnect.isPending}
             >
-              {confirm ? t("google.disconnectConfirm") : t("google.disconnect")}
+              {t("google.disconnect")}
             </button>
           </div>
           <p className="text-xs text-muted">{t("google.disconnectHelp")}</p>

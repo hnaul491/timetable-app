@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiEvent, Review, Task } from "../types";
+import { ToastProvider } from "../components/ui/Toast";
 import { ReviewPage } from "./ReviewPage";
 
 const apiFetch = vi.fn();
@@ -38,9 +39,11 @@ function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ReviewPage />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <ReviewPage />
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -100,5 +103,20 @@ describe("ReviewPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Next week" }));
     expect(await screen.findByText(/boom/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Previous week" })).toBeInTheDocument();
+  });
+
+  it("toasts after ticking a task and after marking the week reviewed", async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Read ch. 4" }));
+    expect(await screen.findByText("Task marked done")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Mark week as reviewed" }));
+    expect(await screen.findByText("Week marked as reviewed")).toBeInTheDocument();
+  });
+
+  it("shows a skeleton with an accessible status while loading", () => {
+    apiFetch.mockImplementation(() => new Promise(() => {}));
+    renderPage();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading review…");
+    expect(screen.queryAllByRole("region")).toHaveLength(0);
   });
 });

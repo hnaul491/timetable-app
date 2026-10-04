@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
+import { Skeleton } from "../components/ui/Skeleton";
 import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { formatLongDate, parisParts } from "../lib/time";
@@ -11,7 +12,18 @@ export function SubjectsPage() {
   const locale = useLocale();
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => apiFetch<SubjectSummary[]>("/api/subjects"), refetchOnMount: "always" });
   if (subjects.error) return <ErrorPanel error={subjects.error} onRetry={() => subjects.refetch()} />;
-  if (!subjects.data) return <p className="text-sm text-muted">{t("subjects.loading")}</p>;
+  if (!subjects.data)
+    return (
+      <div role="status" className="flex flex-col gap-4">
+        <span className="sr-only">{t("subjects.loading")}</span>
+        <Skeleton className="h-8 w-40" />
+        <div aria-hidden="true" className="grid gap-3 md:grid-cols-2">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+      </div>
+    );
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold tracking-tight">{t("subjects.title")}</h1>

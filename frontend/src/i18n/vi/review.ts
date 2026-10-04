@@ -26,4 +26,5 @@ export const review: Messages["review"] = {
   free: "Trống",
   allDay: "cả ngày",
   taskDue: "hạn {date}",
+  toast: { taskDone: "Đã đánh dấu việc là xong", reviewed: "Đã đánh dấu tuần này là đã ôn tập" },
 };

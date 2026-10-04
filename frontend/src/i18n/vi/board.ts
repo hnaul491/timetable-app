@@ -20,7 +20,7 @@ export const board: Messages["board"] = {
     fromClass: "Từ buổi học",
     statusFor: "Trạng thái của {title}",
     deleteAria: "Xoá {title}",
-    confirmDeleteAria: "Bấm lần nữa để xoá {title}",
-    confirmDelete: "Bấm lần nữa để xoá",
   },
+  deleteTitle: "Xoá việc “{title}”?",
+  toast: { added: "Đã thêm việc", moved: "Đã chuyển sang “{column}”", deleted: "Đã xoá việc" },
 };
