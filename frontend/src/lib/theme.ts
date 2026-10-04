@@ -54,3 +54,14 @@ export function useTheme(): [ThemeChoice, (choice: ThemeChoice) => void] {
     },
   ];
 }
+
+/** Keeps the page in step with the OS light/dark setting while the choice is "system", on every page. */
+export function watchSystemTheme(): () => void {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => {
+    if (readTheme() === "system") applyTheme("system");
+  };
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}

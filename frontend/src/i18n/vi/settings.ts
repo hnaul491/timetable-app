@@ -2,6 +2,7 @@ import type { Messages } from "../types";
 
 export const settings: Messages["settings"] = {
   title: "Cài đặt",
+  syncStatus: { running: "đang chạy", ok: "thành công", partial: "một phần", failed: "thất bại", auth_failed: "liên kết hết hạn" },
   appearance: {
     title: "Giao diện",
     language: "Ngôn ngữ",

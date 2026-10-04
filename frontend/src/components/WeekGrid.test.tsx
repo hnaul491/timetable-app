@@ -21,6 +21,13 @@ describe("WeekGrid", () => {
     expect(block.style.height).toBe("100px");
   });
 
+  it("shows work shifts in the themed work colour with a visible border", () => {
+    render(<WeekGrid days={WEEK} events={[event({ kind: "work", color: null })]} />);
+    const block = screen.getByRole("group");
+    expect(block.style.border).toContain("var(--tt-kind-work)");
+    expect(block.style.background).toContain("var(--tt-kind-work)");
+  });
+
   it("renders overlapping events side by side", () => {
     render(<WeekGrid days={WEEK} events={[event({ id: 1 }), event({ id: 2, title: "Other", section: null })]} />);
     const blocks = screen.getAllByRole("group");

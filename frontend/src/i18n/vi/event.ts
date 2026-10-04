@@ -50,7 +50,7 @@ export const event: Messages["event"] = {
   weekdays: { mon: "T2", tue: "T3", wed: "T4", thu: "T5", fri: "T6", sat: "T7", sun: "CN" },
   errTitle: "Hãy đặt tiêu đề cho sự kiện.",
   errTimes: "Hãy chọn ngày, giờ bắt đầu và giờ kết thúc.",
-  errUntil: "Hãy chọn ngày \"Đến ngày\".",
+  errUntil: "Hãy chọn ngày kết thúc lặp lại.",
   errSameTime: "Giờ bắt đầu và giờ kết thúc phải khác nhau.",
   errWeekday: "Hãy chọn ít nhất một ngày trong tuần.",
   errUntilBefore: "\"Đến ngày\" phải trùng hoặc sau ngày bắt đầu.",

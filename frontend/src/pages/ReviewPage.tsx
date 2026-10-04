@@ -166,7 +166,7 @@ export function ReviewPage() {
                 {items.length === 0 && <span className="text-xs text-muted">{t("review.free")}</span>}
                 {items.map((e) => (
                   <span key={e.id} className={`flex items-baseline gap-1.5 text-[12.5px] ${e.status === "cancelled" ? "text-muted line-through" : ""}`}>
-                    <span className="size-1.5 shrink-0 rounded-full" style={{ background: e.color ?? (e.kind === "french_ext" ? "#0E7F72" : "#3B4252") }} />
+                    <span className="size-1.5 shrink-0 rounded-full" style={{ background: e.color ?? (e.kind === "french_ext" ? "#0E7F72" : "var(--tt-kind-work)") }} />
                     <span className="font-mono text-[11px] text-ink-2">{e.kind === "holiday" ? t("review.allDay") : formatTime(e.start)}</span>
                     {e.title}
                   </span>

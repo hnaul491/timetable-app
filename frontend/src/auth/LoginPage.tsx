@@ -1,7 +1,9 @@
-import { useT } from "../i18n";
+import { useEffect } from "react";
+import { I18nProvider, useT } from "../i18n";
+import { initialLanguage } from "../lib/language";
 import { supabase } from "../lib/supabase";
 
-export function LoginPage() {
+function LoginContent() {
   const t = useT();
   const signIn = () =>
     supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
@@ -18,5 +20,17 @@ export function LoginPage() {
         </button>
       </div>
     </main>
+  );
+}
+
+export function LoginPage() {
+  const locale = initialLanguage();
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+  return (
+    <I18nProvider locale={locale}>
+      <LoginContent />
+    </I18nProvider>
   );
 }

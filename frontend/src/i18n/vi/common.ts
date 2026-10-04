@@ -11,7 +11,7 @@ export const common: Messages["common"] = {
   today: "Hôm nay",
   week: "Tuần",
   day: "Ngày",
-  never: "chưa bao giờ",
+  never: "chưa có",
   itemsCount: { one: "{count} mục", other: "{count} mục" },
   signInTitle: "Đăng nhập bằng tài khoản Google để xem thời khoá biểu của bạn.",
   continueWithGoogle: "Tiếp tục với Google",

@@ -107,7 +107,7 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
   );
 }
 
-const KIND_COLORS: Partial<Record<ApiEvent["kind"], string>> = { work: "#3B4252", french_ext: "#0E7F72" };
+const KIND_COLORS: Partial<Record<ApiEvent["kind"], string>> = { work: "var(--tt-kind-work)", french_ext: "#0E7F72" };
 
 function EventBlock({
   ev,
@@ -123,10 +123,10 @@ function EventBlock({
   onSelect?: (id: number) => void;
 }) {
   const t = useT();
-  const color = ev.color ?? KIND_COLORS[ev.kind] ?? "#3B4252";
+  const color = ev.color ?? KIND_COLORS[ev.kind] ?? "var(--tt-kind-work)";
   const title = ev.section ? `${ev.title} ${ev.section}` : ev.title;
   const label = `${t("calendar.grid.eventLabel", { title, start: formatTime(ev.start), end: formatTime(ev.end) })}${ev.room ? `, ${ev.room}` : ""}`;
-  const outline = ev.kind === "french_ext" ? { border: `1.5px dashed ${color}`, background: "var(--tt-surface)" } : { background: `color-mix(in srgb, ${color} var(--event-fill), transparent)` };
+  const outline = ev.kind === "french_ext" ? { border: `1.5px dashed ${color}`, background: "var(--tt-surface)" } : { border: `1px solid color-mix(in srgb, ${color} 45%, transparent)`, background: `color-mix(in srgb, ${color} var(--event-fill), transparent)` };
   return (
     <div
       role="group"

@@ -28,6 +28,8 @@ export const errors = {
   emptyFeed: "feed contains no events",
   notIcal: "response is not an iCalendar document",
   unparsable: "could not parse calendar",
+  sessionExpired: "invalid token",
+  offline: "Failed to fetch",
   unexpected: "unexpected error ({type})",
   keptMissing: "kept {count} upcoming classes that disappeared from the feed (guard: more than 30% would be cancelled)",
   otherGroup: "the feed looks like a different group, so nothing was changed",

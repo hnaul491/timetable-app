@@ -1,7 +1,7 @@
 import type { Messages } from "../types";
 
 export const google: Messages["google"] = {
-  title: "Google Calendar",
+  title: "Lịch Google",
   kinds: {
     class: "Buổi học",
     exam: "Kỳ thi",
@@ -11,17 +11,17 @@ export const google: Messages["google"] = {
     other: "Sự kiện khác",
   },
   pushFailed: "Gửi thất bại: {error}",
-  unknownError: "lỗi không rõ",
+  unknownError: "Lỗi không xác định",
   skipped: "Chưa gửi gì cả — cần kết nối lại Google.",
   sentWithError: "Đã gửi {sent} thay đổi. {error}",
   sentLeft: "Đã gửi {sent} thay đổi, còn {remaining}…",
   sent: "Đã gửi {sent} thay đổi",
   connected: "Đã kết nối. Bấm “Gửi ngay” để điền vào lịch “My Timetable” của bạn.",
   noOffline: "Google không cấp quyền truy cập ngoại tuyến. Hãy gỡ “Timetable” tại myaccount.google.com/permissions rồi kết nối lại.",
-  notConfigured: "Máy chủ chưa thiết lập gửi lên Google Calendar — làm theo mục “Google Calendar” trong docs/SETUP.md.",
-  intro: "Tạo một lịch tên “My Timetable” trong tài khoản Google của bạn và luôn cập nhật lịch đó. Ghi chú không bao giờ được gửi. Lời nhắc do Google Calendar đảm nhiệm — hãy đặt chúng trên lịch đó.",
-  connect: "Kết nối Google Calendar",
-  connectedAs: "Đã kết nối với",
+  notConfigured: "Máy chủ chưa thiết lập gửi lên Lịch Google — làm theo mục “Lịch Google” trong docs/SETUP.md.",
+  intro: "Tạo một lịch tên “My Timetable” trong tài khoản Google của bạn và luôn cập nhật lịch đó. Ghi chú không bao giờ được gửi. Lời nhắc do Lịch Google đảm nhiệm — hãy đặt chúng trên lịch đó.",
+  connect: "Kết nối Lịch Google",
+  connectedAs: "Đã kết nối bằng tài khoản",
   accessStopped: "Quyền truy cập Google đã ngừng hoạt động.",
   reconnect: "Kết nối lại Google",
   sendToGoogle: "Gửi lên Google",

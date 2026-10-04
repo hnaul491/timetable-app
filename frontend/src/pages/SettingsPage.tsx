@@ -18,6 +18,7 @@ const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-ac
 export function SettingsPage() {
   const t = useT();
   const locale = useLocale();
+  const statusLabel = (status: SyncRun["status"]) => t(`settings.syncStatus.${status}`);
   const queryClient = useQueryClient();
   const keyStatus = useQuery({ queryKey: ["zeus-key"], queryFn: () => apiFetch<{ configured: boolean }>("/api/settings/zeus-key") });
   const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
@@ -83,7 +84,7 @@ export function SettingsPage() {
           </form>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
             <span>
-              {t("settings.zeus.lastSync", { value: lastRun ? `${lastRun.status} · ${when(lastRun.finished_at)}` : t("common.never") })}
+              {t("settings.zeus.lastSync", { value: lastRun ? `${statusLabel(lastRun.status)} · ${when(lastRun.finished_at)}` : t("common.never") })}
               {lastRun?.status === "ok" &&
                 ` · ${t("settings.zeus.syncCounts", { fetched: lastRun.fetched, inserted: lastRun.inserted, updated: lastRun.updated, cancelled: lastRun.cancelled })}`}
               {lastRun?.error && ` · ${translateServerMessage(lastRun.error, locale)}`}

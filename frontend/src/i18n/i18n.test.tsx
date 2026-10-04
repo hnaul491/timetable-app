@@ -52,8 +52,18 @@ describe("i18n", () => {
 
   it("translates known server texts, with numbers", () => {
     expect(translateServerMessage("end date must be on or after start date", "vi")).toBe("Ngày kết thúc phải bằng hoặc sau ngày bắt đầu");
-    expect(translateServerMessage("Google Calendar returned 500 (backendError)", "vi")).toBe("Google Lịch trả về lỗi 500 (backendError)");
+    expect(translateServerMessage("Google Calendar returned 500 (backendError)", "vi")).toBe("Lịch Google trả về lỗi 500 (backendError)");
     expect(translateServerMessage("end date must be on or after start date", "en")).toBe("end date must be on or after start date");
+  });
+
+  it("translates the specific invalid-feed and session texts", () => {
+    const tr = (text: string) => translateServerMessage(text, "vi");
+    expect(tr("invalid feed: feed contains no events")).toBe(translate("vi", "errors.emptyFeed"));
+    expect(tr("invalid feed: response is not an iCalendar document")).toBe(translate("vi", "errors.notIcal"));
+    expect(tr("invalid feed: could not parse calendar: bad line")).toBe(translate("vi", "errors.unparsable"));
+    expect(tr("invalid feed: something else")).toBe(translate("vi", "errors.invalidFeed", { detail: "something else" }));
+    expect(tr("invalid token")).toBe(translate("vi", "errors.sessionExpired"));
+    expect(tr("Failed to fetch")).toBe(translate("vi", "errors.offline"));
   });
 
   it("unknown server texts are kept", () => {

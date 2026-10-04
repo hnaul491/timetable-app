@@ -38,7 +38,7 @@ export const calendar: Messages["calendar"] = {
     signOut: "Đăng xuất",
     loadFailed: "Không tải được dữ liệu: {message}.",
     unknownError: "Lỗi không xác định",
-    googleStopped: "Google Calendar đã ngừng cập nhật: {reason}.",
+    googleStopped: "Lịch Google đã ngừng cập nhật: {reason}.",
     accessRevoked: "quyền truy cập đã bị thu hồi",
     reconnectGoogle: "Kết nối lại Google",
   },

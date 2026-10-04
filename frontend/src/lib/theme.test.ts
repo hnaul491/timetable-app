@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyTheme, readTheme, resolveTheme, storeTheme } from "./theme";
+import { applyTheme, readTheme, resolveTheme, storeTheme, watchSystemTheme } from "./theme";
 
 describe("theme", () => {
   afterEach(() => {
@@ -39,5 +39,44 @@ describe("theme", () => {
     });
     expect(readTheme()).toBe("system");
     expect(() => storeTheme("dark")).not.toThrow();
+  });
+
+  describe("watchSystemTheme", () => {
+    function mockMedia() {
+      const state = { matches: false, handler: undefined as undefined | (() => void) };
+      vi.stubGlobal("matchMedia", () => ({
+        get matches() {
+          return state.matches;
+        },
+        addEventListener: (_type: string, handler: () => void) => {
+          state.handler = handler;
+        },
+        removeEventListener: () => {
+          state.handler = undefined;
+        },
+      }));
+      return state;
+    }
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("follows the OS when no choice is stored", () => {
+      const media = mockMedia();
+      const stop = watchSystemTheme();
+      media.matches = true;
+      media.handler!();
+      expect(document.documentElement.dataset.theme).toBe("dark");
+      stop();
+      expect(media.handler).toBeUndefined();
+    });
+
+    it("keeps an explicit choice", () => {
+      storeTheme("light");
+      applyTheme("light");
+      const media = mockMedia();
+      watchSystemTheme();
+      media.matches = true;
+      media.handler!();
+      expect(document.documentElement.dataset.theme).toBe("light");
+    });
   });
 });

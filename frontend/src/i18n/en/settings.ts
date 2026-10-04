@@ -1,5 +1,6 @@
 export const settings = {
   title: "Settings",
+  syncStatus: { running: "running", ok: "ok", partial: "partial", failed: "failed", auth_failed: "auth_failed" },
   appearance: {
     title: "Appearance",
     language: "Language",
