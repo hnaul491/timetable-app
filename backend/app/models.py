@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import (JSON, Boolean, Date, DateTime, ForeignKey, Index, Integer, String,
+from sqlalchemy import (JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, String,
                         Text, UniqueConstraint)
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +17,7 @@ class Semester(Base):
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    drive_folder_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class Subject(Base):
@@ -29,6 +30,7 @@ class Subject(Base):
     color: Mapped[str] = mapped_column(String(7), default="#2E55E6")
     aliases: Mapped[list[str]] = mapped_column(JSON, default=list)
     hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    drive_folder_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
 class MySection(Base):
@@ -147,6 +149,7 @@ class GoogleAccount(Base):
     last_push_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_push_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     push_lock_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    scopes: Mapped[str] = mapped_column(Text, default="", server_default="")
 
 
 class GcalTombstone(Base):
@@ -161,3 +164,33 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[object] = mapped_column(JSON)
+
+
+class Document(Base):
+    __tablename__ = "document"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subject_id: Mapped[int] = mapped_column(ForeignKey("subject.id"), index=True)
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("event.id"), nullable=True, index=True)
+    drive_file_id: Mapped[str] = mapped_column(String(255), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(255))
+    size: Mapped[int] = mapped_column(BigInteger)
+    tag: Mapped[str] = mapped_column(String(16))
+    web_view_link: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class DocumentUpload(Base):
+    __tablename__ = "document_upload"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    session_uri: Mapped[str] = mapped_column(Text)
+    subject_id: Mapped[int] = mapped_column(ForeignKey("subject.id"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("event.id"), nullable=True)
+    tag: Mapped[str] = mapped_column(String(16))
+    name: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(255))
+    size: Mapped[int] = mapped_column(BigInteger)
+    received: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime)

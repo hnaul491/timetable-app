@@ -153,6 +153,9 @@ class HttpGoogleCalendar:
     def revoke(self) -> None:
         self._session.revoke()
 
+    def granted_scopes(self) -> set[str]:
+        return self._session.granted_scopes()
+
     def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> httpx.Response:
         return self._session.request(method, API + path, json=body)
 

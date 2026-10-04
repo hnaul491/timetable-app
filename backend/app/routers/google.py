@@ -11,6 +11,7 @@ from app.db import get_session
 from app.deps import get_gcal_factory, get_now
 from app.gcal.api import (ACCOUNT_ID, ALL_KINDS, CALENDAR_NAME, DEFAULT_KINDS, REFRESH_TOKEN_NAME, TIME_ZONE,
                           GcalFactory, GoogleError)
+from app.gdrive.api import DRIVE_SCOPE
 from app.gcal.push import _close, plan_ops, reset_calendar, run_push
 from app.models import AppSecret, GoogleAccount
 from app.schemas import GoogleConnectIn, GoogleKindsIn, GoogleStatusOut, PushResultOut
@@ -34,6 +35,7 @@ def _status(session: Session, settings: Settings, now: datetime) -> GoogleStatus
         last_push_at=iso_utc(account.last_push_at) if account.last_push_at else None,
         last_push_error=account.last_push_error,
         pending=len(plan_ops(session, account, now, settings.app_url)),
+        drive_enabled=DRIVE_SCOPE in account.scopes.split(),
     )
 
 
@@ -63,6 +65,7 @@ def connect(body: GoogleConnectIn, user: CurrentUser = Depends(require_user),
     try:
         if account.calendar_id is None:
             account.calendar_id = gcal.create_calendar(CALENDAR_NAME, TIME_ZONE)
+        account.scopes = _granted_scopes(gcal)
     except GoogleError as exc:
         session.rollback()
         raise HTTPException(status_code=400, detail=f"Google Calendar refused the connection: {exc}") from None
@@ -104,6 +107,15 @@ def disconnect(session: Session = Depends(get_session), settings: Settings = Dep
     session.execute(delete(AppSecret).where(AppSecret.name == REFRESH_TOKEN_NAME))
     session.commit()
     return Response(status_code=204)
+
+
+def _granted_scopes(gcal: object) -> str:
+    """The scopes Google granted, space separated; empty when they cannot be read."""
+    try:
+        scopes = getattr(gcal, "granted_scopes", None)
+        return " ".join(sorted(scopes())) if callable(scopes) else ""
+    except GoogleError:
+        return ""
 
 
 def _revoke_quietly(session: Session, settings: Settings, factory: GcalFactory) -> None:

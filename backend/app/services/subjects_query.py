@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import Event, MySection, Note, Subject, Task
+from app.models import Document, DocumentUpload, Event, MySection, Note, Subject, Task
 from app.services.events_query import VisibleEvent, list_visible_events
 
 FAR_PAST = datetime(2000, 1, 1)
@@ -83,6 +83,8 @@ def note_snippets(session: Session, event_ids: list[int]) -> dict[int, str]:
 def merge_subjects(session: Session, source: Subject, target: Subject) -> None:
     session.execute(update(Event).where(Event.subject_id == source.id).values(subject_id=target.id))
     session.execute(update(Task).where(Task.subject_id == source.id).values(subject_id=target.id))
+    session.execute(update(Document).where(Document.subject_id == source.id).values(subject_id=target.id))
+    session.execute(delete(DocumentUpload).where(DocumentUpload.subject_id == source.id))
     source_choice = session.get(MySection, source.id)
     if source_choice is not None:
         if session.get(MySection, target.id) is None:

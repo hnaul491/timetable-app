@@ -14,7 +14,9 @@ describe("google connect helpers", () => {
 
   it("asks Google for offline calendar access and comes back to Settings", async () => {
     await startGoogleConnect();
-    expect(CALENDAR_SCOPE).toBe("https://www.googleapis.com/auth/calendar.app.created");
+    expect(CALENDAR_SCOPE).toBe(
+      "https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/drive.file",
+    );
     expect(supabase.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: "google",
       options: {

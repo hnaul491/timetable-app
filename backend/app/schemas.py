@@ -281,6 +281,7 @@ class GoogleStatusOut(BaseModel):
     last_push_at: str | None
     last_push_error: str | None
     pending: int
+    drive_enabled: bool = False
 
 
 class GoogleConnectIn(BaseModel):
@@ -304,3 +305,40 @@ Language = Literal["en", "vi"]
 
 class Preferences(BaseModel):
     language: Language | None = None
+
+
+class DocumentOut(BaseModel):
+    id: int
+    subject_id: int
+    event_id: int | None
+    event_start: str | None
+    name: str
+    mime_type: str
+    size: int
+    tag: str
+    web_view_link: str
+    created_at: str
+
+
+class UploadStartIn(BaseModel):
+    subject_id: int
+    event_id: int | None = None
+    tag: Literal["slides", "exercises", "other"]
+    name: str = Field(min_length=1, max_length=255)
+    mime_type: str = Field(min_length=1, max_length=255)
+    size: int = Field(ge=1, le=104857600)
+
+
+class UploadStartOut(BaseModel):
+    upload_id: str
+    chunk_size: int
+
+
+class UploadChunkOut(BaseModel):
+    received: int
+    document: DocumentOut | None
+
+
+class DocumentPatch(BaseModel):
+    tag: Literal["slides", "exercises", "other"] | None = None
+    event_id: int | None = None

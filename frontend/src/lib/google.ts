@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
+export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/drive.file";
 const FLAG_KEY = "timetable:google-connect";
 
 /** Re-run the Google login asking for calendar access that keeps working offline. */

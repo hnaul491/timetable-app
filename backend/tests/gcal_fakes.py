@@ -6,13 +6,19 @@ from app.gcal.api import GoogleNotFound
 class FakeCalendar:
     """In-memory Google Calendar. `fail` maps a method name to a queue of exceptions (None = succeed)."""
 
-    def __init__(self, fail: dict[str, list[Exception | None]] | None = None) -> None:
+    def __init__(self, fail: dict[str, list[Exception | None]] | None = None,
+                 scopes: set[str] | None = None) -> None:
+        self.scopes = set(scopes or ())
         self.calendars: dict[str, str] = {}
         self.events: dict[str, dict[str, Any]] = {}
         self.calls: list[tuple[str, str]] = []
         self._fail = {name: list(queue) for name, queue in (fail or {}).items()}
         self._created = 0
         self._next = 0
+
+    def granted_scopes(self) -> set[str]:
+        self._check("granted_scopes")
+        return set(self.scopes)
 
     def _check(self, method: str) -> None:
         queue = self._fail.get(method)

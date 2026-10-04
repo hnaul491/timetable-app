@@ -1,10 +1,10 @@
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-from app.models import Event, GcalTombstone, Note, RecurringRule, Task
+from app.models import Document, DocumentUpload, Event, GcalTombstone, Note, RecurringRule, Task
 from app.timeutil import to_naive_utc
 
 PARIS = ZoneInfo("Europe/Paris")
@@ -40,6 +40,8 @@ def delete_event_cascade(session: Session, event: Event) -> None:
         # The Google copy is removed by the next push.
         session.merge(GcalTombstone(gcal_event_id=event.gcal_event_id,
                                     created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+    session.execute(update(Document).where(Document.event_id == event.id).values(event_id=None))
+    session.execute(delete(DocumentUpload).where(DocumentUpload.event_id == event.id))
     session.execute(delete(Task).where(Task.event_id == event.id))
     session.execute(delete(Note).where(Note.event_id == event.id))
     session.delete(event)

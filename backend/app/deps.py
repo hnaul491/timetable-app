@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.gcal.api import GcalFactory, GoogleCalendar
-from app.gcal.http_client import HttpGoogleCalendar
+from app.gcal.http_client import GoogleSession, HttpGoogleCalendar
+from app.gdrive.api import DriveFactory, GoogleDrive
+from app.gdrive.http_client import HttpGoogleDrive
 from app.models import Semester
 from app.secret_store import get_zeus_key
 from app.zeus.ics_client import ZeusFetchError, build_ics_url, fetch_ics
@@ -34,5 +36,12 @@ def get_fetcher(
 def get_gcal_factory(settings: Settings = Depends(get_settings)) -> GcalFactory:
     def make(refresh_token: str) -> GoogleCalendar:
         return HttpGoogleCalendar(settings.google_client_id, settings.google_client_secret, refresh_token)
+
+    return make
+
+
+def get_drive_factory(settings: Settings = Depends(get_settings)) -> DriveFactory:
+    def make(refresh_token: str) -> GoogleDrive:
+        return HttpGoogleDrive(GoogleSession(settings.google_client_id, settings.google_client_secret, refresh_token))
 
     return make

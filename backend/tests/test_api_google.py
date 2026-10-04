@@ -3,8 +3,8 @@ from datetime import datetime
 from sqlalchemy import select
 
 from app.deps import get_fetcher, get_gcal_factory
-from app.gcal.api import GoogleAuthError
-from app.models import AppSecret, Event, Subject
+from app.gcal.api import GoogleAuthError, GoogleError
+from app.models import AppSecret, Event, GoogleAccount, Subject
 from tests.conftest import AUTH
 from tests.gcal_fakes import FakeCalendar
 
@@ -155,3 +155,22 @@ def test_connect_clears_last_push_error_and_disconnect_revokes(client, settings,
     assert session.get(GoogleAccount, 1).last_push_error is None
     client.delete("/api/google", headers=AUTH)
     assert revoked == [True]
+
+
+def test_connect_records_granted_scopes_and_status_shows_drive(client, settings, session, semester):
+    scopes = {"https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/calendar.app.created"}
+    configure(client, settings, FakeCalendar(scopes=scopes))
+    body = connect(client).json()
+    assert body["drive_enabled"] is True
+    assert session.get(GoogleAccount, 1).scopes == " ".join(sorted(scopes))
+    assert client.get("/api/google", headers=AUTH).json()["drive_enabled"] is True
+
+
+def test_connect_without_drive_scope_or_with_tokeninfo_error(client, settings, session, semester):
+    configure(client, settings, FakeCalendar(scopes={"https://www.googleapis.com/auth/calendar.app.created"}))
+    assert connect(client).json()["drive_enabled"] is False
+    configure(client, settings, FakeCalendar(fail={"granted_scopes": [GoogleError("Could not reach Google")]}))
+    body = connect(client)
+    assert body.status_code == 200 and body.json()["drive_enabled"] is False
+    session.expire_all()
+    assert session.get(GoogleAccount, 1).scopes == ""
