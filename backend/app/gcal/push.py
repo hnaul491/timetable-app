@@ -128,7 +128,7 @@ def _delete_quietly(gcal: GoogleCalendar, calendar_id: str, gcal_event_id: str) 
         pass  # already gone in Google
 
 
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 WORKERS = 4
 PARALLEL = ("insert", "update")
 
@@ -279,6 +279,7 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
                 outcomes = [_inline(gcal, calendar_id, op) for op in live]
             stop_run = False
             fatal: Exception | None = None
+            crash: Exception | None = None
             for op, (new_id, error) in zip(live, outcomes):
                 if error is None:
                     try:
@@ -286,6 +287,8 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
                         session.commit()
                     except StaleDataError:
                         session.rollback()
+                        logger.warning("Google event created but not recorded (row changed); "
+                                       "it may be duplicated on the next push")
                         result.failed += 1
                         result.error = "A timetable row changed while pushing; it is retried on the next push"
                         continue
@@ -308,8 +311,10 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
                     last_error = result.error
                     if streak >= SAME_ERROR_LIMIT:  # persistent error: stop hammering Google
                         stop_run = True
-                else:
-                    raise error
+                elif crash is None:
+                    crash = error  # raised after every success of the batch is recorded
+            if crash is not None:
+                raise crash
             if isinstance(fatal, GoogleAuthError):
                 raise fatal
             if fatal is not None:

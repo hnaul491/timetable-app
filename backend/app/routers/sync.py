@@ -18,7 +18,7 @@ from app.zeus.sync import Fetcher, run_sync
 
 router = APIRouter(prefix="/api")
 
-SYNC_AND_PUSH_BUDGET_S = 38.0
+SYNC_AND_PUSH_BUDGET_S = 30.0
 
 
 def to_out(run: SyncRun) -> SyncRunOut:

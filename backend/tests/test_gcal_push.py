@@ -128,11 +128,11 @@ def test_time_budget_is_checked_before_each_batch(session, semester, world):
     ticks = iter(range(100))
     for n in range(10):
         ev(session, semester, f"extra{n}", datetime(2026, 11, 2 + n, 8), subject=session.get(Subject, events["class"].subject_id))
-    session.commit()  # 14 ops: a batch of 8, then a batch of 6
+    session.commit()  # 14 ops: batches of 4,4,4,2
     first = run(session, account, fake, deadline=1, clock=lambda: next(ticks))
-    assert (first.status, first.done, first.remaining) == ("partial", 8, 6)
+    assert (first.status, first.done, first.remaining) == ("partial", 4, 10)
     second = run(session, account, fake)
-    assert (second.status, second.done, second.remaining) == ("ok", 6, 0)
+    assert (second.status, second.done, second.remaining) == ("ok", 10, 0)
     assert len(fake.events) == 14
 
 
@@ -462,3 +462,37 @@ def test_run_push_gives_every_worker_its_own_client(session, world):
     assert run_push(session, cfg, lambda token: Handle(), NOW, NEVER).status == "ok"
     assert len(handles) >= 2 and all(len(h.threads) <= 1 for h in handles)
     assert len(shared.events) == 4
+
+def test_plain_error_mid_batch_still_records_the_successes(session, world):
+    from app.gcal.push import run_push
+    events, _ = world
+    cfg = settings()
+    _stored(session, cfg)
+    fake = FakeCalendar(fail={"insert_event": [None, RuntimeError("boom"), None]})
+    result = run_push(session, cfg, lambda token: fake, NOW, NEVER)
+    assert result.status == "failed"
+    session.expire_all()
+    assert sum(1 for e in events.values() if e.gcal_event_id) == len(fake.events) == 3
+
+
+def test_auth_error_mid_batch_still_records_the_successes(session, world):
+    events, account = world
+    fake = FakeCalendar(fail={"insert_event": [None, GoogleAuthError("revoked"), None]})
+    result = run(session, account, fake)
+    assert result.status == "failed" and account.needs_reconnect is True
+    assert sum(1 for e in events.values() if e.gcal_event_id) == len(fake.events) >= 1
+
+
+def test_unrecorded_google_success_is_logged(session, world, monkeypatch, caplog):
+    import logging
+    from sqlalchemy.orm.exc import StaleDataError
+    from app.gcal import push as push_module
+    _, account = world
+
+    def stale(session_, op, new_id):
+        raise StaleDataError("gone")
+
+    monkeypatch.setattr(push_module, "_record", stale)
+    with caplog.at_level(logging.WARNING, logger="app.gcal.push"):
+        run(session, account, FakeCalendar())
+    assert "Google event created but not recorded (row changed); it may be duplicated on the next push" in caplog.text
