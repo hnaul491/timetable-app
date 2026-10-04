@@ -421,6 +421,7 @@ class SearchEvent(BaseModel):
     end: str
     room: str | None = None
     cancelled: bool = False
+    title_raw: str | None = None
 
 
 class SearchSubject(BaseModel):
@@ -429,6 +430,7 @@ class SearchSubject(BaseModel):
 
 
 class SearchNote(BaseModel):
+    id: int
     event_id: int
     event_title: str
     snippet: str

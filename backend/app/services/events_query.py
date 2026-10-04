@@ -112,6 +112,27 @@ def next_event(session: Session, event: Event) -> Event | None:
     return session.scalars(query.order_by(Event.start_at).limit(1)).first()
 
 
+def visibility(event: Event, subject: Subject | None, chosen: dict[int, str]) -> str:
+    """The calendar's rule: "show", "hide" (hidden subject / another section) or "missing" (no section chosen)."""
+    if subject is not None and subject.hidden:
+        return "hide"
+    if event.section is None:
+        return "show"
+    pick = chosen.get(event.subject_id) if event.subject_id is not None else None
+    if pick is None:
+        return "missing"
+    return "show" if pick == ALL_SECTIONS or pick == event.section else "hide"
+
+
+def invisible_event_ids(session: Session, semester_id: int) -> set[int]:
+    """Ids of the semester's events the calendar does not show, for excluding them from other listings."""
+    subjects = _subjects(session, semester_id)
+    chosen = _chosen(session, list(subjects))
+    rows = session.scalars(select(Event).where(Event.semester_id == semester_id))
+    return {e.id for e in rows
+            if visibility(e, subjects.get(e.subject_id) if e.subject_id is not None else None, chosen) != "show"}
+
+
 def list_visible_events(
     session: Session, semester_id: int, start: datetime, end: datetime, with_counts: bool = True
 ) -> tuple[list[VisibleEvent], list[str]]:
@@ -126,16 +147,11 @@ def list_visible_events(
     missing: set[str] = set()
     for event in rows:
         subject = subjects.get(event.subject_id) if event.subject_id is not None else None
-        if subject is not None and subject.hidden:
-            continue
-        if event.section is not None:
-            pick = chosen.get(event.subject_id) if event.subject_id is not None else None
-            if pick is None:
-                missing.add(subject.display_name if subject else event.title_raw)
-                continue
-            if pick != ALL_SECTIONS and pick != event.section:
-                continue
-        visible.append(_to_visible(event, subject))
+        verdict = visibility(event, subject, chosen)
+        if verdict == "missing":
+            missing.add(subject.display_name if subject else event.title_raw)
+        elif verdict == "show":
+            visible.append(_to_visible(event, subject))
     return (_with_counts(session, visible) if with_counts else visible), sorted(missing)
 
 

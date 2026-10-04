@@ -128,3 +128,61 @@ def test_semester_scoping(client, session, semester):
 
 def test_no_active_semester(client, session):
     assert search(client, "anything").json()["events"] == []
+
+
+def test_section_visibility_follows_the_calendar(client, session, semester):
+    from app.models import MySection
+    sub = make_subject(session, semester, "Physics")
+    other = make_subject(session, semester, "Chemistry")
+    mine = make_event(session, semester, "Quark A", datetime(2026, 10, 16, 8, 0), subject=sub)
+    mine.section = "A"
+    theirs = make_event(session, semester, "Quark B", datetime(2026, 10, 17, 8, 0), subject=sub)
+    theirs.section = "B"
+    unchosen = make_event(session, semester, "Quark C", datetime(2026, 10, 18, 8, 0), subject=other)
+    unchosen.section = "C"
+    plain = make_event(session, semester, "Quark plain", datetime(2026, 10, 19, 8, 0))
+    session.add(MySection(subject_id=sub.id, section="A"))
+    for ev in (mine, theirs, unchosen):
+        session.add(Note(event_id=ev.id, tab="after", body="quark note", updated_at=NOW))
+        session.add(Task(event_id=ev.id, title="quark task", source="manual", created_at=NOW))
+        session.add(Document(subject_id=ev.subject_id, event_id=ev.id, drive_file_id=f"d{ev.id}",
+                             name="quark doc", mime_type="x", size=1, tag="t", created_at=NOW))
+    session.commit()
+    body = search(client, "quark").json()
+    assert {e["id"] for e in body["events"]} == {mine.id, plain.id}
+    assert [n["event_id"] for n in body["notes"]] == [mine.id]
+    assert [t["event_id"] for t in body["tasks"]] == [mine.id]
+    assert len(body["documents"]) == 1
+    assert "id" in body["notes"][0]
+
+
+def test_hidden_subject_events_notes_documents_tasks(client, session, semester):
+    hidden = make_subject(session, semester, "Secret", hidden=True)
+    ev = make_event(session, semester, "Zebra class", datetime(2026, 10, 16, 8, 0), subject=hidden)
+    session.add(Note(event_id=ev.id, tab="after", body="zebra note", updated_at=NOW))
+    session.add(Task(event_id=ev.id, title="zebra task", source="manual", created_at=NOW))
+    session.add(Document(subject_id=hidden.id, drive_file_id="h1", name="zebra doc", mime_type="x", size=1,
+                         tag="t", created_at=NOW))
+    session.commit()
+    assert search(client, "zebra").json() == {
+        "events": [], "subjects": [], "notes": [], "tasks": [], "documents": []}
+
+
+def test_event_in_progress_counts_as_upcoming_and_past_fills_up(client, session, semester):
+    running = make_event(session, semester, "Lab run", datetime(2026, 10, 15, 11, 30))  # ends 12:30, NOW 12:00
+    old1 = make_event(session, semester, "Lab old1", datetime(2026, 10, 1, 8, 0))
+    old2 = make_event(session, semester, "Lab old2", datetime(2026, 10, 2, 8, 0))
+    soon = make_event(session, semester, "Lab soon", datetime(2026, 10, 20, 8, 0))
+    session.commit()
+    ids = [e["id"] for e in search(client, "lab", limit=3).json()["events"]]
+    assert ids == [running.id, soon.id, old2.id]
+    assert [e["id"] for e in search(client, "lab", limit=10).json()["events"]] == [
+        running.id, soon.id, old2.id, old1.id]
+
+
+def test_event_title_raw_returned_when_it_differs(client, session, semester):
+    sub = make_subject(session, semester, "Databases")
+    make_event(session, semester, "CM INF-DB groupe 3", datetime(2026, 10, 16, 8, 0), subject=sub)
+    session.commit()
+    ev = search(client, "groupe").json()["events"][0]
+    assert ev["title"] == "Databases" and ev["title_raw"] == "CM INF-DB groupe 3"
