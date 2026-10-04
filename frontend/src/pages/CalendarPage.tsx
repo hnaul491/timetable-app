@@ -110,7 +110,9 @@ export function CalendarPage() {
   const editParam = params.get("edit");
   const eventId = eventParam && /^\d+$/.test(eventParam) ? Number(eventParam) : null;
   const editId = editParam && /^\d+$/.test(editParam) ? Number(editParam) : null;
-  const slot = parseSlot(params.get("new"));
+  // "?new=today" (home-screen shortcut, quick-action menu) means today at 09:00.
+  const newParam = params.get("new");
+  const slot = newParam === "today" ? { date: todayParis(), start: "09:00" } : parseSlot(newParam);
   const openNew = (date: string, start: string) => openPopup("new", `${date}T${start}`);
 
   const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i)) : [anchor];

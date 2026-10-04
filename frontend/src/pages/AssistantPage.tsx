@@ -95,6 +95,19 @@ export function AssistantPage() {
         : null;
   const quick = eventId !== null ? QUICK_EVENT : subjectId !== null ? QUICK_SUBJECT : QUICK;
   const clearContext = () => setParams({}, { replace: true });
+  // "/assistant?compose=1" (quick-action menu) focuses the composer once, then drops the param.
+  const [composer, setComposer] = useState<HTMLTextAreaElement | null>(null);
+  const wantsCompose = params.get("compose") === "1";
+  useEffect(() => {
+    if (!wantsCompose) return;
+    if (!composer) return; // the composer mounts once the page has loaded
+    composer.focus();
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("compose");
+      return next;
+    }, { replace: true });
+  }, [wantsCompose, composer, setParams]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [hidePrivacy, setHidePrivacy] = useState(privacyDismissed);
@@ -104,7 +117,6 @@ export function AssistantPage() {
   const busyRef = useRef(false); // set synchronously in submit: blocks a second send before state catches up
   const resyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const composer = useRef<HTMLTextAreaElement>(null);
 
   const status = useQuery({ queryKey: ["ai-status"], queryFn: () => apiFetch<AiStatus>("/api/ai/status") });
   const enabled = status.data?.enabled === true;
@@ -253,7 +265,7 @@ export function AssistantPage() {
     }
   };
   const stop = () => abortRef.current?.abort();
-  useShortcut("assistant-focus", "i", () => composer.current?.focus(), { label: "shortcuts.assistantFocus", enabled });
+  useShortcut("assistant-focus", "i", () => composer?.focus(), { label: "shortcuts.assistantFocus", enabled });
   useShortcut("assistant-stop", "Escape", stop, { label: "shortcuts.assistantStop", enabled: streaming });
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // The engine ignores plain keys while typing, and focus stays in the box during a reply.
@@ -415,7 +427,7 @@ export function AssistantPage() {
             className="flex items-end gap-2"
           >
             <textarea
-              ref={composer}
+              ref={setComposer}
               aria-label={t("ai.composer")}
               value={text}
               onChange={(e) => setText(e.target.value)}

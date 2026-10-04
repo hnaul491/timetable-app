@@ -12,4 +12,9 @@ export const nav: Messages["nav"] = {
   selectSemester: "Chọn học kỳ",
   collapse: "Thu gọn thanh bên",
   expand: "Mở rộng thanh bên",
+  quickActions: "Thao tác nhanh",
+  quickNewEvent: "Sự kiện mới",
+  quickNewTask: "Việc mới",
+  quickAskAi: "Hỏi trợ lý AI",
+  quickFreeTime: "Thời gian rảnh",
 };

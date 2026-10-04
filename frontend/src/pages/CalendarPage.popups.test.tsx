@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
 import { translate } from "../i18n";
+import { todayParis } from "../lib/time";
 import { calendarHref } from "../lib/calendarLocation";
 import { ChromeProvider, useChrome } from "../lib/chrome";
 import { ShortcutProvider } from "../lib/shortcuts";
@@ -240,6 +241,12 @@ describe("CalendarPage popups", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Save event" }));
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("event=5"));
     expect(screen.getByTestId("where")).not.toHaveTextContent("edit=");
+  });
+
+  it("?new=today opens the new-event popup for today at 09:00", async () => {
+    renderAt("/?new=today");
+    expect(await screen.findByLabelText("Start")).toHaveValue("09:00");
+    expect(screen.getByLabelText("Date")).toHaveValue(todayParis());
   });
 
   it("ignores an invalid ?new= time", async () => {

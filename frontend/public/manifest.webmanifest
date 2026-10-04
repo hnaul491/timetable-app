@@ -10,5 +10,11 @@
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New event", "short_name": "New event", "url": "/?new=today", "icons": [{ "src": "/icons/shortcut-event.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Free time", "short_name": "Free time", "url": "/free-time", "icons": [{ "src": "/icons/shortcut-free-time.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Assistant", "short_name": "Assistant", "url": "/assistant", "icons": [{ "src": "/icons/shortcut-assistant.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Search", "short_name": "Search", "url": "/?search=1", "icons": [{ "src": "/icons/shortcut-search.png", "sizes": "96x96", "type": "image/png" }] }
   ]
 }

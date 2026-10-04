@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       {createPortal(
-        <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex flex-col items-center gap-2 px-4 md:inset-x-auto md:right-6 md:bottom-6 md:items-end">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[9.5rem] z-[60] flex flex-col items-center gap-2 px-4 md:inset-x-auto md:right-6 md:bottom-24 md:items-end">
           <div aria-live="polite" className="flex w-full max-w-sm flex-col gap-2">{render("success")}</div>
           <div aria-live="assertive" className="flex w-full max-w-sm flex-col gap-2">{render("error")}</div>
         </div>,

@@ -10,4 +10,9 @@ export const nav = {
   selectSemester: "Select semester",
   collapse: "Collapse sidebar",
   expand: "Expand sidebar",
+  quickActions: "Quick actions",
+  quickNewEvent: "New event",
+  quickNewTask: "New task",
+  quickAskAi: "Ask AI",
+  quickFreeTime: "Free time",
 };
