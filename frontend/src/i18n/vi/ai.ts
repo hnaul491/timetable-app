@@ -75,6 +75,7 @@ export const ai: Messages["ai"] = {
   modelLabel: "Mô hình",
   noteBest: "chất lượng tốt nhất",
   noteFastest: "nhanh nhất",
+  modelUnavailable: "không khả dụng",
   autoFallback: "Tự động đổi mô hình khi hết lượt",
   modelHelp: "Gói miễn phí chỉ cho phép vài yêu cầu mỗi phút cho mỗi mô hình. Một câu hỏi có thể dùng nhiều yêu cầu.",
   settingsSaved: "Đã lưu cài đặt AI",

@@ -15,13 +15,19 @@ export function AISettings() {
   const save = useMutation({
     mutationFn: (body: { model?: string; auto_fallback?: boolean }) =>
       apiFetch<AiStatus>("/api/ai/settings", { method: "PUT", body: JSON.stringify(body) }),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       toast.success(t("ai.settingsSaved"));
-      queryClient.invalidateQueries({ queryKey: ["ai-status"] });
+      queryClient.setQueryData(["ai-status"], saved); // the PUT answers with the new status: no snap-back while refetching
     },
     onError: (error) => toast.error(t("ai.settingsFailed", { message: error.message })),
   });
-  const notes: Record<string, string> = { "best quality": t("ai.noteBest"), fastest: t("ai.noteFastest") };
+  const notes = { best: t("ai.noteBest"), fastest: t("ai.noteFastest") };
+  const optionText = (m: NonNullable<AiStatus["models"]>[number]) => {
+    const parts = [m.label];
+    if (m.note_key) parts.push(` — ${notes[m.note_key]}`);
+    if (m.available === false) parts.push(` (${t("ai.modelUnavailable")})`);
+    return parts.join("");
+  };
   const data = status.data;
   return (
     <section className={card}>
@@ -41,7 +47,7 @@ export function AISettings() {
             >
               {data.models.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.note ? `${m.label} — ${notes[m.note] ?? m.note}` : m.label}
+                  {optionText(m)}
                 </option>
               ))}
             </select>

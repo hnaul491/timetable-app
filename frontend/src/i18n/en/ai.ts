@@ -73,6 +73,7 @@ export const ai = {
   modelLabel: "Model",
   noteBest: "best quality",
   noteFastest: "fastest",
+  modelUnavailable: "not available",
   autoFallback: "Switch model automatically when the limit is reached",
   modelHelp: "The free plan allows only a few requests per minute per model. One question can use several.",
   settingsSaved: "AI settings saved",

@@ -199,7 +199,7 @@ export interface DocumentItem {
 export interface AiStatus {
   enabled: boolean;
   model: string | null;
-  models?: { id: string; label: string; note: string }[];
+  models?: { id: string; label: string; note: string; note_key?: "best" | "fastest" | null; available?: boolean }[];
   auto_fallback?: boolean;
 }
 

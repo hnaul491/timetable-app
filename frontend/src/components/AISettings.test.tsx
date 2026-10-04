@@ -14,16 +14,15 @@ vi.mock("../lib/api", async (importOriginal) => ({
 }));
 
 const MODELS = [
-  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash", note: "best quality" },
-  { id: "gemini-3-flash", label: "Gemini 3 Flash", note: "" },
-  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", note: "fastest" },
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash", note: "best quality", note_key: "best" as const, available: true },
+  { id: "gemini-3-flash", label: "Gemini 3 Flash", note: "", note_key: null, available: true },
+  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", note: "fastest", note_key: "fastest" as const, available: true },
 ];
 
 function setup(status: Partial<AiStatus> & { enabled: boolean }, locale: "en" | "vi" = "en") {
   const full = { model: null, ...status } as AiStatus;
-  apiFetch.mockImplementation(async (path: string) => (path === "/api/ai/status" ? full : full));
+  apiFetch.mockImplementation(async () => full);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const invalidate = vi.spyOn(client, "invalidateQueries");
   render(
     <QueryClientProvider client={client}>
       <I18nProvider locale={locale}>
@@ -33,7 +32,7 @@ function setup(status: Partial<AiStatus> & { enabled: boolean }, locale: "en" | 
       </I18nProvider>
     </QueryClientProvider>,
   );
-  return invalidate;
+  return client;
 }
 
 const enabled = { enabled: true, model: "gemini-3.8-flash", models: MODELS, auto_fallback: true };
@@ -49,7 +48,7 @@ describe("AISettings", () => {
   });
 
   it("lists the models and saves the chosen one", async () => {
-    const invalidate = setup(enabled);
+    const client = setup(enabled);
     const select = await screen.findByRole("combobox", { name: "Model" });
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
       "Gemini 3.8 Flash — best quality",
@@ -62,7 +61,29 @@ describe("AISettings", () => {
       expect(apiFetch).toHaveBeenCalledWith("/api/ai/settings", { method: "PUT", body: JSON.stringify({ model: "gemini-2.5-flash-lite" }) }),
     );
     expect(await screen.findByText("AI settings saved")).toBeInTheDocument();
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["ai-status"] });
+    expect(client.getQueryData(["ai-status"])).toEqual(enabled);
+  });
+
+  it("keeps the saved choice in the select without waiting for a refetch", async () => {
+    const saved = { ...enabled, model: "gemini-2.5-flash-lite" };
+    const client = setup(enabled);
+    const select = await screen.findByRole("combobox", { name: "Model" });
+    apiFetch.mockImplementation(async (path: string) => (path === "/api/ai/settings" ? saved : enabled));
+    await userEvent.selectOptions(select, "gemini-2.5-flash-lite");
+    await waitFor(() => expect(client.getQueryData(["ai-status"])).toEqual(saved));
+    expect(select).toHaveValue("gemini-2.5-flash-lite");
+  });
+
+  it("marks models the server reports as gone, still selectable", async () => {
+    setup({ ...enabled, models: [MODELS[0], { ...MODELS[1], available: false }, MODELS[2]] });
+    await screen.findByRole("combobox", { name: "Model" });
+    const option = screen.getByRole("option", { name: "Gemini 3 Flash (not available)" });
+    expect(option).not.toBeDisabled();
+  });
+
+  it("marks gone models in Vietnamese", async () => {
+    setup({ ...enabled, models: [MODELS[0], { ...MODELS[1], available: false }, MODELS[2]] }, "vi");
+    expect(await screen.findByRole("option", { name: "Gemini 3 Flash (không khả dụng)" })).toBeInTheDocument();
   });
 
   it("toggles automatic fallback", async () => {

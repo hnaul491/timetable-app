@@ -142,6 +142,17 @@ describe("AssistantPage", () => {
     expect(await screen.findByText(/AI limit reached, try again later/)).toBeInTheDocument();
   });
 
+  it("shows the Vietnamese limit text and the hint when a 429 arrives in Vietnamese", async () => {
+    route((path, init) => {
+      if (path === "/api/chat" && init?.method === "POST") throw new ApiError(429, "some server text");
+      return undefined;
+    });
+    renderPage("vi");
+    await userEvent.type(await screen.findByRole("textbox", { name: "Nhắn cho trợ lý" }), "xin chào{Enter}");
+    expect(await screen.findByText(/Đã đạt giới hạn AI, hãy thử lại sau/)).toBeInTheDocument();
+    expect(screen.getByText(/Bạn có thể chọn mô hình khác/)).toBeInTheDocument();
+  });
+
   it("explains when the AI is off and links to Settings", async () => {
     enabled = false;
     route();
@@ -295,6 +306,7 @@ describe("AssistantPage", () => {
       renderPage();
       await typeHi();
       expect(await screen.findByText(/AI limit reached, try again later/)).toBeInTheDocument();
+      expect(screen.getByText(/You can pick another model in Settings\./)).toBeInTheDocument();
       expect(apiFetch.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
       expect(screen.getByRole("textbox", { name: "Message the assistant" })).toHaveValue("hi");
     });
@@ -398,6 +410,20 @@ describe("AssistantPage", () => {
       const dialog = await screen.findByRole("dialog");
       await userEvent.click(within(dialog).getByRole("button", { name: "Clear chat" }));
       await waitFor(() => expect(screen.queryByText("Partial")).toBeNull());
+    });
+
+    it("Clear chat is disabled while a reply is streaming", async () => {
+      history = [reply({ actions: [] })];
+      fetchMock.mockImplementation(hang([frame("delta", { text: "Partial" })]));
+      route();
+      renderPage();
+      await screen.findByRole("button", { name: "Clear chat" });
+      await typeHi();
+      await screen.findByText("Partial");
+      expect(screen.getByRole("button", { name: "Clear chat" })).toBeDisabled();
+      await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+      await screen.findByText("Stopped");
+      expect(screen.getByRole("button", { name: "Clear chat" })).toBeEnabled();
     });
 
     it("shows status chips and Stop in Vietnamese", async () => {

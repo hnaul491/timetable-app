@@ -271,7 +271,7 @@ export function AssistantPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">{t("ai.title")}</h1>
         {enabled && messages.length > 0 && (
-          <button type="button" onClick={askClear} disabled={clear.isPending} className="h-9 rounded-lg border border-line px-3 text-sm font-semibold text-ink-2 disabled:opacity-60">
+          <button type="button" onClick={askClear} disabled={clear.isPending || streaming} className="h-9 rounded-lg border border-line px-3 text-sm font-semibold text-ink-2 disabled:opacity-60">
             {t("ai.clear")}
           </button>
         )}
