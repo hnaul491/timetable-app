@@ -1,23 +1,29 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MessageKey } from "../i18n";
+import { eventKey, isModifierKey, isSingleKey, parseKeys } from "./shortcutKeys";
+
+export { formatKeys, isSequence } from "./shortcutKeys";
 
 export type ShortcutOptions = { label?: MessageKey; inDialog?: boolean; enabled?: boolean };
 type Handler = (e: KeyboardEvent) => void;
 type Entry = { id: string; keys: string; label?: MessageKey; inDialog: boolean; handlerRef: { current: Handler } };
+/** id -> replacement keys; null turns the shortcut off. */
+export type ShortcutOverrides = Record<string, string | null>;
+export type ShortcutInfo = {
+  id: string;
+  /** Effective keys (override or default); empty when turned off. */
+  keys: string;
+  defaultKeys: string;
+  label: MessageKey;
+  disabled: boolean;
+};
 type Registry = {
   register: (entry: Entry) => () => void;
-  list: { id: string; keys: string; label: MessageKey }[];
+  list: ShortcutInfo[];
 };
 
 const SEQUENCE_MS = 1000;
 const Ctx = createContext<Registry | null>(null);
-
-const normalise = (key: string) => (key.length === 1 ? key.toLowerCase() : key);
-
-function parse(keys: string): { mod: boolean; steps: string[] } {
-  if (keys.startsWith("Mod+")) return { mod: true, steps: [normalise(keys.slice(4))] };
-  return { mod: false, steps: keys.split(" ").map(normalise) };
-}
 
 const NON_TEXT_INPUTS = ["checkbox", "radio", "button", "submit", "reset", "range", "color", "file"];
 
@@ -27,59 +33,72 @@ function isTyping(target: EventTarget | null): boolean {
   return target.isContentEditable || target.closest('[contenteditable=""], [contenteditable="true"]') !== null || ["TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-export function ShortcutProvider({ children }: { children: ReactNode }) {
+/** Override ?? default; null (off) gives null. */
+export function effectiveKeys(id: string, defaultKeys: string, overrides: ShortcutOverrides): string | null {
+  return Object.prototype.hasOwnProperty.call(overrides, id) ? overrides[id] : defaultKeys;
+}
+
+export function ShortcutProvider({
+  children,
+  overrides,
+  singleKey = true,
+}: {
+  children: ReactNode;
+  overrides?: ShortcutOverrides;
+  /** false: shortcuts without Mod or Alt are ignored, except Escape (WCAG 2.1.4). */
+  singleKey?: boolean;
+}) {
   const entries = useRef(new Map<string, Entry>());
   const [version, setVersion] = useState(0);
   const pending = useRef<{ prefix: string; at: number } | null>(null);
+  const effective = overrides ?? NO_OVERRIDES;
+  const live = useRef({ overrides: effective, singleKey });
+  live.current = { overrides: effective, singleKey };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey || e.defaultPrevented || ["Control", "Meta", "Shift", "Alt"].includes(e.key)) return;
+      if (e.defaultPrevented || isModifierKey(e.key)) return;
       const mod = e.ctrlKey || e.metaKey;
-      const key = normalise(e.key);
+      const alt = e.altKey;
+      const key = eventKey(e);
       const arrow = key.startsWith("Arrow");
-      // Held letter keys must not retrigger actions, and Shift+letter/arrow belongs to text selection.
+      // Held letter keys must not retrigger actions.
       if (e.repeat && !arrow) return;
-      if (e.shiftKey && (arrow || /^[a-z]$/.test(key))) return;
       const typing = isTyping(e.target);
       const inDialog = document.querySelector('[aria-modal="true"]') !== null;
-      const eligible = [...entries.current.values()].filter((en) => {
-        const parsed = parse(en.keys);
-        if (parsed.mod !== mod) return false;
-        if (typing && !parsed.mod) return false;
-        if (inDialog && !en.inDialog) return false;
-        return true;
+      const { overrides: current, singleKey: allowSingle } = live.current;
+      const eligible = [...entries.current.values()].flatMap((en) => {
+        const keys = effectiveKeys(en.id, en.keys, current);
+        if (keys === null) return [];
+        const parsed = parseKeys(keys);
+        if (parsed.mod !== mod || parsed.alt !== alt) return [];
+        // Shift+letter/arrow belongs to text selection unless the shortcut asks for Shift.
+        if (parsed.shift ? !e.shiftKey : e.shiftKey && (arrow || /^[a-z]$/.test(key))) return [];
+        if (!allowSingle && isSingleKey(keys) && keys !== "Escape") return [];
+        if (typing && !parsed.mod && !parsed.alt) return [];
+        if (inDialog && !en.inDialog) return [];
+        return [{ en, steps: parsed.steps }];
       });
       const fire = (en: Entry) => {
         e.preventDefault();
         pending.current = null;
         en.handlerRef.current(e);
       };
-      if (mod) {
+      if (mod || alt) {
         pending.current = null;
-        const hit = eligible.find((en) => parse(en.keys).steps[0] === key);
-        if (hit) fire(hit);
+        const hit = eligible.find((c) => c.steps[0] === key);
+        if (hit) fire(hit.en);
         return;
       }
       const prior = pending.current;
       pending.current = null;
       if (prior && Date.now() - prior.at <= SEQUENCE_MS) {
-        const hit = eligible.find((en) => {
-          const steps = parse(en.keys).steps;
-          return steps.length === 2 && steps[0] === prior.prefix && steps[1] === key;
-        });
-        if (hit) return fire(hit);
+        const hit = eligible.find((c) => c.steps.length === 2 && c.steps[0] === prior.prefix && c.steps[1] === key);
+        if (hit) return fire(hit.en);
       }
-      const single = eligible.find((en) => {
-        const steps = parse(en.keys).steps;
-        return steps.length === 1 && steps[0] === key;
-      });
-      if (single) return fire(single);
-      const startsSequence = eligible.some((en) => {
-        const steps = parse(en.keys).steps;
-        return steps.length === 2 && steps[0] === key;
-      });
-      if (startsSequence) pending.current = { prefix: key, at: Date.now() };
+      const single = eligible.find((c) => c.steps.length === 1 && c.steps[0] === key);
+      if (single) return fire(single.en);
+      if (eligible.some((c) => c.steps.length === 2 && c.steps[0] === key)) pending.current = { prefix: key, at: Date.now() };
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -99,13 +118,18 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Registry>(() => {
     const list = [...entries.current.values()]
       .filter((en): en is Entry & { label: MessageKey } => en.label !== undefined)
-      .map(({ id, keys, label }) => ({ id, keys, label }));
+      .map(({ id, keys, label }) => {
+        const keysNow = effectiveKeys(id, keys, effective);
+        return { id, keys: keysNow ?? "", defaultKeys: keys, label, disabled: keysNow === null };
+      });
     return { list, register };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, register]);
+  }, [version, register, effective]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
+
+const NO_OVERRIDES: ShortcutOverrides = {};
 
 export function useShortcut(id: string, keys: string, handler: Handler, options: ShortcutOptions = {}) {
   const registry = useContext(Ctx);
@@ -119,13 +143,6 @@ export function useShortcut(id: string, keys: string, handler: Handler, options:
   }, [register, id, keys, label, inDialog, enabled]);
 }
 
-export function useShortcutList(): { id: string; keys: string; label: MessageKey }[] {
+export function useShortcutList(): ShortcutInfo[] {
   return useContext(Ctx)?.list ?? [];
-}
-
-const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-
-export function formatKeys(keys: string, mac: boolean = isMac()): string[] {
-  if (keys.startsWith("Mod+")) return [mac ? "⌘" : "Ctrl", ...formatKeys(keys.slice(4), mac)];
-  return keys.split(" ").map((k) => (k.length === 1 ? k.toUpperCase() : k));
 }

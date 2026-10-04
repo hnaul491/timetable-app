@@ -5,6 +5,7 @@ import { AppearanceSettings } from "../components/AppearanceSettings";
 import { BackupSettings } from "../components/BackupSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
 import { MobileSemesterSwitch } from "../components/MobileSemesterSwitch";
+import { ShortcutSettings } from "../components/ShortcutSettings";
 import { SubjectSettings } from "../components/SubjectSettings";
 import { useT } from "../i18n";
 import { connectPending } from "../lib/google";
@@ -28,6 +29,8 @@ function SectionBody({ id }: { id: SectionId }) {
       return <AISettings />;
     case "backup":
       return <BackupSettings />;
+    case "shortcuts":
+      return <ShortcutSettings />;
   }
 }
 

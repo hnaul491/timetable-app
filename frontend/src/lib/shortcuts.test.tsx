@@ -1,7 +1,8 @@
 import { act, render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatKeys, ShortcutProvider, useShortcut } from "./shortcuts";
+import { formatKeys } from "./shortcutKeys";
+import { ShortcutProvider, useShortcut, useShortcutList, type ShortcutOverrides } from "./shortcuts";
 
 function Probe({ n, go, save }: { n: () => void; go: () => void; save?: (e: KeyboardEvent) => void }) {
   useShortcut("new", "n", n);
@@ -139,5 +140,121 @@ describe("formatKeys", () => {
     expect(formatKeys("Mod+s", false)).toEqual(["Ctrl", "S"]);
     expect(formatKeys("Mod+s", true)).toEqual(["⌘", "S"]);
     expect(formatKeys("g c")).toEqual(["G", "C"]);
+  });
+});
+
+function Listed() {
+  useShortcut("new", "n", () => {}, { label: "shortcuts.newEvent" });
+  useShortcut("go", "g c", () => {}, { label: "shortcuts.goCalendar" });
+  const list = useShortcutList();
+  return (
+    <ul>
+      {list.map((s) => (
+        <li key={s.id}>{`${s.id}|${s.keys}|${s.defaultKeys}|${s.disabled}`}</li>
+      ))}
+    </ul>
+  );
+}
+
+describe("shortcut overrides", () => {
+  const mount = (overrides: ShortcutOverrides | undefined, singleKey = true) => {
+    const fns = { n: vi.fn(), t: vi.fn(), go: vi.fn(), alt: vi.fn(), shift: vi.fn(), esc: vi.fn(), save: vi.fn() };
+    function Many() {
+      useShortcut("new", "n", fns.n);
+      useShortcut("today", "t", fns.t);
+      useShortcut("go", "g c", fns.go);
+      useShortcut("alt", "Alt+x", fns.alt);
+      useShortcut("shift", "Shift+ArrowRight", fns.shift);
+      useShortcut("esc", "Escape", fns.esc);
+      useShortcut("save", "Mod+s", fns.save);
+      return null;
+    }
+    const tree = (o: ShortcutOverrides | undefined, s: boolean) => (
+      <ShortcutProvider overrides={o} singleKey={s}>
+        <Many />
+      </ShortcutProvider>
+    );
+    const view = render(tree(overrides, singleKey));
+    return { fns, rerender: (o: ShortcutOverrides | undefined, s = true) => view.rerender(tree(o, s)) };
+  };
+
+  it("uses the override instead of the default key, live", async () => {
+    const user = userEvent.setup();
+    const { fns, rerender } = mount(undefined);
+    await user.keyboard("n");
+    expect(fns.n).toHaveBeenCalledTimes(1);
+    rerender({ new: "m" });
+    await user.keyboard("n");
+    expect(fns.n).toHaveBeenCalledTimes(1);
+    await user.keyboard("m");
+    expect(fns.n).toHaveBeenCalledTimes(2);
+    rerender({});
+    await user.keyboard("n");
+    expect(fns.n).toHaveBeenCalledTimes(3);
+  });
+
+  it("turns a shortcut off with null and leaves the others", async () => {
+    const user = userEvent.setup();
+    const { fns } = mount({ new: null });
+    await user.keyboard("n");
+    await user.keyboard("t");
+    expect(fns.n).not.toHaveBeenCalled();
+    expect(fns.t).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts overridden sequences, Alt and Shift combos", async () => {
+    const user = userEvent.setup();
+    const { fns } = mount({ go: "g x", new: "Alt+n", today: "Shift+t" });
+    await user.keyboard("gc");
+    expect(fns.go).not.toHaveBeenCalled();
+    await user.keyboard("gx");
+    expect(fns.go).toHaveBeenCalledTimes(1);
+    await user.keyboard("{Alt>}n{/Alt}");
+    expect(fns.n).toHaveBeenCalledTimes(1);
+    await user.keyboard("t");
+    expect(fns.t).not.toHaveBeenCalled();
+    await user.keyboard("{Shift>}t{/Shift}");
+    expect(fns.t).toHaveBeenCalledTimes(1);
+    await user.keyboard("{Alt>}x{/Alt}");
+    expect(fns.alt).toHaveBeenCalledTimes(1);
+    await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
+    expect(fns.shift).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores shortcuts without Mod or Alt when single-key shortcuts are off, except Escape", async () => {
+    const user = userEvent.setup();
+    const { fns, rerender } = mount(undefined, false);
+    await user.keyboard("n");
+    await user.keyboard("gc");
+    await user.keyboard("{Shift>}{ArrowRight}{/Shift}");
+    await user.keyboard("{Escape}");
+    await user.keyboard("{Control>}s{/Control}");
+    await user.keyboard("{Alt>}x{/Alt}");
+    expect(fns.n).not.toHaveBeenCalled();
+    expect(fns.go).not.toHaveBeenCalled();
+    expect(fns.shift).not.toHaveBeenCalled();
+    expect(fns.esc).toHaveBeenCalledTimes(1);
+    expect(fns.save).toHaveBeenCalledTimes(1);
+    expect(fns.alt).toHaveBeenCalledTimes(1);
+    rerender(undefined, true);
+    await user.keyboard("n");
+    expect(fns.n).toHaveBeenCalledTimes(1);
+  });
+
+  it("an override that adds Mod keeps working with single keys off", async () => {
+    const user = userEvent.setup();
+    const { fns } = mount({ new: "Mod+j" }, false);
+    await user.keyboard("{Control>}j{/Control}");
+    expect(fns.n).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists effective keys, defaults and the off state", () => {
+    const { container } = render(
+      <ShortcutProvider overrides={{ new: "m", go: null }}>
+        <Listed />
+      </ShortcutProvider>,
+    );
+    const items = [...container.querySelectorAll("li")].map((li) => li.textContent);
+    expect(items).toEqual(["new|m|n|false", "go||g c|true"]);
   });
 });

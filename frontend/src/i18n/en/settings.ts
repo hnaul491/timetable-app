@@ -10,6 +10,7 @@ export const settings = {
     google: "Google",
     ai: "AI assistant",
     backup: "Backup",
+    shortcuts: "Shortcuts",
   },
   status: {
     synced: "Synced {when}",
@@ -28,6 +29,8 @@ export const settings = {
     aiOff: "Off",
     backupNever: "Never",
     backupDownloadOnly: "Download only",
+    shortcutsCustom: { one: "{count} customised", other: "{count} customised" },
+    shortcutsDefault: "Default",
   },
   syncStatus: { running: "running", ok: "ok", partial: "partial", failed: "failed", auth_failed: "auth_failed" },
   appearance: {

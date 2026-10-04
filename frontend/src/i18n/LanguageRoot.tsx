@@ -7,6 +7,9 @@ import type { Locale } from "./locale";
 
 export interface Preferences {
   language: Locale | null;
+  /** Keyboard shortcut overrides (id -> keys, null = off). */
+  shortcuts?: Record<string, string | null>;
+  single_key_shortcuts?: boolean;
 }
 
 export function usePreferences() {

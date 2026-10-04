@@ -12,7 +12,7 @@ import { TopProgress } from "./components/ui/TopProgress";
 import { ApiError } from "./lib/api";
 import { ChromeProvider } from "./lib/chrome";
 import { initialLanguage } from "./lib/language";
-import { ShortcutProvider } from "./lib/shortcuts";
+import { ShortcutRoot } from "./components/ShortcutRoot";
 import { AssistantPage } from "./pages/AssistantPage";
 import { BoardPage } from "./pages/BoardPage";
 import { CalendarPage } from "./pages/CalendarPage";
@@ -77,11 +77,11 @@ export default function App() {
             <ToastProvider>
               <ConfirmProvider>
                 <TopProgress />
-                <ShortcutProvider>
+                <ShortcutRoot>
                   <ChromeProvider>
                     <AuthedRouter />
                   </ChromeProvider>
-                </ShortcutProvider>
+                </ShortcutRoot>
               </ConfirmProvider>
             </ToastProvider>
           </LanguageRoot>
