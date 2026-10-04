@@ -5,6 +5,7 @@ import { useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { useChrome } from "../lib/chrome";
 import { useShortcut } from "../lib/shortcuts";
+import { SearchPalette } from "./SearchPalette";
 import { ShortcutHelp } from "./ShortcutHelp";
 import type { Semester } from "../types";
 
@@ -31,6 +32,13 @@ export function Layout() {
   const navigate = useNavigate();
   const { sidebarCollapsed, toggleSidebar, fullScreen, setFullScreen } = useChrome();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  // Ctrl/Cmd+K toggles the palette, but never opens it on top of another dialog.
+  useShortcut("search", "Mod+k", () => {
+    if (searchOpen) setSearchOpen(false);
+    else if (document.querySelector('[aria-modal="true"]') === null) setSearchOpen(true);
+  }, { label: "shortcuts.search", inDialog: true });
+  useShortcut("search-slash", "/", () => setSearchOpen(true), { label: "shortcuts.search" });
   useShortcut("sidebar", "[", toggleSidebar, { label: "shortcuts.toggleSidebar" });
   useShortcut("help", "?", () => setHelpOpen(true), { label: "shortcuts.help" });
   useShortcut("exit-full-screen", "Escape", () => setFullScreen(false), { label: "shortcuts.exitFullScreen", enabled: fullScreen });
@@ -96,6 +104,16 @@ export function Layout() {
         </div>
         <button
           type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label={t("search.open")}
+          title={t("search.open")}
+          className={`flex h-10 items-center gap-3 rounded-lg text-sm font-medium text-ink-2 hover:bg-subtle ${collapsed ? "justify-center" : "px-3"}`}
+        >
+          <Icon><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Icon>
+          {!collapsed && t("search.open")}
+        </button>
+        <button
+          type="button"
           onClick={toggleSidebar}
           aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
           title={collapsed ? t("nav.expand") : t("nav.collapse")}
@@ -106,7 +124,13 @@ export function Layout() {
         </button>
       </nav>
       )}
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {!fullScreen && (
+        <button type="button" onClick={() => setSearchOpen(true)} aria-label={t("search.open")} className="fixed top-3 right-3 z-40 flex size-10 items-center justify-center rounded-full border border-line bg-surface text-ink-2 shadow-sm md:hidden">
+          <Icon><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Icon>
+        </button>
+      )}
       <main className="min-w-0 flex-1 px-4 pt-5 pb-24 md:px-7 md:pb-8">
         <Outlet />
       </main>

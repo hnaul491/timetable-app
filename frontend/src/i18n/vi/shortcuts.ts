@@ -19,6 +19,7 @@ export const shortcuts: Messages["shortcuts"] = {
   goSettings: "Đến Cài đặt",
   save: "Lưu",
   delete: "Xoá",
+  search: "Tìm kiếm",
   help: "Hiện phím tắt",
   contextHint: "Có thêm phím tắt khi ở trang Lịch.",
   then: "rồi",
