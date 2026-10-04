@@ -13,7 +13,12 @@ import { useLocale, useT } from "../i18n";
 import { translateServerMessage } from "../i18n/serverMessages";
 import { apiFetch } from "../lib/api";
 import { formatTime, parisParts } from "../lib/time";
-import type { SectionChoice, SyncRun, SyncStatus } from "../types";
+import type { SectionChoice, Semester, SyncRun, SyncStatus } from "../types";
+
+interface GroupMismatch {
+  link_group: number;
+  semester_group: number;
+}
 
 const card = "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5";
 const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60";
@@ -27,16 +32,30 @@ export function SettingsPage() {
   const keyStatus = useQuery({ queryKey: ["zeus-key"], queryFn: () => apiFetch<{ configured: boolean }>("/api/settings/zeus-key") });
   const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => apiFetch<SectionChoice[]>("/api/settings/sections") });
+  const semesters = useQuery({ queryKey: ["semesters"], queryFn: () => apiFetch<Semester[]>("/api/semesters") });
   const [link, setLink] = useState("");
+  const [mismatch, setMismatch] = useState<GroupMismatch | null>(null);
 
   const saveKey = useMutation({
-    mutationFn: (value: string) => apiFetch("/api/settings/zeus-key", { method: "PUT", body: JSON.stringify({ value }) }),
-    onSuccess: () => {
+    mutationFn: (value: string) =>
+      apiFetch<{ configured: boolean; group_mismatch?: GroupMismatch | null }>("/api/settings/zeus-key", { method: "PUT", body: JSON.stringify({ value }) }),
+    onSuccess: (data) => {
       setLink("");
+      setMismatch(data?.group_mismatch ?? null);
       queryClient.invalidateQueries({ queryKey: ["zeus-key"] });
       toast.success(t("settings.zeus.keySaved"));
     },
     onError: (error, value) => toast.error(error.message, { retry: () => saveKey.mutate(value) }),
+  });
+  const activeSemester = semesters.data?.find((s) => s.is_active);
+  const useLinkGroup = useMutation({
+    mutationFn: (v: { id: number; group: number }) =>
+      apiFetch(`/api/semesters/${v.id}`, { method: "PATCH", body: JSON.stringify({ zeus_group_id: v.group }) }),
+    onSuccess: () => {
+      setMismatch(null);
+      queryClient.invalidateQueries();
+    },
+    onError: (error, v) => toast.error(error.message, { retry: () => useLinkGroup.mutate(v) }),
   });
   const syncNow = useMutation({
     mutationFn: () => apiFetch<SyncRun>("/api/sync", { method: "POST" }),
@@ -97,6 +116,24 @@ export function SettingsPage() {
             </p>
             <p className="text-sm">{keyStatus.data?.configured ? t("settings.zeus.saved") : t("settings.zeus.notSaved")}</p>
           </form>
+          {mismatch && (
+            <div role="alert" className="flex flex-col gap-2 rounded-xl border border-warn-line bg-warn-soft px-3 py-2.5 text-sm text-warn">
+              <p>{t("settings.zeus.groupMismatch", { link_group: mismatch.link_group, semester_group: mismatch.semester_group })}</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!activeSemester || useLinkGroup.isPending}
+                  onClick={() => activeSemester && useLinkGroup.mutate({ id: activeSemester.id, group: mismatch.link_group })}
+                  className={primary}
+                >
+                  {t("settings.zeus.useGroup", { group: mismatch.link_group })}
+                </button>
+                <button type="button" onClick={() => setMismatch(null)} className="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink">
+                  {t("settings.zeus.keepGroup", { group: mismatch.semester_group })}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
             <span>
               {t("settings.zeus.lastSync", { value: lastRun ? `${statusLabel(lastRun.status)} · ${when(lastRun.finished_at)}` : t("common.never") })}

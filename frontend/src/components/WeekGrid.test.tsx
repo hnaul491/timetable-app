@@ -97,7 +97,7 @@ describe("WeekGrid", () => {
   it("draws an event that ends on a later Paris day on each day it covers", async () => {
     const onSelect = vi.fn();
     // Mon 19 Oct 22:00 Paris (20:00Z) to Tue 20 Oct 02:00 Paris (00:00Z)
-    render(<WeekGrid days={WEEK} events={[event({ id: 9, title: "Night shift", section: null, room: null, kind: "work", color: null, start: "2026-10-19T20:00:00Z", end: "2026-10-20T00:00:00Z" })]} onSelect={onSelect} />);
+    render(<WeekGrid days={WEEK} events={[event({ id: 9, title: "Night shift", section: undefined, room: undefined, kind: "work", color: null, start: "2026-10-19T20:00:00Z", end: "2026-10-20T00:00:00Z" })]} onSelect={onSelect} />);
     const blocks = screen.getAllByRole("group", { name: /Night shift/ });
     expect(blocks).toHaveLength(2);
     const [first, second] = blocks;
@@ -113,7 +113,7 @@ describe("WeekGrid", () => {
   });
 
   it("does not add a day when the event ends exactly at midnight", () => {
-    render(<WeekGrid days={WEEK} events={[event({ id: 9, title: "Late", section: null, room: null, start: "2026-10-19T20:00:00Z", end: "2026-10-19T22:00:00Z" })]} />);
+    render(<WeekGrid days={WEEK} events={[event({ id: 9, title: "Late", section: undefined, room: undefined, start: "2026-10-19T20:00:00Z", end: "2026-10-19T22:00:00Z" })]} />);
     expect(screen.getAllByRole("group", { name: /Late/ })).toHaveLength(1);
   });
 });
