@@ -150,7 +150,7 @@ def test_unexpected_error_is_persisted_as_failed_without_leaking_secret(session,
     monkeypatch.setattr("app.zeus.sync.apply_feed", boom)
     text = ("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nDTSTART:20261020T123000Z\r\n"
             "DTEND:20261020T143000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
-    run = run_sync(session, lambda sem: text, LATER)
+    run = run_sync(session, lambda sem: text, LATER, clock=lambda: LATER)
     assert run.status == "failed"
     assert run.error == "unexpected error (RuntimeError)"
     assert "SECRETKEY99" not in run.error

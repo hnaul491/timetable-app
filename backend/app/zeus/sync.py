@@ -98,7 +98,7 @@ def _utcnow() -> datetime:
 
 
 def run_sync(session: Session, fetch: Fetcher, now: datetime,
-             clock: Callable[[], datetime] = _utcnow) -> SyncRun:
+             clock: Callable[[], datetime] | None = None) -> SyncRun:
     run = SyncRun(started_at=now, status="running", fetched=0, inserted=0, updated=0,
                   cancelled=0, skipped=0)
     session.add(run)
@@ -128,6 +128,6 @@ def run_sync(session: Session, fetch: Fetcher, now: datetime,
                          "(guard: more than 30% would be cancelled)")
         else:
             run.status = "ok"
-    run.finished_at = clock()
+    run.finished_at = (clock or _utcnow)()
     session.commit()
     return run

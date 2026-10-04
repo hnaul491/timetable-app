@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.deps import get_fetcher
 from app.models import MySection, Subject
 from app.zeus.ics_client import ZeusFetchError
@@ -45,7 +47,8 @@ def test_auth_failure_is_reported_in_body(client, semester):
     assert (body["status"], body["error"]) == ("auth_failed", "Zeus rejected the ICS link")
 
 
-def test_status_reports_last_run_and_last_success(client, semester):
+def test_status_reports_last_run_and_last_success(client, semester, monkeypatch):
+    monkeypatch.setattr("app.zeus.sync._utcnow", lambda: datetime(2026, 10, 15, 12, 0))
     assert client.get("/api/sync/status", headers=AUTH).json() == {"last_run": None, "last_success_at": None}
     use_feed(client)
     client.post("/api/sync", headers=AUTH)
