@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
 import { SettingsAt } from "../test/settingsRoute";
 
@@ -10,6 +12,7 @@ vi.mock("../lib/api", async (importOriginal) => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
 }));
 
+const deletes = () => apiFetch.mock.calls.filter((c) => String(c[0]).startsWith("/api/settings/sections/") && c[1]?.method === "DELETE");
 const puts = () => apiFetch.mock.calls.filter((c) => c[0] === "/api/settings/sections" && c[1]?.method === "PUT");
 
 function setup() {
@@ -28,7 +31,9 @@ function setup() {
   render(
     <QueryClientProvider client={client}>
       <ToastProvider>
-        <SettingsAt />
+        <ConfirmProvider>
+          <SettingsAt />
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>,
   );
@@ -52,5 +57,25 @@ describe("SettingsPage My groups", () => {
     expect(choose.disabled).toBe(true);
     fireEvent.change(open, { target: { value: "" } });
     expect(puts()).toHaveLength(0);
+  });
+
+  it("removes a chosen group after confirming", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(await screen.findByRole("button", { name: "Remove my group for Chosen subject" }));
+    expect(await screen.findByText("Remove your group for “Chosen subject”?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(deletes()).toHaveLength(1));
+    expect(deletes()[0][0]).toBe("/api/settings/sections/1");
+    expect(await screen.findByText("Group removed")).toBeInTheDocument();
+  });
+
+  it("keeps the group when the dialog is cancelled, and offers no Remove before a group is chosen", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(await screen.findByRole("button", { name: "Remove my group for Chosen subject" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(deletes()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Remove my group for Open subject" })).toBeNull();
   });
 });

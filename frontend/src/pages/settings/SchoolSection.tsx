@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ErrorPanel } from "../../components/Banners";
+import { useConfirm } from "../../components/ui/Confirm";
 import { useToast } from "../../components/ui/Toast";
 import { RecurringList } from "../../components/RecurringList";
 import { SemesterSettings } from "../../components/SemesterSettings";
@@ -24,6 +25,7 @@ export function SchoolSection() {
   const statusLabel = (status: SyncRun["status"]) => t(`settings.syncStatus.${status}`);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const keyStatus = useQuery({ queryKey: ["zeus-key"], queryFn: () => apiFetch<{ configured: boolean }>("/api/settings/zeus-key") });
   const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
   const sections = useQuery({ queryKey: ["sections"], queryFn: () => apiFetch<SectionChoice[]>("/api/settings/sections") });
@@ -70,6 +72,23 @@ export function SchoolSection() {
     },
     onError: (error, body) => toast.error(error.message, { retry: () => pick.mutate(body) }),
   });
+  const removeGroup = useMutation({
+    mutationFn: (subjectId: number) => apiFetch(`/api/settings/sections/${subjectId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success(t("settings.groups.removed"));
+    },
+    onError: (error, subjectId) => toast.error(error.message, { retry: () => removeGroup.mutate(subjectId) }),
+  });
+  const askRemove = async (choice: SectionChoice) => {
+    const ok = await confirm({
+      title: t("settings.groups.removeTitle", { subject: choice.subject_name }),
+      body: t("settings.groups.removeBody"),
+      confirmLabel: t("settings.groups.removeConfirm"),
+      tone: "danger",
+    });
+    if (ok) removeGroup.mutate(choice.subject_id);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -143,9 +162,11 @@ export function SchoolSection() {
         <p className="text-sm text-muted">{t("settings.groups.help")}</p>
         {sections.data?.length === 0 && <p className="text-sm">{t("settings.groups.none")}</p>}
         {sections.data?.map((choice) => (
-          <label key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">
-            {choice.subject_name}
+          <div key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">
+          <label htmlFor={`group-${choice.subject_id}`}>{choice.subject_name}</label>
+          <div className="flex items-center gap-2">
             <select
+              id={`group-${choice.subject_id}`}
               value={choice.chosen ?? ""}
               onChange={(e) => e.target.value && pick.mutate({ subject_id: choice.subject_id, section: e.target.value })}
               className="h-10 min-w-[120px] rounded-xl border border-line-strong bg-surface px-2.5 font-semibold"
@@ -162,7 +183,20 @@ export function SchoolSection() {
                 </option>
               ))}
             </select>
-          </label>
+            {choice.chosen !== null && (
+              <button
+                type="button"
+                onClick={() => askRemove(choice)}
+                disabled={removeGroup.isPending}
+                aria-label={t("settings.groups.removeAria", { subject: choice.subject_name })}
+                title={t("settings.groups.removeAria", { subject: choice.subject_name })}
+                className="h-10 rounded-xl border border-line px-3 font-semibold text-danger hover:bg-subtle disabled:opacity-50"
+              >
+                {t("settings.groups.remove")}
+              </button>
+            )}
+          </div>
+          </div>
         ))}
       </section>
       <RecurringList />

@@ -100,3 +100,20 @@ def test_choose_all_groups(client, session, semester):
     [choice] = client.get("/api/settings/sections", headers=AUTH).json()
     assert choice["chosen"] == "ALL"
     assert choice["sections"] == ["G1", "G2"]
+
+
+def test_remove_chosen_group(client, session, semester):
+    french = seed_sections(session, semester, ["GR1", "GR5"])
+    client.put("/api/settings/sections", json={"subject_id": french.id, "section": "GR5"}, headers=AUTH)
+    resp = client.delete(f"/api/settings/sections/{french.id}", headers=AUTH)
+    assert resp.status_code == 204
+    assert session.scalar(select(MySection.section)) is None
+    [choice] = client.get("/api/settings/sections", headers=AUTH).json()
+    assert choice["chosen"] is None
+    # removing again is harmless
+    assert client.delete(f"/api/settings/sections/{french.id}", headers=AUTH).status_code == 204
+
+
+def test_remove_group_needs_auth(client, session, semester):
+    french = seed_sections(session, semester, ["GR1"])
+    assert client.delete(f"/api/settings/sections/{french.id}").status_code == 401

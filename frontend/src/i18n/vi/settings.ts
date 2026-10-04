@@ -63,6 +63,12 @@ export const settings: Messages["settings"] = {
     choose: "Chọn…",
     all: "Tất cả nhóm",
     saved: "Đã lưu nhóm",
+    remove: "Bỏ chọn",
+    removeAria: "Bỏ chọn nhóm của {subject}",
+    removeTitle: "Bỏ chọn nhóm của “{subject}”?",
+    removeBody: "Các buổi học theo nhóm (TD/TP) của môn này sẽ bị ẩn khỏi lịch cho đến khi bạn chọn lại nhóm.",
+    removeConfirm: "Bỏ chọn",
+    removed: "Đã bỏ chọn nhóm",
   },
   recurring: {
     title: "Sự kiện lặp lại của tôi",
