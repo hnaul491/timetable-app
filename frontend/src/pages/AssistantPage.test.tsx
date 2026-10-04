@@ -40,7 +40,7 @@ function route(extra: (path: string, init?: RequestInit) => unknown = () => unde
   });
 }
 
-function renderPage(locale: "en" | "vi" = "en") {
+function renderPage(locale: "en" | "vi" = "en", url = "/") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, "invalidateQueries");
   render(
@@ -49,7 +49,7 @@ function renderPage(locale: "en" | "vi" = "en") {
         <ToastProvider>
           <ConfirmProvider>
             <ShortcutProvider>
-              <MemoryRouter>
+              <MemoryRouter initialEntries={[url]}>
                 <AssistantPage />
               </MemoryRouter>
             </ShortcutProvider>
@@ -205,5 +205,56 @@ describe("AssistantPage", () => {
     renderPage("vi");
     expect(await screen.findByRole("textbox", { name: "Nhắn cho trợ lý" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tuần này có gì đến hạn?" })).toBeInTheDocument();
+  });
+});
+
+describe("AssistantPage context chip", () => {
+  beforeEach(() => {
+    apiFetch.mockReset();
+    localStorage.clear();
+    history = [];
+    enabled = true;
+    sendAnswer = () => reply({ actions: [] });
+  });
+  const eventDetail = { event: { id: 7, title: "DB lecture", start: "2026-10-20T08:00:00Z" } };
+  const subjectDetail = { subject: { id: 3, display_name: "Databases" } };
+  const ctx = (path: string, init?: RequestInit) => {
+    if (path === "/api/events/7") return eventDetail;
+    if (path === "/api/subjects/3") return subjectDetail;
+    return undefined;
+  };
+  const posted = () => JSON.parse(String(apiFetch.mock.calls.find((c) => c[0] === "/api/chat" && c[1]?.method === "POST")![1].body));
+
+  it("shows an event chip, adapts quick prompts and sends event_id", async () => {
+    route(ctx);
+    renderPage("en", "/assistant?event=7");
+    expect(await screen.findByText(/About: DB lecture · /)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quiz me on a subject" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Make a quiz from this class" }));
+    await waitFor(() => expect(posted().context).toEqual({ path: "/assistant", event_id: 7 }));
+  });
+
+  it("shows a subject chip with subject prompts and sends subject_id", async () => {
+    route(ctx);
+    renderPage("en", "/assistant?subject=3");
+    expect(await screen.findByText("About: Databases")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Quiz me on this subject" }));
+    await waitFor(() => expect(posted().context).toEqual({ path: "/assistant", subject_id: 3 }));
+  });
+
+  it("clearing the chip restores the default prompts and context", async () => {
+    route(ctx);
+    renderPage("en", "/assistant?subject=3");
+    await screen.findByText("About: Databases");
+    await userEvent.click(screen.getByRole("button", { name: "Clear the context" }));
+    expect(screen.queryByText("About: Databases")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Quiz me on a subject" }));
+    await waitFor(() => expect(posted().context).toEqual({ path: "/assistant" }));
+  });
+
+  it("is translated in Vietnamese", async () => {
+    route(ctx);
+    renderPage("vi", "/assistant?subject=3");
+    expect(await screen.findByText("Về: Databases")).toBeInTheDocument();
   });
 });

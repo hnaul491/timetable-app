@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams } from "react-router";
+import { AskAiLink } from "../components/AskAiLink";
 import { ErrorPanel } from "../components/Banners";
 import { DocumentsSection } from "../components/DocumentsSection";
 import { SuggestTasks } from "../components/SuggestTasks";
@@ -254,6 +255,7 @@ function EventPageInner() {
             </span>
             {event.room ? ` · ${event.room}` : ""}
           </p>
+          <AskAiLink event={event.id} className="self-start text-sm font-semibold text-accent" />
           {detail.data.next_event_id && nextStart && (
             <Link to={`/events/${detail.data.next_event_id}`} className="text-sm font-semibold text-accent">
               {t("event.nextClass", { date: formatLongDate(parisParts(nextStart).date, locale), time: formatTime(nextStart) })}

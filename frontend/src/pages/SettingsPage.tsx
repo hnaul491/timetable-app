@@ -155,7 +155,7 @@ export function SettingsPage() {
               {choice.subject_name}
               <select
                 value={choice.chosen ?? ""}
-                onChange={(e) => pick.mutate({ subject_id: choice.subject_id, section: e.target.value })}
+                onChange={(e) => e.target.value && pick.mutate({ subject_id: choice.subject_id, section: e.target.value })}
                 className="h-10 min-w-[120px] rounded-xl border border-line-strong bg-surface px-2.5 font-semibold"
               >
                 {choice.chosen === null && (

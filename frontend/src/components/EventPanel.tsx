@@ -7,6 +7,7 @@ import { invalidateTaskViews } from "../lib/invalidate";
 import { useShortcut } from "../lib/shortcuts";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
+import { AskAiLink } from "./AskAiLink";
 import { ErrorPanel } from "./Banners";
 import { DocumentsSection } from "./DocumentsSection";
 import { RuleEditDialog } from "./RuleEditDialog";
@@ -157,6 +158,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
             <Link to={`/events/${event.id}`} className={action}>
               {t("event.openFullPage")}
             </Link>
+            <AskAiLink event={event.id} className={action} />
             {data.recurring_rule_id !== null && (
               <button type="button" onClick={() => setEditingSeries(true)} className={action}>
                 {t("event.editSeries")}

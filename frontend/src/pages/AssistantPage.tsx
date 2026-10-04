@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { ActionCard } from "../components/ActionCard";
 import { useConfirm } from "../components/ui/Confirm";
 import { Skeleton } from "../components/ui/Skeleton";
@@ -9,12 +9,20 @@ import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { aiErrorText } from "../lib/aiError";
 import { invalidateTaskViews } from "../lib/invalidate";
-import type { AiStatus, ChatMessage, PendingAction } from "../types";
+import { formatLongDate, parisParts } from "../lib/time";
+import type { AiStatus, ChatMessage, EventDetail, PendingAction, SubjectDetail } from "../types";
 
 const PRIVACY_KEY = "timetable:ai-privacy";
 const MAX_LENGTH = 2000;
 const COUNTER_FROM = 1800;
 const QUICK: MessageKey[] = ["ai.quickDue", "ai.quickFree", "ai.quickQuiz", "ai.quickSummary"];
+const QUICK_EVENT: MessageKey[] = ["ai.quickEventSummary", "ai.quickEventQuiz", "ai.quickEventPrepare"];
+const QUICK_SUBJECT: MessageKey[] = ["ai.quickSubjectSummary", "ai.quickSubjectQuiz", "ai.quickSubjectPlan"];
+
+function positiveId(raw: string | null): number | null {
+  const n = Number(raw);
+  return raw && Number.isInteger(n) && n > 0 ? n : null;
+}
 
 function privacyDismissed(): boolean {
   try {
@@ -61,6 +69,21 @@ export function AssistantPage() {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const eventId = positiveId(params.get("event"));
+  const subjectId = eventId === null ? positiveId(params.get("subject")) : null;
+  const eventCtx = useQuery({ queryKey: ["event", String(eventId)], queryFn: () => apiFetch<EventDetail>(`/api/events/${eventId}`), enabled: eventId !== null });
+  const subjectCtx = useQuery({ queryKey: ["subject", String(subjectId)], queryFn: () => apiFetch<SubjectDetail>(`/api/subjects/${subjectId}`), enabled: subjectId !== null });
+  const contextLabel =
+    eventId !== null
+      ? eventCtx.data
+        ? t("ai.aboutEvent", { title: eventCtx.data.event.title, date: formatLongDate(parisParts(eventCtx.data.event.start).date, locale) })
+        : t("ai.aboutEvent", { title: "…", date: "…" })
+      : subjectId !== null
+        ? t("ai.aboutSubject", { title: subjectCtx.data?.subject.display_name ?? "…" })
+        : null;
+  const quick = eventId !== null ? QUICK_EVENT : subjectId !== null ? QUICK_SUBJECT : QUICK;
+  const clearContext = () => setParams({}, { replace: true });
   const [text, setText] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [hidePrivacy, setHidePrivacy] = useState(privacyDismissed);
@@ -77,7 +100,7 @@ export function AssistantPage() {
 
   const send = useMutation({
     mutationFn: (message: string) =>
-      apiFetch<{ message: ChatMessage }>("/api/chat", { method: "POST", body: JSON.stringify({ message, context: { path: location.pathname }, locale }) }),
+      apiFetch<{ message: ChatMessage }>("/api/chat", { method: "POST", body: JSON.stringify({ message, context: { path: location.pathname, ...(eventId !== null ? { event_id: eventId } : {}), ...(subjectId !== null ? { subject_id: subjectId } : {}) }, locale }) }),
     onSuccess: (answer, message) => {
       queryClient.setQueryData<{ messages: ChatMessage[] }>(["chat"], (old) => {
         const list = old?.messages ?? [];
@@ -223,11 +246,20 @@ export function AssistantPage() {
 
           {messages.length === 0 && !sending && (
             <div role="group" aria-label={t("ai.quickPromptsLabel")} className="flex flex-wrap gap-2">
-              {QUICK.map((k) => (
+              {quick.map((k) => (
                 <button key={k} type="button" onClick={() => submit(t(k))} className="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium text-ink-2 hover:bg-subtle">
                   {t(k)}
                 </button>
               ))}
+            </div>
+          )}
+
+          {contextLabel && (
+            <div className="flex items-center gap-2 self-start rounded-full border border-line bg-surface-2 py-1 pr-1 pl-3.5 text-sm text-ink-2">
+              <span>{contextLabel}</span>
+              <button type="button" onClick={clearContext} aria-label={t("ai.clearContext")} className="flex size-7 items-center justify-center rounded-full hover:bg-subtle">
+                <span aria-hidden="true">✕</span>
+              </button>
             </div>
           )}
 

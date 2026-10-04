@@ -20,9 +20,10 @@ const detail = (ruleId: number | null) => ({
   tasks: [], next_event_id: null, next_event_start: null, recurring_rule_id: ruleId,
 });
 
-function setup(ruleId: number | null) {
+function setup(ruleId: number | null, aiEnabled = false) {
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
+    if (path === "/api/ai/status") return { enabled: aiEnabled, model: "m" };
     if (path === "/api/events/7") return detail(ruleId);
     if (path === "/api/recurring" && !init?.method) return [RULE];
     if (path === "/api/recurring/5" && init?.method === "PUT") return RULE;
@@ -61,5 +62,18 @@ describe("EventPanel Edit series", () => {
     setup(null);
     await screen.findByRole("button", { name: "Edit" });
     expect(screen.queryByRole("button", { name: "Edit series" })).not.toBeInTheDocument();
+  });
+});
+
+describe("EventPanel Ask AI", () => {
+  it("links to the assistant about this class when AI is on", async () => {
+    setup(null, true);
+    expect(await screen.findByRole("link", { name: "Ask AI" })).toHaveAttribute("href", "/assistant?event=7");
+  });
+
+  it("hides Ask AI when AI is off", async () => {
+    setup(null, false);
+    await screen.findByRole("button", { name: "Edit" });
+    expect(screen.queryByRole("link", { name: "Ask AI" })).not.toBeInTheDocument();
   });
 });
