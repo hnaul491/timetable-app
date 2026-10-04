@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { AuthGate } from "./auth/AuthGate";
+import { I18nProvider } from "./i18n";
+import { LanguageRoot } from "./i18n/LanguageRoot";
 import { Layout } from "./components/Layout";
 import { ApiError } from "./lib/api";
+import { initialLanguage } from "./lib/language";
 import { BoardPage } from "./pages/BoardPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
@@ -24,22 +27,26 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthGate>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<CalendarPage />} />
-              <Route path="board" element={<BoardPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="review" element={<ReviewPage />} />
-              <Route path="subjects" element={<SubjectsPage />} />
-              <Route path="subjects/:id" element={<SubjectPage />} />
-              <Route path="events/new" element={<NewEventPage />} />
-              <Route path="events/:id" element={<EventPage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </AuthGate>
+      <I18nProvider locale={initialLanguage()}>
+        <AuthGate>
+          <LanguageRoot>
+            <BrowserRouter>
+              <Routes>
+                <Route element={<Layout />}>
+                  <Route index element={<CalendarPage />} />
+                  <Route path="board" element={<BoardPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="review" element={<ReviewPage />} />
+                  <Route path="subjects" element={<SubjectsPage />} />
+                  <Route path="subjects/:id" element={<SubjectPage />} />
+                  <Route path="events/new" element={<NewEventPage />} />
+                  <Route path="events/:id" element={<EventPage />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </LanguageRoot>
+        </AuthGate>
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

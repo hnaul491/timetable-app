@@ -1,0 +1,16 @@
+export const common = {
+  save: "Save",
+  cancel: "Cancel",
+  delete: "Delete",
+  edit: "Edit",
+  close: "Close",
+  loading: "Loading…",
+  retry: "Try again",
+  today: "Today",
+  week: "Week",
+  day: "Day",
+  never: "never",
+  itemsCount: { one: "{count} item", other: "{count} items" },
+  signInTitle: "Sign in with your Google account to see your timetable.",
+  continueWithGoogle: "Continue with Google",
+};

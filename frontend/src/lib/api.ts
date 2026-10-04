@@ -1,3 +1,5 @@
+import { getMessageLocale } from "../i18n/current";
+import { translateServerMessage } from "../i18n/serverMessages";
 import { supabase } from "./supabase";
 
 export class ApiError extends Error {
@@ -28,6 +30,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     } catch {
       // error body was not JSON; keep the status text
     }
+    message = translateServerMessage(message, getMessageLocale());
     throw new ApiError(response.status, message);
   }
   if (response.status === 204) return undefined as T;

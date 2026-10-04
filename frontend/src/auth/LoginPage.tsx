@@ -1,6 +1,8 @@
+import { useT } from "../i18n";
 import { supabase } from "../lib/supabase";
 
 export function LoginPage() {
+  const t = useT();
   const signIn = () =>
     supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   return (
@@ -10,9 +12,9 @@ export function LoginPage() {
           <div className="flex size-8 items-center justify-center rounded-lg bg-accent font-bold text-white">T</div>
           <h1 className="text-xl font-bold">Timetable</h1>
         </div>
-        <p className="text-sm text-muted">Sign in with your Google account to see your timetable.</p>
+        <p className="text-sm text-muted">{t("common.signInTitle")}</p>
         <button type="button" onClick={signIn} className="h-11 rounded-xl bg-accent font-semibold text-white hover:bg-accent-strong">
-          Continue with Google
+          {t("common.continueWithGoogle")}
         </button>
       </div>
     </main>

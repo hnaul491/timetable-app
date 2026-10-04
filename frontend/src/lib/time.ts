@@ -1,3 +1,5 @@
+import { INTL_LOCALE, type Locale } from "../i18n/locale";
+
 export const TZ = "Europe/Paris";
 
 const partsFormat = new Intl.DateTimeFormat("en-CA", {
@@ -64,13 +66,13 @@ export function rangeUtc(firstDate: string, days: number): { start: string; end:
   return { start: parisMidnightUtc(firstDate), end: parisMidnightUtc(addDays(firstDate, days)) };
 }
 
-export function dayLabel(date: string): { weekday: string; day: string } {
+export function dayLabel(date: string, locale: Locale = "en"): { weekday: string; day: string } {
   const dt = utcNoon(date);
-  return { weekday: dt.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }), day: String(dt.getUTCDate()) };
+  return { weekday: dt.toLocaleDateString(INTL_LOCALE[locale], { weekday: "short", timeZone: "UTC" }), day: String(dt.getUTCDate()) };
 }
 
-export function formatLongDate(date: string): string {
-  return utcNoon(date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+export function formatLongDate(date: string, locale: Locale = "en"): string {
+  return utcNoon(date).toLocaleDateString(INTL_LOCALE[locale], { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 export function parisLocalToUtc(date: string, hhmm: string): string {

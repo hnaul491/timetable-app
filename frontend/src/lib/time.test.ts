@@ -35,6 +35,12 @@ describe("Paris time", () => {
     expect(dayLabel("2026-10-19")).toEqual({ weekday: "Mon", day: "19" });
     expect(formatLongDate("2026-10-25")).toBe("25 October 2026");
   });
+
+  it("formatLongDate in Vietnamese", () => {
+    expect(formatLongDate("2026-11-01", "vi")).toContain("tháng 11");
+    expect(formatLongDate("2026-11-01")).toBe("1 November 2026");
+    expect(dayLabel("2026-10-26", "vi").day).toBe("26");
+  });
 });
 
 describe("Paris local → UTC", () => {
