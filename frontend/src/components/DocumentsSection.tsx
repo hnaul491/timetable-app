@@ -113,7 +113,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
       {driveOn === false && (
         <p className="rounded-xl bg-subtle px-4 py-3 text-sm text-ink-2">
           {t("documents.driveOff")}{" "}
-          <Link to="/settings" className="font-semibold text-accent">
+          <Link to="/settings/google" className="font-semibold text-accent">
             {t("documents.driveOffLink")}
           </Link>
         </p>

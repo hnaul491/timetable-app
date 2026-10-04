@@ -110,9 +110,9 @@ export function GoogleSettings() {
   const error = (connect.error ?? kinds.error ?? disconnect.error) as Error | null;
   return (
     <section className={card} aria-labelledby="google-heading">
-      <h2 id="google-heading" className="text-base font-bold">
+      <h3 id="google-heading" className="text-base font-bold">
         {t("google.title")}
-      </h2>
+      </h3>
       {!s ? (
         <div role="status" className="flex flex-col gap-2">
           <span className="sr-only">{t("common.loading")}</span>

@@ -31,7 +31,7 @@ export function AISettings() {
   const data = status.data;
   return (
     <section className={card}>
-      <h2 className="text-base font-bold">{t("ai.settingsTitle")}</h2>
+      <h3 className="text-base font-bold">{t("ai.settingsTitle")}</h3>
       {status.error && <p className="text-sm text-danger">{t("ai.statusFailed", { message: status.error.message })}</p>}
       {!data && !status.error && <Skeleton className="h-5 w-48" />}
       {data && <p className="text-sm font-semibold">{data.enabled ? t("ai.statusOn", { model: data.model ?? "" }) : t("ai.statusOff")}</p>}

@@ -1,186 +1,162 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
-import { ErrorPanel } from "../components/Banners";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { AISettings } from "../components/AISettings";
+import { AppearanceSettings } from "../components/AppearanceSettings";
 import { BackupSettings } from "../components/BackupSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
-import { useToast } from "../components/ui/Toast";
-import { AppearanceSettings } from "../components/AppearanceSettings";
 import { MobileSemesterSwitch } from "../components/MobileSemesterSwitch";
-import { RecurringList } from "../components/RecurringList";
-import { SemesterSettings } from "../components/SemesterSettings";
 import { SubjectSettings } from "../components/SubjectSettings";
-import { useLocale, useT } from "../i18n";
-import { translateServerMessage } from "../i18n/serverMessages";
-import { apiFetch } from "../lib/api";
-import { formatTime, parisParts } from "../lib/time";
-import type { SectionChoice, Semester, SyncRun, SyncStatus } from "../types";
+import { useT } from "../i18n";
+import { connectPending } from "../lib/google";
+import { useIsDesktop } from "../lib/useMediaQuery";
+import { SchoolSection } from "./settings/SchoolSection";
+import { SectionList } from "./settings/SectionList";
+import { SECTIONS, isSectionId, matchSections, type SectionId } from "./settings/sections";
+import { useSettingsStatus } from "./settings/useSettingsStatus";
 
-interface GroupMismatch {
-  link_group: number;
-  semester_group: number;
+function SectionBody({ id }: { id: SectionId }) {
+  switch (id) {
+    case "general":
+      return <AppearanceSettings />;
+    case "school":
+      return <SchoolSection />;
+    case "subjects":
+      return <SubjectSettings />;
+    case "google":
+      return <GoogleSettings />;
+    case "ai":
+      return <AISettings />;
+    case "backup":
+      return <BackupSettings />;
+  }
 }
 
-const card = "flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5";
-const primary = "h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-60";
+/** Rendered with key={id}, so it re-mounts on a section change and its children play the enter animation again. */
+function SectionContent({ id }: { id: SectionId }) {
+  return (
+    <div data-section={id} className="flex min-w-0 flex-col gap-4 motion-safe:*:animate-[settings-in_180ms_ease-out]">
+      <SectionBody id={id} />
+    </div>
+  );
+}
 
 export function SettingsPage() {
   const t = useT();
-  const locale = useLocale();
-  const statusLabel = (status: SyncRun["status"]) => t(`settings.syncStatus.${status}`);
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const keyStatus = useQuery({ queryKey: ["zeus-key"], queryFn: () => apiFetch<{ configured: boolean }>("/api/settings/zeus-key") });
-  const sync = useQuery({ queryKey: ["sync-status"], queryFn: () => apiFetch<SyncStatus>("/api/sync/status") });
-  const sections = useQuery({ queryKey: ["sections"], queryFn: () => apiFetch<SectionChoice[]>("/api/settings/sections") });
-  const semesters = useQuery({ queryKey: ["semesters"], queryFn: () => apiFetch<Semester[]>("/api/semesters") });
-  const [link, setLink] = useState("");
-  const [mismatch, setMismatch] = useState<GroupMismatch | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { section } = useParams();
+  const desktop = useIsDesktop();
+  const status = useSettingsStatus();
+  const [query, setQuery] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
 
-  const saveKey = useMutation({
-    mutationFn: (value: string) =>
-      apiFetch<{ configured: boolean; group_mismatch?: GroupMismatch | null }>("/api/settings/zeus-key", { method: "PUT", body: JSON.stringify({ value }) }),
-    onSuccess: (data) => {
-      setLink("");
-      setMismatch(data?.group_mismatch ?? null);
-      queryClient.invalidateQueries({ queryKey: ["zeus-key"] });
-      toast.success(t("settings.zeus.keySaved"));
-    },
-    onError: (error, value) => toast.error(error.message, { retry: () => saveKey.mutate(value) }),
-  });
-  const activeSemester = semesters.data?.find((s) => s.is_active);
-  const applyLinkGroup = useMutation({
-    mutationFn: (v: { id: number; group: number }) =>
-      apiFetch(`/api/semesters/${v.id}`, { method: "PATCH", body: JSON.stringify({ zeus_group_id: v.group }) }),
-    onSuccess: () => {
-      setMismatch(null);
-      queryClient.invalidateQueries();
-    },
-    onError: (error, v) => toast.error(error.message, { retry: () => applyLinkGroup.mutate(v) }),
-  });
-  const syncNow = useMutation({
-    mutationFn: () => apiFetch<SyncRun>("/api/sync", { method: "POST" }),
-    onSuccess: (run) => {
-      if (run.status === "ok" || run.status === "partial") toast.success(t("settings.zeus.syncDone", { count: run.fetched }));
-      else toast.error(run.error ? translateServerMessage(run.error, locale) : t("settings.zeus.syncFailed"), { retry: () => syncNow.mutate() });
-    },
-    onError: (error) => toast.error(error.message, { retry: () => syncNow.mutate() }),
-    onSettled: () => queryClient.invalidateQueries(),
-  });
-  const pick = useMutation({
-    mutationFn: (body: { subject_id: number; section: string }) =>
-      apiFetch("/api/settings/sections", { method: "PUT", body: JSON.stringify(body) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toast.success(t("settings.groups.saved"));
-    },
-    onError: (error, body) => toast.error(error.message, { retry: () => pick.mutate(body) }),
-  });
+  const matches = matchSections(query, (id) => t(`settings.sections.${id}`));
+  const current = isSectionId(section) ? section : null;
+  const effective = current ?? (desktop ? "general" : null);
+  const filteredOut = query.trim() !== "" && matches.length > 0 && effective !== null && !matches.some((s) => s.id === effective);
+  const desktopRef = useRef(desktop);
+  desktopRef.current = desktop;
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    if (link.trim()) saveKey.mutate(link.trim());
+  useEffect(() => {
+    if (!desktopRef.current && current) heading.current?.focus();
+  }, [current]);
+
+  const goBack = () => {
+    if ((location.state as { fromList?: boolean } | null)?.fromList) navigate(-1);
+    else navigate("/settings", { replace: true });
   };
 
-  const lastRun = sync.data?.last_run;
-  const when = (iso: string | null | undefined) => (iso ? `${parisParts(iso).date} ${formatTime(iso)}` : t("common.never"));
+  if (section !== undefined && !current) return <Navigate to="/settings" replace />;
+  if (!current && connectPending()) return <Navigate to="/settings/google" replace />;
+  if (!current && desktop) return <Navigate to="/settings/general" replace />;
+
+  if (!desktop) {
+    return (
+      <div className="flex flex-col gap-4">
+        <MobileSemesterSwitch />
+        {current ? (
+          <>
+            <div className="flex items-center gap-2.5">
+              <Link
+                to="/settings"
+                onClick={(e) => {
+                  e.preventDefault();
+                  goBack();
+                }}
+                aria-label={t("settings.back")}
+                className="flex size-9 items-center justify-center rounded-xl border border-line bg-surface text-accent-strong"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current stroke-2">
+                  <path d="m15 6-6 6 6 6" />
+                </svg>
+              </Link>
+              <h2 ref={heading} tabIndex={-1} className="text-xl font-bold outline-none">
+                {t(`settings.sections.${current}`)}
+              </h2>
+            </div>
+            <h1 className="sr-only">{t("settings.title")}</h1>
+            <SectionContent key={current} id={current} />
+          </>
+        ) : (
+          <>
+            <h1 className="text-2xl font-bold tracking-tight">{t("settings.title")}</h1>
+            <SectionList items={SECTIONS} status={status} variant="grouped" />
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold tracking-tight">{t("settings.title")}</h1>
-      <MobileSemesterSwitch />
-      {keyStatus.error && <ErrorPanel error={keyStatus.error} />}
-      <AppearanceSettings />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className={card}>
-          <h2 className="text-base font-bold">{t("settings.zeus.title")}</h2>
-          <form onSubmit={submit} className="flex flex-col gap-2">
-            <label htmlFor="zeus-link" className="text-sm font-semibold text-ink-2">
-              {t("settings.zeus.linkLabel")}
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="zeus-link"
-                type="password"
-                autoComplete="off"
-                value={link}
-                onChange={(e) => setLink(e.target.value)}
-                placeholder={keyStatus.data?.configured ? t("settings.zeus.placeholderSaved") : "https://zeus.ionis-it.com/api/group/…/ics/…"}
-                className="h-10 min-w-0 flex-1 rounded-xl border border-line-strong px-3 text-sm"
-              />
-              <button type="submit" className={primary} disabled={saveKey.isPending}>
-                {t("common.save")}
-              </button>
-            </div>
-            <p className="text-xs text-muted">
-              {t("settings.zeus.help")}
-            </p>
-            <p className="text-sm">{keyStatus.data?.configured ? t("settings.zeus.saved") : t("settings.zeus.notSaved")}</p>
-          </form>
-          {mismatch && (
-            <div role="alert" className="flex flex-col gap-2 rounded-xl border border-warn-line bg-warn-soft px-3 py-2.5 text-sm text-warn">
-              <p>{t("settings.zeus.groupMismatch", { link_group: mismatch.link_group, semester_group: mismatch.semester_group })}</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={!activeSemester || applyLinkGroup.isPending}
-                  onClick={() => activeSemester && applyLinkGroup.mutate({ id: activeSemester.id, group: mismatch.link_group })}
-                  className={primary}
-                >
-                  {t("settings.zeus.useGroup", { group: mismatch.link_group })}
-                </button>
-                <button type="button" onClick={() => setMismatch(null)} className="h-10 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink">
-                  {t("settings.zeus.keepGroup", { group: mismatch.semester_group })}
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2.5 text-sm">
-            <span>
-              {t("settings.zeus.lastSync", { value: lastRun ? `${statusLabel(lastRun.status)} · ${when(lastRun.finished_at)}` : t("common.never") })}
-              {lastRun?.status === "ok" &&
-                ` · ${t("settings.zeus.syncCounts", { fetched: lastRun.fetched, inserted: lastRun.inserted, updated: lastRun.updated, cancelled: lastRun.cancelled })}`}
-              {lastRun?.error && ` · ${translateServerMessage(lastRun.error, locale)}`}
-            </span>
-            <button type="button" className={primary} onClick={() => syncNow.mutate()} disabled={syncNow.isPending}>
-              {syncNow.isPending ? t("settings.zeus.syncing") : t("settings.zeus.syncNow")}
-            </button>
-          </div>
-        </section>
-        <section className={card}>
-          <h2 className="text-base font-bold">{t("settings.groups.title")}</h2>
-          <p className="text-sm text-muted">{t("settings.groups.help")}</p>
-          {sections.data?.length === 0 && <p className="text-sm">{t("settings.groups.none")}</p>}
-          {sections.data?.map((choice) => (
-            <label key={choice.subject_id} className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium">
-              {choice.subject_name}
-              <select
-                value={choice.chosen ?? ""}
-                onChange={(e) => e.target.value && pick.mutate({ subject_id: choice.subject_id, section: e.target.value })}
-                className="h-10 min-w-[120px] rounded-xl border border-line-strong bg-surface px-2.5 font-semibold"
-              >
-                {choice.chosen === null && (
-                  <option value="" disabled>
-                    {t("settings.groups.choose")}
-                  </option>
-                )}
-                <option value="ALL">{t("settings.groups.all")}</option>
-                {choice.sections.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-        </section>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">{t("settings.title")}</h1>
+        <label className="flex h-9 w-full max-w-70 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-muted">
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 shrink-0 fill-none stroke-current stroke-2">
+            <circle cx="11" cy="11" r="6" />
+            <path d="m20 20-4-4" />
+          </svg>
+          <span className="sr-only">{t("settings.find.label")}</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && query !== "") {
+                e.preventDefault();
+                e.stopPropagation();
+                setQuery("");
+              } else if (e.key === "Enter" && matches.length > 0 && query.trim() !== "") {
+                e.preventDefault();
+                navigate(`/settings/${matches[0].id}`, { state: { fromList: true } });
+              }
+            }}
+            placeholder={t("settings.find.placeholder")}
+            className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+          />
+        </label>
       </div>
-      <RecurringList />
-      <SemesterSettings />
-      <SubjectSettings />
-      <GoogleSettings />
-      <AISettings />
-      <BackupSettings />
+      <div className="grid grid-cols-[236px_1fr] items-start gap-5">
+        <div className="sticky top-3 flex flex-col gap-2">
+          <SectionList items={matches} status={status} variant="rail" />
+          {matches.length === 0 && (
+            <p role="status" className="px-3 text-sm text-muted">
+              {t("settings.find.noMatch", { query: query.trim() })}
+            </p>
+          )}
+          {filteredOut && (
+            <p role="status" className="px-3 text-xs text-muted">
+              {t("settings.find.openFirst", { title: t(`settings.sections.${matches[0].id}`) })}
+            </p>
+          )}
+        </div>
+        {effective && (
+          <div className="min-w-0">
+            <h2 className="sr-only">{t(`settings.sections.${effective}`)}</h2>
+            <SectionContent key={effective} id={effective} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

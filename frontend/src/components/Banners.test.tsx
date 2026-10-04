@@ -39,7 +39,7 @@ describe("banners", () => {
   it("lists subjects that need a section", () => {
     wrap(<MissingSectionsBanner names={["French for Fall 26 T1", "Tutorat Fall 26 T1"]} />);
     expect(screen.getByText(/French for Fall 26 T1, Tutorat Fall 26 T1/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /choose your groups/i })).toHaveAttribute("href", "/settings");
+    expect(screen.getByRole("link", { name: /choose your groups/i })).toHaveAttribute("href", "/settings/school");
   });
 
   it("warns about a partial sync with the reason", () => {
@@ -60,7 +60,7 @@ describe("banners", () => {
       />,
     );
     expect(screen.getByText(/Google Calendar stopped updating/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Reconnect Google" })).toHaveAttribute("href", "/settings");
+    expect(screen.getByRole("link", { name: "Reconnect Google" })).toHaveAttribute("href", "/settings/google");
   });
 
   it("shows nothing for Google when all is well", () => {

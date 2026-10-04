@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
-import { SettingsPage } from "./SettingsPage";
+import { SettingsAt } from "../test/settingsRoute";
 
 const apiFetch = vi.fn();
 vi.mock("../lib/api", async (importOriginal) => ({
@@ -28,7 +28,7 @@ function setup() {
   render(
     <QueryClientProvider client={client}>
       <ToastProvider>
-        <SettingsPage />
+        <SettingsAt />
       </ToastProvider>
     </QueryClientProvider>,
   );

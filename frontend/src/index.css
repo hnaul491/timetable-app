@@ -109,3 +109,9 @@ body {
   color: var(--tt-ink);
   font-family: var(--font-sans);
 }
+
+@keyframes settings-in {
+  from {
+    transform: translateY(4px);
+  }
+}

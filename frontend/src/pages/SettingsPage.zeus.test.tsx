@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
-import { SettingsPage } from "./SettingsPage";
+import { SettingsAt } from "../test/settingsRoute";
 
 let putResult: unknown = { configured: true, group_mismatch: null };
 const calls: { path: string; init?: RequestInit }[] = [];
@@ -33,7 +33,7 @@ async function saveLink() {
   render(
     <QueryClientProvider client={client}>
       <ToastProvider>
-        <SettingsPage />
+        <SettingsAt />
       </ToastProvider>
     </QueryClientProvider>,
   );

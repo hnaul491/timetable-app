@@ -43,7 +43,7 @@ export function SubjectSettings() {
   const all = subjects.data ?? [];
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
-      <h2 className="text-base font-bold">{t("settings.subjects.title")}</h2>
+      <h3 className="text-base font-bold">{t("settings.subjects.title")}</h3>
       <p className="text-sm text-muted">{t("settings.subjects.help")}</p>
       {all.map((s) => (
         <SubjectRow key={s.id} subject={s} others={all.filter((o) => o.id !== s.id)} onPatch={(body) => patch.mutate({ id: s.id, body })} onMerge={(into) => void askMerge(s, into)} />

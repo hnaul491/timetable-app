@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { RecurringList } from "../components/RecurringList";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { GoogleSettings } from "../components/GoogleSettings";
-import { SettingsPage } from "../pages/SettingsPage";
+import { SettingsAt } from "../test/settingsRoute";
 import { I18nProvider, translate } from "./index";
 
 const RULE = { id: 5, title: "French (external)", kind: "french_ext", weekdays: [0, 3], start_time: "19:30", end_time: "21:00",
@@ -41,10 +41,18 @@ const vi_ = (key: Parameters<typeof translate>[1], vars?: Record<string, string 
 
 describe("settings in Vietnamese", () => {
   it("translates the settings page and the appearance card", async () => {
-    wrap(<SettingsPage />);
+    wrap(<SettingsAt url="/settings/general" />);
     expect(await screen.findByRole("heading", { name: vi_("settings.title") })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: vi_("settings.appearance.title") })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: vi_("settings.appearance.themes.dark") })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: vi_("settings.sectionsLabel") })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: new RegExp(vi_("settings.sections.school")) })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: vi_("settings.find.label") })).toBeInTheDocument();
+  });
+
+  it("translates the school timetable section", async () => {
+    wrap(<SettingsAt />);
+    expect(await screen.findByRole("button", { name: vi_("settings.zeus.syncNow") })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: vi_("settings.zeus.syncNow") })).toBeInTheDocument();
     expect(screen.getByText(vi_("settings.zeus.lastSync", { value: vi_("common.never") }))).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: vi_("settings.groups.title") })).toBeInTheDocument();
