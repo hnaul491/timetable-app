@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } fr
 import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { EventForm, type FormValues } from "../components/EventForm";
 import { EventPanel } from "../components/EventPanel";
+import { ShortcutHint } from "../components/ShortcutHint";
 import { Dialog } from "../components/ui/Dialog";
 import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
@@ -12,6 +13,7 @@ import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { rememberCalendarSearch } from "../lib/calendarLocation";
 import { useChrome } from "../lib/chrome";
+import { useAriaKeyshortcutsFor, useHintTitle } from "../lib/shortcutHints";
 import { useShortcut } from "../lib/shortcuts";
 import { addDays, dayLabel, formatLongDate, formatTime, parisParts, rangeUtc, startOfWeek, todayParis, weekdayIndex } from "../lib/time";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -115,6 +117,9 @@ export function CalendarPage() {
   const slot = newParam === "today" ? { date: todayParis(), start: "09:00" } : parseSlot(newParam);
   const openNew = (date: string, start: string) => openPopup("new", `${date}T${start}`);
 
+  const hintTitle = useHintTitle();
+  const ariaKeys = useAriaKeyshortcutsFor();
+  const then = t("shortcuts.then");
   const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i)) : [anchor];
   const range = rangeUtc(days[0], days.length);
   const step = view === "week" ? 7 : 1;
@@ -144,13 +149,14 @@ export function CalendarPage() {
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-bold tracking-tight">{title}</h1>
         <div className="flex gap-1.5">
-          <button type="button" aria-label={t(view === "week" ? "calendar.header.previousWeek" : "calendar.header.previousDay")} className={buttonClass} onClick={() => setAnchor(addDays(anchor, -step))}>
+          <button type="button" aria-label={t(view === "week" ? "calendar.header.previousWeek" : "calendar.header.previousDay")} title={hintTitle(t(view === "week" ? "calendar.header.previousWeek" : "calendar.header.previousDay"), "cal-previous", then)} aria-keyshortcuts={ariaKeys("cal-previous")} className={buttonClass} onClick={() => setAnchor(addDays(anchor, -step))}>
             ‹
           </button>
-          <button type="button" className={buttonClass} onClick={() => setAnchor(todayParis())}>
+          <button type="button" aria-keyshortcuts={ariaKeys("cal-today")} className={`flex items-center gap-2 ${buttonClass}`} onClick={() => setAnchor(todayParis())}>
             {t("common.today")}
+            <ShortcutHint id="cal-today" />
           </button>
-          <button type="button" aria-label={t(view === "week" ? "calendar.header.nextWeek" : "calendar.header.nextDay")} className={buttonClass} onClick={() => setAnchor(addDays(anchor, step))}>
+          <button type="button" aria-label={t(view === "week" ? "calendar.header.nextWeek" : "calendar.header.nextDay")} title={hintTitle(t(view === "week" ? "calendar.header.nextWeek" : "calendar.header.nextDay"), "cal-next", then)} aria-keyshortcuts={ariaKeys("cal-next")} className={buttonClass} onClick={() => setAnchor(addDays(anchor, step))}>
             ›
           </button>
         </div>
@@ -160,10 +166,12 @@ export function CalendarPage() {
               key={v}
               type="button"
               aria-pressed={view === v}
+              aria-keyshortcuts={ariaKeys(v === "week" ? "cal-week" : "cal-day")}
               onClick={() => setView(v)}
-              className={`h-[34px] rounded-lg px-4 text-sm capitalize ${view === v ? "bg-surface font-semibold shadow-sm" : "font-medium text-ink-2"}`}
+              className={`flex h-[34px] items-center gap-1.5 rounded-lg px-4 text-sm capitalize ${view === v ? "bg-surface font-semibold shadow-sm" : "font-medium text-ink-2"}`}
             >
               {t(v === "week" ? "calendar.header.viewWeek" : "calendar.header.viewDay")}
+              <ShortcutHint id={v === "week" ? "cal-week" : "cal-day"} />
             </button>
           ))}
         </div>
@@ -171,7 +179,8 @@ export function CalendarPage() {
           type="button"
           aria-pressed={fullScreen}
           aria-label={t(fullScreen ? "shortcuts.exitFullScreen" : "shortcuts.fullScreen")}
-          title={t(fullScreen ? "shortcuts.exitFullScreen" : "shortcuts.fullScreen")}
+          title={hintTitle(t(fullScreen ? "shortcuts.exitFullScreen" : "shortcuts.fullScreen"), fullScreen ? "exit-full-screen" : "cal-full-screen", then)}
+          aria-keyshortcuts={ariaKeys(fullScreen ? "exit-full-screen" : "cal-full-screen")}
           onClick={() => setFullScreen(!fullScreen)}
           className={`flex h-10 w-10 items-center justify-center rounded-xl border border-line hover:bg-surface-2 ${fullScreen ? "bg-subtle" : "bg-surface"}`}
         >
@@ -179,11 +188,13 @@ export function CalendarPage() {
             {fullScreen ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
           </svg>
         </button>
-        <Link to="/free-time" className={`flex items-center ${buttonClass}`}>
+        <Link to="/free-time" className={`flex items-center gap-2 ${buttonClass}`}>
           {t("freeTime.open")}
+          <ShortcutHint id="go-free-time" />
         </Link>
-        <button type="button" onClick={() => openNew(anchor, "09:00")} className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
+        <button type="button" aria-keyshortcuts={ariaKeys("cal-new")} onClick={() => openNew(anchor, "09:00")} className="flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
           {t("calendar.header.addEvent")}
+          <ShortcutHint id="cal-new" className="[&_kbd]:border-on-accent/40 [&_kbd]:text-on-accent" />
         </button>
       </header>
       <SyncBanner status={sync.data} />

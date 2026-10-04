@@ -11,7 +11,9 @@ import { translateServerMessage } from "../i18n/serverMessages";
 import { aiErrorText, sendFailedText } from "../lib/aiError";
 import { streamChat } from "../lib/chatStream";
 import { comboFromEvent, isSingleKey } from "../lib/shortcutKeys";
+import { useAriaKeyshortcuts } from "../lib/shortcutHints";
 import { useShortcut, useShortcutList } from "../lib/shortcuts";
+import { ShortcutHint } from "../components/ShortcutHint";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { formatLongDate, parisParts } from "../lib/time";
 import type { AiStatus, ChatMessage, EventDetail, PendingAction, SubjectDetail } from "../types";
@@ -267,6 +269,8 @@ export function AssistantPage() {
   };
   const stop = () => abortRef.current?.abort();
   const shortcutList = useShortcutList();
+  const focusKeys = useAriaKeyshortcuts("assistant-focus");
+  const stopAria = useAriaKeyshortcuts("assistant-stop");
   useShortcut("assistant-focus", "i", () => composer?.focus(), { label: "shortcuts.assistantFocus", enabled });
   useShortcut("assistant-stop", "Escape", stop, { label: "shortcuts.assistantStop", enabled: streaming });
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -386,8 +390,9 @@ export function AssistantPage() {
                   )
                 )}
                 {streaming && (
-                  <button type="button" onClick={stop} className="h-9 self-start rounded-lg border border-line px-3 text-sm font-semibold text-ink-2 hover:bg-subtle">
+                  <button type="button" onClick={stop} aria-keyshortcuts={stopAria} className="flex h-9 items-center gap-2 self-start rounded-lg border border-line px-3 text-sm font-semibold text-ink-2 hover:bg-subtle">
                     {t("ai.stop")}
+                    <ShortcutHint id="assistant-stop" />
                   </button>
                 )}
               </div>
@@ -434,6 +439,7 @@ export function AssistantPage() {
             <textarea
               ref={setComposer}
               aria-label={t("ai.composer")}
+              aria-keyshortcuts={focusKeys}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
@@ -442,6 +448,7 @@ export function AssistantPage() {
               placeholder={t("ai.placeholder")}
               className="min-w-0 flex-1 rounded-xl border border-line-strong p-3 text-sm"
             />
+            <ShortcutHint id="assistant-focus" className="self-center" />
             {text.length > COUNTER_FROM && (
               <span className="self-center text-xs text-muted" aria-live="polite">
                 {t("ai.charsLeft", { count: MAX_LENGTH - text.length })}

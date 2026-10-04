@@ -30,7 +30,7 @@ export function isSingleKey(keys: string): boolean {
   return !parsed.mod && !parsed.alt;
 }
 
-const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+export const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
 export function formatKeys(keys: string, mac: boolean = isMac()): string[] {
   const parsed = parseKeys(keys);

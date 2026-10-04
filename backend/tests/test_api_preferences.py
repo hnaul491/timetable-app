@@ -2,7 +2,7 @@ import pytest
 
 from tests.conftest import AUTH
 
-DEFAULT = {"language": None, "shortcuts": {}, "single_key_shortcuts": True}
+DEFAULT = {"language": None, "shortcuts": {}, "single_key_shortcuts": True, "shortcut_hints": True}
 
 
 def test_requires_login(client):
@@ -31,15 +31,15 @@ def put(client, body):
 
 
 def test_shortcuts_round_trip_and_off(client):
-    body = {"shortcuts": {"go-board": "g x", "cal-new": None, "search": "Mod+Shift+k", "cal-today": "Alt+t"}, "single_key_shortcuts": False}
+    body = {"shortcuts": {"go-board": "g x", "cal-new": None, "search": "Mod+Shift+k", "cal-today": "Alt+t"}, "single_key_shortcuts": False, "shortcut_hints": True}
     assert put(client, body).json() == {**DEFAULT, **body}
     assert client.get("/api/preferences", headers=AUTH).json() == {**DEFAULT, **body}
 
 
 def test_partial_put_keeps_other_fields(client):
     put(client, {"language": "vi", "shortcuts": {"help": "F1"}, "single_key_shortcuts": False})
-    assert put(client, {"language": "en"}).json() == {"language": "en", "shortcuts": {"help": "F1"}, "single_key_shortcuts": False}
-    assert put(client, {"single_key_shortcuts": True}).json() == {"language": "en", "shortcuts": {"help": "F1"}, "single_key_shortcuts": True}
+    assert put(client, {"language": "en"}).json() == {"language": "en", "shortcuts": {"help": "F1"}, "single_key_shortcuts": False, "shortcut_hints": True}
+    assert put(client, {"single_key_shortcuts": True}).json() == {"language": "en", "shortcuts": {"help": "F1"}, "single_key_shortcuts": True, "shortcut_hints": True}
     assert put(client, {"shortcuts": {}}).json() == {**DEFAULT, "language": "en"}
     assert put(client, {}).json() == {**DEFAULT, "language": "en"}
 
@@ -92,6 +92,7 @@ def test_get_drops_invalid_stored_entries(client, session):
         "language": "vi",
         "shortcuts": {"ok": "g x", "off": None},
         "single_key_shortcuts": True,
+        "shortcut_hints": True,
     }
 
 
@@ -101,3 +102,19 @@ def test_get_survives_non_dict_shortcuts(client, session):
     session.add(AppSetting(key="shortcuts", value=["x"]))
     session.commit()
     assert client.get("/api/preferences", headers=AUTH).json()["shortcuts"] == {}
+
+
+def test_shortcut_hints_round_trip_and_partial(client):
+    assert put(client, {"shortcut_hints": False}).json() == {**DEFAULT, "shortcut_hints": False}
+    assert client.get("/api/preferences", headers=AUTH).json()["shortcut_hints"] is False
+    assert put(client, {"language": "en"}).json()["shortcut_hints"] is False
+    assert put(client, {"shortcut_hints": True}).json()["shortcut_hints"] is True
+
+
+def test_shortcut_hints_must_be_boolean_and_lenient_on_read(client, session):
+    from app.models import AppSetting
+
+    assert put(client, {"shortcut_hints": "no"}).status_code == 422
+    session.add(AppSetting(key="shortcut_hints", value="nope"))
+    session.commit()
+    assert client.get("/api/preferences", headers=AUTH).json()["shortcut_hints"] is True

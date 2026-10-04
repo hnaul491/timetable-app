@@ -79,6 +79,8 @@ export const shortcuts: Messages["shortcuts"] = {
     resetAllBody: "Mọi phím tắt sẽ trở về phím mặc định.",
     singleKey: "Phím tắt một phím",
     singleKeyHelp: "Hãy tắt nếu bạn dùng điều khiển bằng giọng nói hoặc hay bấm nhầm phím. Các phím tắt dùng Ctrl, Cmd hoặc Alt vẫn hoạt động.",
+    hints: "Hiện phím tắt trên nút",
+    hintsHelp: "Nhãn phím nhỏ bên cạnh nút và mục menu, ví dụ G rồi C. Ẩn trên màn hình cảm ứng.",
     saveFailed: "Không lưu được phím tắt của bạn.",
   },
 };

@@ -11,7 +11,9 @@ import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { calendarHref } from "../lib/calendarLocation";
 import { invalidateTaskViews } from "../lib/invalidate";
+import { useAriaKeyshortcuts } from "../lib/shortcutHints";
 import { useShortcut } from "../lib/shortcuts";
+import { ShortcutHint } from "../components/ShortcutHint";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 
@@ -143,6 +145,7 @@ function EventPageInner() {
     if (ok) remove.mutate();
   };
 
+  const saveKeys = useAriaKeyshortcuts("note-save");
   useShortcut(
     "note-save",
     "Mod+s",
@@ -296,9 +299,11 @@ function EventPageInner() {
             type="button"
             disabled={!dirty || save.isPending}
             onClick={() => save.mutate({ tab, draft: current })}
-            className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
+            aria-keyshortcuts={saveKeys}
+            className="flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
           >
             {t("event.saveNote")}
+            <ShortcutHint id="note-save" className="[&_kbd]:border-on-accent/40 [&_kbd]:text-on-accent" />
           </button>
           {dirty && (
             <button type="button" onClick={discard} className="h-10 rounded-xl border border-line px-4 text-sm font-semibold text-ink-2">

@@ -42,7 +42,7 @@ export function effectiveKeys(id: string, defaultKeys: string, overrides: Shortc
   return own !== null && isReserved(own) && !isReserved(defaultKeys) ? defaultKeys : own;
 }
 
-const isBlocked = (keys: string, singleKey: boolean) => !singleKey && isSingleKey(keys) && keys !== "Escape";
+export const isBlocked = (keys: string, singleKey: boolean) => !singleKey && isSingleKey(keys) && keys !== "Escape";
 
 export function ShortcutProvider({
   children,

@@ -4,7 +4,9 @@ import { Link } from "react-router";
 import { useLocale, useT } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { invalidateTaskViews } from "../lib/invalidate";
+import { useAriaKeyshortcuts } from "../lib/shortcutHints";
 import { useShortcut } from "../lib/shortcuts";
+import { ShortcutHint } from "./ShortcutHint";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 import { AskAiLink } from "./AskAiLink";
@@ -76,6 +78,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
       asking.current = false;
     }
   };
+  const deleteKeys = useAriaKeyshortcuts("panel-delete");
   useShortcut("panel-delete", "Mod+d", askDelete, { inDialog: true, label: "shortcuts.delete", enabled: own });
   useShortcut("panel-delete-key", "Delete", askDelete, { inDialog: true, label: "shortcuts.delete", enabled: own });
 
@@ -169,8 +172,9 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
                 <button type="button" onClick={() => onEdit(event.id)} className={action}>
                   {t("common.edit")}
                 </button>
-                <button type="button" onClick={askDelete} disabled={remove.isPending} className="h-10 rounded-xl border border-danger-line px-4 text-sm font-semibold text-danger disabled:opacity-60">
+                <button type="button" onClick={askDelete} disabled={remove.isPending} aria-keyshortcuts={deleteKeys} className="flex h-10 items-center gap-2 rounded-xl border border-danger-line px-4 text-sm font-semibold text-danger disabled:opacity-60">
                   {t("common.delete")}
+                  <ShortcutHint id="panel-delete" />
                 </button>
               </>
             )}

@@ -256,6 +256,23 @@ describe("Shortcuts settings", () => {
     expect(await within(row("free-day-3")).findByRole("alert", {}, LATE)).toHaveTextContent("already used for “Toggle Monday”");
   });
 
+  it("toggles the key hints setting, default on, in English and Vietnamese", async () => {
+    const user = userEvent.setup();
+    setup();
+    const toggle = await screen.findByRole("checkbox", { name: /Show key hints on buttons/ });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    await waitFor(() => expect(puts()).toEqual([{ shortcut_hints: false }]));
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    await waitFor(() => expect(puts()[1]).toEqual({ shortcut_hints: true }));
+  });
+
+  it("labels the key hints setting in Vietnamese", async () => {
+    setup("vi");
+    expect(await screen.findByRole("checkbox", { name: /Hiện phím tắt trên nút/ })).toBeChecked();
+  });
+
   it("toggles single-key shortcuts", async () => {
     const user = userEvent.setup();
     setup();

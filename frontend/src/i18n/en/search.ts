@@ -4,6 +4,7 @@ export const search = {
   placeholder: "Search classes, subjects, notes, tasks, documents",
   inputLabel: "Search",
   results: "Search results",
+  footer: "↑↓ to move · Enter to open · Esc to close",
   hint: "Type at least 2 characters to search.",
   empty: "No results for “{q}”",
   error: "Search failed. Try again.",

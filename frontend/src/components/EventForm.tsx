@@ -4,7 +4,9 @@ import { useLocale, useT, type MessageKey } from "../i18n";
 import { translateServerMessage } from "../i18n/serverMessages";
 import { apiFetch } from "../lib/api";
 import { invalidateTaskViews } from "../lib/invalidate";
+import { useAriaKeyshortcuts } from "../lib/shortcutHints";
 import { useShortcut } from "../lib/shortcuts";
+import { ShortcutHint } from "./ShortcutHint";
 import { addDays, parisLocalToUtc, todayParis, weekdayIndex } from "../lib/time";
 import type { CustomKind } from "../types";
 
@@ -109,6 +111,7 @@ export function EventForm({ initial, eventId, ruleId, onDone, onCancel }: Props)
     setError(null);
     save.mutate();
   };
+  const saveKeys = useAriaKeyshortcuts("form-save");
   useShortcut("form-save", "Mod+s", submit, { inDialog: true, label: "shortcuts.save" });
 
   const toggleDay = (day: number) =>
@@ -178,8 +181,9 @@ export function EventForm({ initial, eventId, ruleId, onDone, onCancel }: Props)
       {ruleMode && <p className="text-sm text-muted">{t("event.ruleNote")}</p>}
       {(error || save.error) && <p role="alert" className="text-sm text-danger">{error ?? t("event.saveFailed", { message: translateServerMessage((save.error as Error).message, locale) })}</p>}
       <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={save.isPending} className="h-11 flex-1 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50">
+        <button type="submit" disabled={save.isPending} aria-keyshortcuts={saveKeys} className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50">
           {t("event.saveEvent")}
+          <ShortcutHint id="form-save" className="[&_kbd]:border-on-accent/40 [&_kbd]:text-on-accent" />
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} className="h-11 rounded-xl border border-line px-4 text-sm font-semibold text-ink-2">

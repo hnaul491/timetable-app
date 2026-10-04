@@ -6,6 +6,7 @@ export const search: Messages["search"] = {
   placeholder: "Tìm buổi học, môn học, ghi chú, việc cần làm, tài liệu",
   inputLabel: "Tìm kiếm",
   results: "Kết quả tìm kiếm",
+  footer: "↑↓ để di chuyển · Enter để mở · Esc để đóng",
   hint: "Nhập ít nhất 2 ký tự để tìm.",
   empty: "Không có kết quả cho “{q}”",
   error: "Tìm kiếm không thành công. Hãy thử lại.",

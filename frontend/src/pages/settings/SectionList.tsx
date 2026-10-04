@@ -1,6 +1,7 @@
 import { NavLink } from "react-router";
+import { ShortcutHint } from "../../components/ShortcutHint";
 import { useT } from "../../i18n";
-import type { SectionDef, SectionId } from "./sections";
+import { SECTIONS, type SectionDef, type SectionId } from "./sections";
 import type { SectionStatus } from "./useSettingsStatus";
 
 const dotClass = { ok: "bg-success", warn: "bg-warn", none: "bg-transparent" } as const;
@@ -43,6 +44,7 @@ export function SectionList({
                 <span className={`text-sm font-bold ${isActive && !grouped ? "text-accent-strong" : "text-ink"}`}>{t(s.title)}</span>
                 <span className="truncate text-xs text-muted">{status[s.id].text || " "}</span>
               </span>
+              {!grouped && <ShortcutHint id={`settings-section-${SECTIONS.findIndex((x) => x.id === s.id) + 1}`} />}
               <Dot status={status[s.id]} />
               {grouped && (
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 shrink-0 fill-none stroke-muted stroke-2">

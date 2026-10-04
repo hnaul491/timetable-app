@@ -10,6 +10,7 @@ export interface Preferences {
   /** Keyboard shortcut overrides (id -> keys, null = off). */
   shortcuts?: Record<string, string | null>;
   single_key_shortcuts?: boolean;
+  shortcut_hints?: boolean;
 }
 
 export function usePreferences() {

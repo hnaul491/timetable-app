@@ -54,7 +54,7 @@ describe("Layout shortcuts", () => {
     expect(screen.getAllByRole("link", { name: "Board" }).length).toBeGreaterThan(0);
     await user.keyboard("[[");
     expect(localStorage.getItem("timetable:sidebar")).toBe("collapsed");
-    const rail = screen.getAllByRole("link", { name: "Board" }).find((a) => a.getAttribute("title") === "Board");
+    const rail = screen.getAllByRole("link", { name: "Board" }).find((a) => a.getAttribute("title") === "Board (G then B)");
     expect(rail).toBeDefined();
     expect(rail!.textContent).toBe("");
   });

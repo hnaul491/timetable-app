@@ -13,6 +13,7 @@ import { useIsDesktop } from "../lib/useMediaQuery";
 import { SchoolSection } from "./settings/SchoolSection";
 import { SectionList } from "./settings/SectionList";
 import { useShortcut } from "../lib/shortcuts";
+import { ShortcutHint } from "../components/ShortcutHint";
 import { SECTIONS, isSectionId, matchSections, type SectionId } from "./settings/sections";
 import { useSettingsStatus } from "./settings/useSettingsStatus";
 
@@ -150,6 +151,7 @@ export function SettingsPage() {
             placeholder={t("settings.find.placeholder")}
             className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
           />
+          <ShortcutHint id="settings-find" />
         </label>
       </div>
       <div className="grid grid-cols-[236px_1fr] items-start gap-5">

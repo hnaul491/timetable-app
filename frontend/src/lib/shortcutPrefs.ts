@@ -9,14 +9,14 @@ import type { ShortcutOverrides } from "./shortcuts";
 const NONE: ShortcutOverrides = {};
 
 /** Overrides and the single-key toggle from the account preferences (the query the language already uses). */
-export function useShortcutSettings(): { overrides: ShortcutOverrides; singleKey: boolean; loaded: boolean } {
+export function useShortcutSettings(): { overrides: ShortcutOverrides; singleKey: boolean; hints: boolean; loaded: boolean } {
   const { data } = usePreferences();
   const prefs = data && !Array.isArray(data) ? (data as Partial<Preferences>) : null;
   const overrides = prefs?.shortcuts && typeof prefs.shortcuts === "object" ? prefs.shortcuts : NONE;
-  return { overrides, singleKey: prefs?.single_key_shortcuts !== false, loaded: prefs !== null };
+  return { overrides, singleKey: prefs?.single_key_shortcuts !== false, hints: prefs?.shortcut_hints !== false, loaded: prefs !== null };
 }
 
-type Patch = { shortcuts?: ShortcutOverrides; single_key_shortcuts?: boolean };
+type Patch = { shortcuts?: ShortcutOverrides; single_key_shortcuts?: boolean; shortcut_hints?: boolean };
 
 /** Saves a partial preferences update: applied at once, rolled back with a Retry toast if the server refuses it. */
 export function useSaveShortcutPrefs(): (patch: Patch) => void {

@@ -353,6 +353,7 @@ class Preferences(BaseModel):
     # id -> keys in the frontend engine's syntax; null turns that shortcut off.
     shortcuts: dict[str, str | None] = Field(default_factory=dict)
     single_key_shortcuts: StrictBool = True
+    shortcut_hints: StrictBool = True
 
     @field_validator("shortcuts")
     @classmethod

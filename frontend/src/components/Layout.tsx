@@ -5,7 +5,9 @@ import { useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { useChrome } from "../lib/chrome";
 import { OpenSearchContext } from "../lib/searchContext";
+import { useHintTitle } from "../lib/shortcutHints";
 import { useShortcut } from "../lib/shortcuts";
+import { ShortcutHint } from "./ShortcutHint";
 import { QuickActions } from "./QuickActions";
 import { SearchPalette } from "./SearchPalette";
 import { ShortcutHelp } from "./ShortcutHelp";
@@ -17,13 +19,13 @@ const Icon = ({ children }: { children: ReactNode }) => (
   </svg>
 );
 
-const links: { to: string; label: MessageKey; keys: string; goLabel: MessageKey; icon: ReactNode }[] = [
-  { to: "/", label: "nav.calendar", keys: "g c", goLabel: "shortcuts.goCalendar", icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></Icon> },
-  { to: "/board", label: "nav.board", keys: "g b", goLabel: "shortcuts.goBoard", icon: <Icon><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="4" height="13" rx="1" /></Icon> },
-  { to: "/subjects", label: "nav.subjects", keys: "g s", goLabel: "shortcuts.goSubjects", icon: <Icon><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z" /><path d="M4 19a2 2 0 0 1 2-2h13" /></Icon> },
-  { to: "/review", label: "nav.review", keys: "g r", goLabel: "shortcuts.goReview", icon: <Icon><path d="M20 12a8 8 0 1 1-2.3-5.7" /><path d="M20 4v5h-5" /></Icon> },
-  { to: "/assistant", label: "nav.assistant", keys: "g a", goLabel: "shortcuts.goAssistant", icon: <Icon><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z" /></Icon> },
-  { to: "/settings", label: "nav.settings", keys: "g ,", goLabel: "shortcuts.goSettings", icon: <Icon><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></Icon> },
+const links: { to: string; label: MessageKey; keys: string; goId: string; goLabel: MessageKey; icon: ReactNode }[] = [
+  { to: "/", label: "nav.calendar", keys: "g c", goId: "go-calendar", goLabel: "shortcuts.goCalendar", icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></Icon> },
+  { to: "/board", label: "nav.board", keys: "g b", goId: "go-board", goLabel: "shortcuts.goBoard", icon: <Icon><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="4" height="13" rx="1" /></Icon> },
+  { to: "/subjects", label: "nav.subjects", keys: "g s", goId: "go-subjects", goLabel: "shortcuts.goSubjects", icon: <Icon><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z" /><path d="M4 19a2 2 0 0 1 2-2h13" /></Icon> },
+  { to: "/review", label: "nav.review", keys: "g r", goId: "go-review", goLabel: "shortcuts.goReview", icon: <Icon><path d="M20 12a8 8 0 1 1-2.3-5.7" /><path d="M20 4v5h-5" /></Icon> },
+  { to: "/assistant", label: "nav.assistant", keys: "g a", goId: "go-assistant", goLabel: "shortcuts.goAssistant", icon: <Icon><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z" /></Icon> },
+  { to: "/settings", label: "nav.settings", keys: "g ,", goId: "go-settings", goLabel: "shortcuts.goSettings", icon: <Icon><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></Icon> },
 ];
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -33,6 +35,7 @@ export function Layout() {
   const t = useT();
   const navigate = useNavigate();
   const { sidebarCollapsed, toggleSidebar, fullScreen, setFullScreen } = useChrome();
+  const hintTitle = useHintTitle();
   const [helpOpen, setHelpOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   // Home-screen shortcut "/?search=1": open the palette once and drop the param.
@@ -83,7 +86,7 @@ export function Layout() {
             type="button"
             onClick={toggleSidebar}
             aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
-            title={`${collapsed ? t("nav.expand") : t("nav.collapse")} ([)`}
+            title={hintTitle(collapsed ? t("nav.expand") : t("nav.collapse"), "sidebar", t("shortcuts.then"))}
             className={`flex size-8 items-center justify-center rounded-lg text-muted hover:bg-subtle hover:text-ink ${collapsed ? "" : "ml-auto"}`}
           >
             <Icon>
@@ -123,11 +126,12 @@ export function Layout() {
               to={l.to}
               end={l.to === "/"}
               aria-label={collapsed ? t(l.label) : undefined}
-              title={collapsed ? t(l.label) : undefined}
+              title={collapsed ? hintTitle(t(l.label), l.goId, t("shortcuts.then")) : undefined}
               className={(s) => `${navClass(s)} gap-3 ${collapsed ? "justify-center px-0!" : ""}`}
             >
               {l.icon}
-              {!collapsed && t(l.label)}
+              {!collapsed && <span className="min-w-0 flex-1 truncate">{t(l.label)}</span>}
+              {!collapsed && <ShortcutHint id={l.goId} />}
             </NavLink>
           ))}
         </div>
@@ -135,11 +139,12 @@ export function Layout() {
           type="button"
           onClick={() => setSearchOpen(true)}
           aria-label={t("search.open")}
-          title={t("search.open")}
+          title={hintTitle(t("search.open"), "search", t("shortcuts.then"))}
           className={`flex h-10 items-center gap-3 rounded-lg text-sm font-medium text-ink-2 hover:bg-subtle ${collapsed ? "justify-center" : "px-3"}`}
         >
           <Icon><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Icon>
-          {!collapsed && t("search.open")}
+          {!collapsed && <span className="min-w-0 flex-1 truncate text-left">{t("search.open")}</span>}
+          {!collapsed && <ShortcutHint id="search" />}
         </button>
       </nav>
       )}

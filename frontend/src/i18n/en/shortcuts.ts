@@ -77,6 +77,8 @@ export const shortcuts = {
     resetAllBody: "Every shortcut goes back to its default keys.",
     singleKey: "Single-key shortcuts",
     singleKeyHelp: "Turn off if you use voice control or keys trigger by accident. Shortcuts that use Ctrl, Cmd or Alt keep working.",
+    hints: "Show key hints on buttons",
+    hintsHelp: "Small key labels next to buttons and menu items, such as G then C. Hidden on touch screens.",
     saveFailed: "Couldn't save your shortcuts.",
   },
 };

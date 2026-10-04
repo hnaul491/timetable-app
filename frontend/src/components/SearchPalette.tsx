@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { INTL_LOCALE } from "../i18n/locale";
 import { apiFetch } from "../lib/api";
+import { useHintsVisible } from "../lib/shortcutHints";
 import { setTheme } from "../lib/theme";
 import { parisParts, formatLongDate, TZ } from "../lib/time";
 import type { SearchResults } from "../types";
@@ -184,6 +185,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
     }
   };
 
+  const hintsVisible = useHintsVisible();
   const loading = enabled && (query.isPending || debounced !== q);
   const noResults = !loading && items.length === 0;
 
@@ -228,6 +230,11 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
         <div className="mt-2" role="status" aria-label={t("search.loading")}>
           <SkeletonRows rows={2} />
         </div>
+      )}
+      {hintsVisible && (
+        <p aria-hidden="true" className="mt-3 hidden border-t border-line pt-2 text-xs text-muted md:block">
+          {t("search.footer")}
+        </p>
       )}
       {query.isError && enabled && <p role="alert" className="mt-2 text-sm text-danger">{t("search.error")}</p>}
       {noResults && !query.isError && (

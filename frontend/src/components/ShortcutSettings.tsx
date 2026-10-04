@@ -96,7 +96,7 @@ export function ShortcutSettings() {
   const t = useT();
   const confirm = useConfirm();
   const live = useShortcutList();
-  const { overrides, singleKey } = useShortcutSettings();
+  const { overrides, singleKey, hints } = useShortcutSettings();
   const save = useSaveShortcutPrefs();
   const [capturing, setCapturing] = useState<string | null>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
@@ -206,6 +206,15 @@ export function ShortcutSettings() {
           <span className="font-semibold text-ink-2">{t("shortcuts.settings.singleKey")}</span>
           <span id="single-key-help" className="text-xs text-muted">
             {t("shortcuts.settings.singleKeyHelp")}
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2.5 text-sm">
+        <input type="checkbox" checked={hints} onChange={(e) => save({ shortcut_hints: e.target.checked })} aria-describedby="hints-help" className="mt-0.5" />
+        <span className="flex flex-col gap-0.5">
+          <span className="font-semibold text-ink-2">{t("shortcuts.settings.hints")}</span>
+          <span id="hints-help" className="text-xs text-muted">
+            {t("shortcuts.settings.hintsHelp")}
           </span>
         </span>
       </label>
