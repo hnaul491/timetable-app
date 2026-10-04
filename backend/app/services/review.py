@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import Event, Note, Subject, Task
 from app.services.events_query import VisibleEvent, list_visible_events
 from app.services.recurrence import PARIS
+from app.services.task_query import not_hidden
 from app.timeutil import to_naive_utc
 
 SCHOOL_KINDS = ("class", "exam")
@@ -42,7 +43,7 @@ def hours_by_kind(events: list[VisibleEvent]) -> dict[str, float]:
 
 def open_tasks_due(session: Session, before: date | None = None, start: date | None = None,
                    end: date | None = None) -> list[Task]:
-    query = select(Task).where(Task.status != "done", Task.due_date.is_not(None))
+    query = select(Task).where(Task.status != "done", Task.due_date.is_not(None), not_hidden())
     if before is not None:
         query = query.where(Task.due_date < before)
     if start is not None:

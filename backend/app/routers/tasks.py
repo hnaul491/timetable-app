@@ -11,7 +11,7 @@ from app.deps import get_now
 from app.models import Event, Note, Subject, Task
 from app.schemas import Deleted, TaskCreate, TaskOut, TaskPatch
 from app.services.note_tasks import update_line
-from app.services.task_query import task_out_list
+from app.services.task_query import not_hidden, task_out_list
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_user)])
 
@@ -25,8 +25,10 @@ def _task(session: Session, task_id: int) -> Task:
 
 @router.get("/tasks", response_model=list[TaskOut])
 def list_tasks(status: Literal["todo", "doing", "done"] | None = None, subject_id: int | None = None,
-               session: Session = Depends(get_session)) -> list[TaskOut]:
+               include_hidden: bool = False, session: Session = Depends(get_session)) -> list[TaskOut]:
     query = select(Task)
+    if not include_hidden:
+        query = query.where(not_hidden())
     if status is not None:
         query = query.where(Task.status == status)
     if subject_id is not None:

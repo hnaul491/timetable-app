@@ -1,9 +1,14 @@
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Event, Subject, Task
 from app.schemas import TaskOut
 from app.timeutil import iso_utc
+
+
+def not_hidden() -> ColumnElement[bool]:
+    """Tasks without a subject, or whose subject is not hidden."""
+    return or_(Task.subject_id.is_(None), Task.subject_id.not_in(select(Subject.id).where(Subject.hidden.is_(True))))
 
 
 def task_out_list(session: Session, tasks: list[Task]) -> list[TaskOut]:

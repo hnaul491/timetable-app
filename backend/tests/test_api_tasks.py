@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from app.models import Event, Note, Subject
 from tests.conftest import AUTH
@@ -98,3 +98,30 @@ def test_task_can_link_to_an_event_of_the_same_subject(client, session, semester
     assert client.post("/api/tasks", headers=AUTH, json={"title": "x", "event_id": event_id,
                                                           "subject_id": other.id}).status_code == 422
     assert client.post("/api/tasks", headers=AUTH, json={"title": "x", "event_id": 9999}).status_code == 422
+
+
+def _hidden_subject_tasks(session, semester):
+    hidden = Subject(semester_id=semester.id, display_name="GenAI 101", aliases=[], hidden=True)
+    shown = Subject(semester_id=semester.id, display_name="Databases", aliases=[])
+    session.add_all([hidden, shown])
+    session.flush()
+    from app.models import Task
+    for title, subject in (("Hidden task", hidden), ("Shown task", shown), ("No subject", None)):
+        session.add(Task(title=title, status="todo", due_date=date(2026, 10, 14), important=False, position=0,
+                         source="manual", created_at=datetime(2026, 10, 1), subject_id=subject.id if subject else None))
+    session.commit()
+
+
+def test_tasks_of_hidden_subjects_are_left_out_unless_asked(client, session, semester):
+    _hidden_subject_tasks(session, semester)
+    titles = lambda url: sorted(t["title"] for t in client.get(url, headers=AUTH).json())  # noqa: E731
+    assert titles("/api/tasks") == ["No subject", "Shown task"]
+    assert titles("/api/tasks?include_hidden=true") == ["Hidden task", "No subject", "Shown task"]
+
+
+def test_review_lists_skip_tasks_of_hidden_subjects(client, session, semester):
+    _hidden_subject_tasks(session, semester)
+    body = client.get("/api/review?week_start=2026-10-19", headers=AUTH).json()
+    assert sorted(t["title"] for t in body["overdue"]) == ["No subject", "Shown task"]
+    body = client.get("/api/review?week_start=2026-10-12", headers=AUTH).json()
+    assert sorted(t["title"] for t in body["due_this_week"]) == ["No subject", "Shown task"]
