@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { ErrorPanel } from "../components/Banners";
+import { AISettings } from "../components/AISettings";
 import { GoogleSettings } from "../components/GoogleSettings";
 import { useToast } from "../components/ui/Toast";
 import { AppearanceSettings } from "../components/AppearanceSettings";
@@ -138,6 +139,7 @@ export function SettingsPage() {
       <SemesterSettings />
       <SubjectSettings />
       <GoogleSettings />
+      <AISettings />
     </div>
   );
 }

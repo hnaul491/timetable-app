@@ -11,6 +11,7 @@ import { ApiError } from "./lib/api";
 import { ChromeProvider } from "./lib/chrome";
 import { initialLanguage } from "./lib/language";
 import { ShortcutProvider } from "./lib/shortcuts";
+import { AssistantPage } from "./pages/AssistantPage";
 import { BoardPage } from "./pages/BoardPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
@@ -46,6 +47,7 @@ export default function App() {
                           <Route index element={<CalendarPage />} />
                           <Route path="board" element={<BoardPage />} />
                           <Route path="settings" element={<SettingsPage />} />
+                          <Route path="assistant" element={<AssistantPage />} />
                           <Route path="review" element={<ReviewPage />} />
                           <Route path="subjects" element={<SubjectsPage />} />
                           <Route path="subjects/:id" element={<SubjectPage />} />

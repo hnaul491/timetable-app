@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { DocumentsSection } from "../components/DocumentsSection";
+import { SuggestTasks } from "../components/SuggestTasks";
 import { useConfirm } from "../components/ui/Confirm";
 import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
@@ -267,6 +268,8 @@ function EventPageInner() {
           {dirty ? <span className="text-sm text-muted">{t("event.unsaved")}</span> : saved.updated_at ? <span className="text-sm text-muted">{t("event.saved")}</span> : null}
           {save.error && <p className="text-sm text-danger">{(save.error as Error).message}</p>}
         </div>
+
+        <SuggestTasks key={tab} eventId={event.id} subjectId={event.subject_id} tab={tab} />
 
         {tasks.length > 0 && (
           <section aria-label={t("event.tasksFromClass")} className="flex flex-col gap-2 border-t border-line pt-4">
