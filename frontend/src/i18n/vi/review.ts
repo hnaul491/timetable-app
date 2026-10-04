@@ -1,3 +1,29 @@
 import type { Messages } from "../types";
 
-export const review: Messages["review"] = {};
+export const review: Messages["review"] = {
+  loading: "Đang tải phần ôn tập…",
+  weekendReview: "Ôn tập cuối tuần",
+  previousWeek: "Tuần trước",
+  nextWeek: "Tuần sau",
+  reviewedOn: "Đã ôn tập ngày {date}",
+  markReviewed: "Đánh dấu đã ôn tập tuần này",
+  overdue: "Quá hạn",
+  nothingOverdue: "Không có việc quá hạn.",
+  dueThisWeek: "Đến hạn tuần này",
+  noDeadlines: "Tuần này không có hạn nào.",
+  importantNotes: "Ghi chú quan trọng",
+  noImportantNotes: "Không có ghi chú quan trọng.",
+  markedImportant: "★ Đã đánh dấu quan trọng",
+  withoutNotes: "Buổi học tuần trước chưa có ghi chú",
+  everyClassHasNote: "Buổi học nào cũng có ghi chú.",
+  addNote: "Thêm ghi chú",
+  changes: "Thay đổi lịch học của trường",
+  noChanges: "Tuần này trường không đổi lịch.",
+  cancelled: "Đã huỷ",
+  changed: "Đã đổi",
+  glance: "Tổng quan tuần",
+  hours: "{school} giờ học · {work} giờ làm · {french} giờ tiếng Pháp (bên ngoài)",
+  free: "Trống",
+  allDay: "cả ngày",
+  taskDue: "hạn {date}",
+};

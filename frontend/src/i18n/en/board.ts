@@ -1,1 +1,24 @@
-export const board = {};
+export const board = {
+  loading: "Loading tasks…",
+  title: "Task board",
+  openSummary: "{count} open · tasks come from [ ] lines in your class notes",
+  subject: "Subject",
+  allSubjects: "All subjects",
+  newTask: "New task",
+  newTaskPlaceholder: "e.g. Print the lab sheet",
+  due: "Due",
+  addTask: "Add task",
+  todo: "To do",
+  doing: "Doing",
+  done: "Done",
+  card: {
+    important: "Important",
+    due: "Due {date}",
+    noDueDate: "No due date",
+    fromClass: "From class",
+    statusFor: "Status for {title}",
+    deleteAria: "Delete {title}",
+    confirmDeleteAria: "Click again to delete {title}",
+    confirmDelete: "Click again to delete",
+  },
+};

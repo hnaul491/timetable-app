@@ -3,17 +3,19 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { ErrorPanel } from "../components/Banners";
 import { apiFetch } from "../lib/api";
+import { useT, type MessageKey } from "../i18n";
 import { invalidateTaskViews } from "../lib/invalidate";
 import type { Task, TaskStatus } from "../types";
 
-const COLUMNS: { status: TaskStatus; label: string; dot: string }[] = [
-  { status: "todo", label: "To do", dot: "#8A90A0" },
-  { status: "doing", label: "Doing", dot: "#2E55E6" },
-  { status: "done", label: "Done", dot: "#1F8A4C" },
+const COLUMNS: { status: TaskStatus; label: MessageKey; dot: string }[] = [
+  { status: "todo", label: "board.todo", dot: "#8A90A0" },
+  { status: "doing", label: "board.doing", dot: "#2E55E6" },
+  { status: "done", label: "board.done", dot: "#1F8A4C" },
 ];
 const field = "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm";
 
 export function BoardPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => apiFetch<Task[]>("/api/tasks") });
   const [subject, setSubject] = useState("all");
@@ -42,7 +44,7 @@ export function BoardPage() {
   };
 
   if (tasks.error && !tasks.data) return <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />;
-  if (!tasks.data) return <p className="text-sm text-muted">Loading tasks…</p>;
+  if (!tasks.data) return <p className="text-sm text-muted">{t("board.loading")}</p>;
   const all = tasks.data;
   const subjects = [...new Set(all.map((t) => t.subject_name).filter((s): s is string => Boolean(s)))].sort();
   const visible = all.filter((t) => subject === "all" || t.subject_name === subject);
@@ -52,13 +54,13 @@ export function BoardPage() {
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-2xl font-bold tracking-tight">Task board</h1>
-          <p className="text-sm text-muted">{all.filter((t) => t.status !== "done").length} open · tasks come from [ ] lines in your class notes</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("board.title")}</h1>
+          <p className="text-sm text-muted">{t("board.openSummary", { count: all.filter((x) => x.status !== "done").length })}</p>
         </div>
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
-          Subject
-          <select aria-label="Subject" className={field} value={subject} onChange={(e) => setSubject(e.target.value)}>
-            <option value="all">All subjects</option>
+          {t("board.subject")}
+          <select aria-label={t("board.subject")} className={field} value={subject} onChange={(e) => setSubject(e.target.value)}>
+            <option value="all">{t("board.allSubjects")}</option>
             {subjects.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -70,15 +72,15 @@ export function BoardPage() {
 
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2 rounded-2xl border border-line bg-surface p-3">
         <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-semibold text-muted">
-          New task
-          <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} placeholder="e.g. Print the lab sheet" />
+          {t("board.newTask")}
+          <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} placeholder={t("board.newTaskPlaceholder")} />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
-          Due
+          {t("board.due")}
           <input type="date" className={field} value={due} onChange={(e) => setDue(e.target.value)} />
         </label>
         <button type="submit" disabled={add.isPending} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50">
-          Add task
+          {t("board.addTask")}
         </button>
       </form>
       {mutationError && <p className="text-sm text-danger">{mutationError.message}</p>}
@@ -88,10 +90,10 @@ export function BoardPage() {
         {COLUMNS.map((col) => {
           const cards = visible.filter((t) => t.status === col.status);
           return (
-            <section key={col.status} aria-label={col.label} className="flex flex-col gap-2.5 rounded-2xl bg-subtle p-3">
+            <section key={col.status} aria-label={t(col.label)} className="flex flex-col gap-2.5 rounded-2xl bg-subtle p-3">
               <h2 className="flex items-center gap-2 px-1 text-sm font-bold">
                 <span className="size-2.5 rounded-full" style={{ background: col.dot }} />
-                {col.label}
+                {t(col.label)}
                 <span className="rounded-full bg-surface px-2 text-xs font-semibold text-ink-2">{cards.length}</span>
               </h2>
               {cards.map((t) => (
@@ -106,25 +108,26 @@ export function BoardPage() {
 }
 
 function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: boolean; onMove: (s: TaskStatus) => void; onDelete: () => void }) {
+  const t = useT();
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3">
       <div className="flex flex-wrap gap-1.5">
         {task.subject_name && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11.5px] font-semibold text-accent-strong">{task.subject_name}</span>}
-        {task.important && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11.5px] font-bold text-warn">Important</span>}
+        {task.important && <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11.5px] font-bold text-warn">{t("board.card.important")}</span>}
       </div>
       <p className={`text-[14.5px] font-semibold ${task.status === "done" ? "text-muted line-through" : ""}`}>{task.title}</p>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-        <span className="font-mono">{task.due_date ? `Due ${task.due_date}` : "No due date"}</span>
+        <span className="font-mono">{task.due_date ? t("board.card.due", { date: task.due_date }) : t("board.card.noDueDate")}</span>
         {task.event_id !== null && (
           <Link to={`/events/${task.event_id}`} className="font-semibold text-accent">
-            From class
+            {t("board.card.fromClass")}
           </Link>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <select
-          aria-label={`Status for ${task.title}`}
+          aria-label={t("board.card.statusFor", { title: task.title })}
           value={task.status}
           disabled={pending}
           onChange={(e) => onMove(e.target.value as TaskStatus)}
@@ -132,19 +135,19 @@ function TaskCard({ task, pending, onMove, onDelete }: { task: Task; pending: bo
         >
           {COLUMNS.map((c) => (
             <option key={c.status} value={c.status}>
-              {c.label}
+              {t(c.label)}
             </option>
           ))}
         </select>
         {task.source === "manual" && (
           <button
             type="button"
-            aria-label={confirm ? `Click again to delete ${task.title}` : `Delete ${task.title}`}
+            aria-label={confirm ? t("board.card.confirmDeleteAria", { title: task.title }) : t("board.card.deleteAria", { title: task.title })}
             onClick={() => (confirm ? onDelete() : setConfirm(true))}
             onBlur={() => setConfirm(false)}
             className="h-9 rounded-lg px-2 text-sm font-semibold text-danger"
           >
-            {confirm ? "Click again to delete" : "Delete"}
+            {confirm ? t("board.card.confirmDelete") : t("common.delete")}
           </button>
         )}
       </div>

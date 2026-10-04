@@ -1,1 +1,33 @@
-export const subjects = {};
+export const subjects = {
+  loading: "Loading subjects…",
+  title: "Subjects",
+  empty: "No subjects yet — sync your school timetable first.",
+  hidden: "Hidden",
+  summary: {
+    one: "{done} of {total} sessions · {count} open task",
+    other: "{done} of {total} sessions · {count} open tasks",
+  },
+  summaryNext: {
+    one: "{done} of {total} sessions · {count} open task · next {date}",
+    other: "{done} of {total} sessions · {count} open tasks · next {date}",
+  },
+  exam: "Exam {date}",
+  detail: {
+    back: "‹ All subjects",
+    alsoCalled: "Also called: {names}",
+    subject: "Subject",
+    stats: "{sessions} sessions · {done} done · {notes} notes · {open} open tasks",
+    exam: "Exam",
+    progress: "{done} of {total} sessions done",
+    sessions: "Sessions",
+    noSessions: "No sessions (hidden subject, or pick your group in Settings).",
+    noNotes: "No notes yet",
+    cancelled: "Cancelled",
+    changed: "Changed",
+    important: "Important",
+    openCount: "{count} open",
+    tasks: "Tasks",
+    due: "due {date}",
+    openBoard: "Open the board",
+  },
+};
