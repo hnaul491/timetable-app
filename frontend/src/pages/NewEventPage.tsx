@@ -7,8 +7,8 @@ import { addDays, parisLocalToUtc, todayParis, weekdayIndex } from "../lib/time"
 import type { CustomKind } from "../types";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const field = "h-10 rounded-xl border border-[#D5D9E0] bg-white px-3 text-sm";
-const labelCls = "flex flex-col gap-1.5 text-sm font-semibold text-[#3A3F4B]";
+const field = "h-10 rounded-xl border border-line-strong bg-surface px-3 text-sm";
+const labelCls = "flex flex-col gap-1.5 text-sm font-semibold text-ink-2";
 
 export function NewEventPage() {
   const navigate = useNavigate();
@@ -82,7 +82,7 @@ export function NewEventPage() {
       <Link to={calendarHref()} className="text-sm font-semibold text-accent">
         ‹ Back to calendar
       </Link>
-      <form onSubmit={submit} className="flex max-w-xl flex-col gap-4 rounded-2xl border border-line bg-white p-5 md:p-7">
+      <form onSubmit={submit} className="flex max-w-xl flex-col gap-4 rounded-2xl border border-line bg-surface p-5 md:p-7">
         <h1 className="text-2xl font-bold tracking-tight">Add event</h1>
         <label className={labelCls}>
           Title
@@ -120,7 +120,7 @@ export function NewEventPage() {
         </label>
         {form.repeat && (
           <fieldset className="flex flex-col gap-3">
-            <legend className="mb-1.5 text-sm font-semibold text-[#3A3F4B]">On</legend>
+            <legend className="mb-1.5 text-sm font-semibold text-ink-2">On</legend>
             <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((name, day) => (
                 <label key={name} className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm">
@@ -135,8 +135,8 @@ export function NewEventPage() {
             </label>
           </fieldset>
         )}
-        {(error || create.error) && <p className="text-sm text-[#8B1A1A]">{error ?? (create.error as Error).message}</p>}
-        <button type="submit" disabled={create.isPending} className="h-11 rounded-xl bg-accent text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-50">
+        {(error || create.error) && <p className="text-sm text-danger">{error ?? (create.error as Error).message}</p>}
+        <button type="submit" disabled={create.isPending} className="h-11 rounded-xl bg-accent text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50">
           Save event
         </button>
       </form>

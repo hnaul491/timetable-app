@@ -6,7 +6,7 @@ import { formatTime, parisParts } from "../lib/time";
 import type { GoogleStatus, SyncStatus } from "../types";
 
 function Banner({ tone, children }: { tone: "warn" | "error"; children: ReactNode }) {
-  const styles = tone === "warn" ? "border-[#F5D9B8] bg-[#FFF7ED] text-[#7C2D12]" : "border-[#F3C4C4] bg-[#FDECEC] text-[#8B1A1A]";
+  const styles = tone === "warn" ? "border-warn-line bg-warn-soft text-warn" : "border-danger-line bg-danger-soft text-danger";
   return <div className={`rounded-xl border px-4 py-3 text-sm ${styles}`}>{children}</div>;
 }
 

@@ -20,7 +20,7 @@ function parseDate(value: string | null): string | null {
   return addDays(value, 0) === value ? value : null; // rejects 2026-13-45 and other impossible dates
 }
 
-const buttonClass = "h-10 rounded-xl border border-line bg-white px-3.5 text-sm font-semibold hover:bg-[#F8F9FB]";
+const buttonClass = "h-10 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold hover:bg-surface-2";
 
 export function CalendarPage() {
   const navigate = useNavigate();
@@ -67,20 +67,20 @@ export function CalendarPage() {
             ›
           </button>
         </div>
-        <div role="group" aria-label="View" className="flex rounded-xl bg-[#E9EBEF] p-[3px]">
+        <div role="group" aria-label="View" className="flex rounded-xl bg-subtle p-[3px]">
           {(["week", "day"] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={view === v}
               onClick={() => setView(v)}
-              className={`h-[34px] rounded-lg px-4 text-sm capitalize ${view === v ? "bg-white font-semibold shadow-sm" : "font-medium text-[#3A3F4B]"}`}
+              className={`h-[34px] rounded-lg px-4 text-sm capitalize ${view === v ? "bg-surface font-semibold shadow-sm" : "font-medium text-ink-2"}`}
             >
               {v}
             </button>
           ))}
         </div>
-        <Link to="/events/new" className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong">
+        <Link to="/events/new" className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
           Add event
         </Link>
       </header>

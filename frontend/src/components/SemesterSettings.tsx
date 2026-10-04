@@ -15,11 +15,11 @@ export function SemesterSettings() {
   const activate = useMutation({ mutationFn: (id: number) => apiFetch(`/api/semesters/${id}/activate`, { method: "PUT" }), onSuccess: refresh });
   const error = (save.error ?? activate.error) as Error | null;
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-5">
+    <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-base font-bold">Semesters</h2>
       <p className="text-sm text-muted">Set each semester's Zeus group when you know it, then make it active to switch the whole app.</p>
       {semesters.data?.map((s) => <SemesterRow key={s.id} semester={s} onSave={(g) => save.mutate({ id: s.id, zeus_group_id: g })} onActivate={() => activate.mutate(s.id)} />)}
-      {error && <p className="text-sm text-[#8B1A1A]">{error.message}</p>}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
     </section>
   );
 }
@@ -27,7 +27,7 @@ export function SemesterSettings() {
 function SemesterRow({ semester, onSave, onActivate }: { semester: Semester; onSave: (group: number | null) => void; onActivate: () => void }) {
   const [group, setGroup] = useState(semester.zeus_group_id?.toString() ?? "");
   return (
-    <div className={`flex flex-wrap items-end gap-3 rounded-xl px-3 py-2.5 ${semester.is_active ? "bg-[#F2FAF5]" : "bg-[#F8F9FB]"}`}>
+    <div className={`flex flex-wrap items-end gap-3 rounded-xl px-3 py-2.5 ${semester.is_active ? "bg-success-soft" : "bg-surface-2"}`}>
       <span className="flex min-w-[180px] flex-1 flex-col">
         <span className="text-sm font-semibold">{semester.name}</span>
         <span className="text-xs text-muted">{semester.is_active ? "Active" : "Not active"}</span>
@@ -39,14 +39,14 @@ function SemesterRow({ semester, onSave, onActivate }: { semester: Semester; onS
           inputMode="numeric"
           value={group}
           onChange={(e) => setGroup(e.target.value.replace(/\D/g, ""))}
-          className="h-9 w-24 rounded-lg border border-[#D5D9E0] bg-white px-2 text-sm text-ink"
+          className="h-9 w-24 rounded-lg border border-line-strong bg-surface px-2 text-sm text-ink"
         />
       </label>
-      <button type="button" aria-label={`Save ${semester.name}`} onClick={() => onSave(group ? Number(group) : null)} className="h-9 rounded-lg border border-line bg-white px-3 text-sm font-semibold">
+      <button type="button" aria-label={`Save ${semester.name}`} onClick={() => onSave(group ? Number(group) : null)} className="h-9 rounded-lg border border-line bg-surface px-3 text-sm font-semibold">
         Save
       </button>
       {!semester.is_active && (
-        <button type="button" aria-label={`Make ${semester.name} active`} onClick={onActivate} className="h-9 rounded-lg bg-accent px-3 text-sm font-semibold text-white">
+        <button type="button" aria-label={`Make ${semester.name} active`} onClick={onActivate} className="h-9 rounded-lg bg-accent px-3 text-sm font-semibold text-on-accent">
           Make active
         </button>
       )}

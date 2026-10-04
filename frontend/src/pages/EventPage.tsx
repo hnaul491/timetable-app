@@ -13,7 +13,7 @@ const TABS: { id: NoteTab; label: string }[] = [
   { id: "before", label: "Before next class" },
 ];
 const KIND_LABEL: Record<string, string> = { work: "Work", french_ext: "French (external)", other: "My event" };
-const chip = "rounded-full bg-[#F0F1F4] px-2.5 py-1 text-xs font-semibold text-[#3A3F4B]";
+const chip = "rounded-full bg-subtle px-2.5 py-1 text-xs font-semibold text-ink-2";
 
 interface Draft {
   body: string;
@@ -148,7 +148,7 @@ function EventPageInner() {
       <Link to={calendarHref()} className="text-sm font-semibold text-accent">
         ‹ Back to calendar
       </Link>
-      <article className="flex flex-col gap-4 rounded-2xl border border-line bg-white p-5 md:p-7">
+      <article className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 md:p-7">
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             {event.subject_name && <span className={chip}>{event.subject_name}</span>}
@@ -160,7 +160,7 @@ function EventPageInner() {
               onClick={() => star.mutate(!event.important)}
               disabled={star.isPending}
               className={`ml-auto flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold disabled:opacity-60 ${
-                event.important ? "border-[#F5D9B8] bg-[#FFF1E0] text-[#9A3412]" : "border-line bg-white text-[#3A3F4B]"
+                event.important ? "border-warn-line bg-warn-soft text-changed" : "border-line bg-surface text-ink-2"
               }`}
             >
               <span aria-hidden="true" className="text-base leading-none">{event.important ? "★" : "☆"}</span>
@@ -174,7 +174,7 @@ function EventPageInner() {
             {event.title}
             {event.section ? ` · ${event.section}` : ""}
           </h1>
-          <p className="text-sm text-[#3A3F4B]">
+          <p className="text-sm text-ink-2">
             {dayLabel(start.date).weekday} {formatLongDate(start.date)} ·{" "}
             <span className="font-mono">
               {formatTime(event.start)}–{formatTime(event.end)}
@@ -221,17 +221,17 @@ function EventPageInner() {
             type="button"
             disabled={!dirty || save.isPending}
             onClick={() => save.mutate({ tab, draft: current })}
-            className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-strong disabled:opacity-50"
+            className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong disabled:opacity-50"
           >
             Save note
           </button>
           {dirty && (
-            <button type="button" onClick={discard} className="h-10 rounded-xl border border-line px-4 text-sm font-semibold text-[#3A3F4B]">
+            <button type="button" onClick={discard} className="h-10 rounded-xl border border-line px-4 text-sm font-semibold text-ink-2">
               Discard changes
             </button>
           )}
           {dirty ? <span className="text-sm text-muted">Unsaved changes</span> : saved.updated_at ? <span className="text-sm text-muted">Saved</span> : null}
-          {save.error && <p className="text-sm text-[#8B1A1A]">{(save.error as Error).message}</p>}
+          {save.error && <p className="text-sm text-danger">{(save.error as Error).message}</p>}
         </div>
 
         {tasks.length > 0 && (
@@ -246,7 +246,7 @@ function EventPageInner() {
                 {task.due_date && <span className="font-mono text-xs text-muted">due {task.due_date}</span>}
               </label>
             ))}
-            {toggleTask.error && <p className="text-sm text-[#8B1A1A]">{(toggleTask.error as Error).message}</p>}
+            {toggleTask.error && <p className="text-sm text-danger">{(toggleTask.error as Error).message}</p>}
           </section>
         )}
 
@@ -255,7 +255,7 @@ function EventPageInner() {
             <button
               type="button"
               onClick={() => (confirmDelete ? remove.mutate() : setConfirmDelete(true))}
-              className="h-10 rounded-xl border border-[#F3C4C4] px-4 text-sm font-semibold text-[#8B1A1A]"
+              className="h-10 rounded-xl border border-danger-line px-4 text-sm font-semibold text-danger"
             >
               {event.note_count > 0
                 ? confirmDelete
@@ -265,7 +265,7 @@ function EventPageInner() {
                   ? "Click again to delete"
                   : "Delete event"}
             </button>
-            {remove.error && <p className="text-sm text-[#8B1A1A]">{(remove.error as Error).message}</p>}
+            {remove.error && <p className="text-sm text-danger">{(remove.error as Error).message}</p>}
           </div>
         )}
       </article>
