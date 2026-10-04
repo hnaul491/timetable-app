@@ -72,7 +72,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
   const enabled = open && debounced.length >= 2;
   const query = useQuery({
     queryKey: ["search", debounced],
-    queryFn: () => apiFetch<SearchResults>(`/api/search?q=${encodeURIComponent(debounced)}&limit=${LIMIT}`),
+    queryFn: async () => ({ q: debounced, results: await apiFetch<SearchResults>(`/api/search?q=${encodeURIComponent(debounced)}&limit=${LIMIT}`) }),
     enabled,
     placeholderData: keepPreviousData,
   });
@@ -89,7 +89,8 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
 
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
-    const data = enabled ? query.data : undefined;
+    const data = enabled ? query.data?.results : undefined;
+    const hq = query.data?.q ?? q; // highlight with the query these results answer
     if (data) {
       for (const e of data.events) {
         const when = new Date(e.start).toLocaleString(INTL_LOCALE[locale], {
@@ -100,10 +101,11 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
           run: () => go(`/?event=${e.id}&date=${parisParts(e.start).date}`),
           content: (
             <>
-              <span className={`block truncate text-sm font-semibold ${e.cancelled ? "line-through" : ""}`}><Highlight text={e.title} q={q} /></span>
+              <span className={`block truncate text-sm font-semibold ${e.cancelled ? "line-through" : ""}`}><Highlight text={e.title} q={hq} /></span>
+              {e.title_raw && <span className="block truncate text-xs text-ink-2"><Highlight text={e.title_raw} q={hq} /></span>}
               <Muted>
                 {when}
-                {e.room ? <> · <Highlight text={e.room} q={q} /></> : null}
+                {e.room ? <> · <Highlight text={e.room} q={hq} /></> : null}
                 {e.cancelled ? ` · ${t("search.cancelled")}` : ""}
               </Muted>
             </>
@@ -112,13 +114,13 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
       }
       for (const s of data.subjects)
         out.push({ key: `s${s.id}`, group: "search.subjects", text: s.name, run: () => go(`/subjects/${s.id}`),
-          content: <span className="block truncate text-sm font-semibold"><Highlight text={s.name} q={q} /></span> });
+          content: <span className="block truncate text-sm font-semibold"><Highlight text={s.name} q={hq} /></span> });
       for (const n of data.notes)
-        out.push({ key: `n${n.event_id}${n.snippet}`, group: "search.notes", text: n.snippet, run: () => go(`/events/${n.event_id}`),
+        out.push({ key: `n${n.id}`, group: "search.notes", text: n.snippet, run: () => go(`/events/${n.event_id}`),
           content: (
             <>
               <span className="block truncate text-sm font-semibold">{n.event_title}</span>
-              <span className="block text-xs text-ink-2"><Highlight text={n.snippet} q={q} /></span>
+              <span className="block text-xs text-ink-2"><Highlight text={n.snippet} q={hq} /></span>
             </>
           ) });
       for (const k of data.tasks)
@@ -126,7 +128,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
           run: () => go(k.event_id !== null ? `/events/${k.event_id}` : "/board"),
           content: (
             <>
-              <span className={`block truncate text-sm font-semibold ${k.done ? "line-through" : ""}`}><Highlight text={k.title} q={q} /></span>
+              <span className={`block truncate text-sm font-semibold ${k.done ? "line-through" : ""}`}><Highlight text={k.title} q={hq} /></span>
               <Muted>
                 {k.done ? t("search.done") : ""}
                 {k.done && k.due ? " · " : ""}
@@ -142,7 +144,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
               window.open(d.web_view_link, "_blank", "noopener,noreferrer");
             } else go(`/subjects/${d.subject_id}`);
           },
-          content: <span className="block truncate text-sm font-semibold"><Highlight text={d.name} q={q} /></span> });
+          content: <span className="block truncate text-sm font-semibold"><Highlight text={d.name} q={hq} /></span> });
     }
     const needle = q.toLowerCase();
     for (const a of ACTIONS) {
@@ -155,8 +157,18 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.data, enabled, q, locale, t]);
+  const groups = items.reduce<{ group: MessageKey; entries: { item: Item; index: number }[] }[]>((acc, item, index) => {
+    const last = acc[acc.length - 1];
+    if (last && last.group === item.group) last.entries.push({ item, index });
+    else acc.push({ group: item.group, entries: [{ item, index }] });
+    return acc;
+  }, []);
 
   useEffect(() => setActive(0), [items.length, q]);
+  useEffect(() => {
+    if (!open) return;
+    document.getElementById(`${listId}-o${active}`)?.scrollIntoView?.({ block: "nearest" });
+  }, [open, active, listId, items.length]);
   const current = items[Math.min(active, items.length - 1)];
   const optionId = (i: number) => `${listId}-o${i}`;
 
@@ -173,7 +185,6 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
 
   const loading = enabled && (query.isPending || debounced !== q);
   const noResults = !loading && items.length === 0;
-  let lastGroup: MessageKey | null = null;
 
   return (
     <Dialog open={open} onClose={onClose} title={t("search.title")}>
@@ -181,7 +192,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
         data-autofocus
         role="combobox"
         aria-label={t("search.inputLabel")}
-        aria-expanded="true"
+        aria-expanded={items.length > 0}
         aria-controls={listId}
         aria-activedescendant={current ? optionId(items.indexOf(current)) : undefined}
         aria-autocomplete="list"
@@ -193,25 +204,24 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
         className="mb-3 h-11 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink"
       />
       <div role="listbox" id={listId} aria-label={t("search.results")} className="flex flex-col">
-        {items.map((item, i) => {
-          const heading = item.group !== lastGroup ? item.group : null;
-          lastGroup = item.group;
-          return (
-            <Fragment key={item.key}>
-              {heading && <div role="presentation" className="px-3 pt-3 pb-1 text-xs font-bold text-muted">{t(heading)}</div>}
+        {groups.map(({ group, entries }) => (
+          <div key={group} role="group" aria-labelledby={`${listId}-${group}`}>
+            <div id={`${listId}-${group}`} className="px-3 pt-3 pb-1 text-xs font-bold text-muted">{t(group)}</div>
+            {entries.map(({ item, index }) => (
               <div
-                id={optionId(i)}
+                key={item.key}
+                id={optionId(index)}
                 role="option"
                 aria-selected={item === current}
-                onMouseMove={() => setActive(i)}
+                onMouseMove={() => setActive(index)}
                 onClick={item.run}
                 className={`cursor-pointer rounded-lg px-3 py-2 ${item === current ? "bg-accent-soft" : ""}`}
               >
                 {item.content}
               </div>
-            </Fragment>
-          );
-        })}
+            ))}
+          </div>
+        ))}
       </div>
       {loading && (
         <div className="mt-2" role="status" aria-label={t("search.loading")}>

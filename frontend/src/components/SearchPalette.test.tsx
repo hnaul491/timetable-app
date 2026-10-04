@@ -11,9 +11,9 @@ import type { SearchResults } from "../types";
 import { Layout } from "./Layout";
 
 const RESULTS: SearchResults = {
-  events: [{ id: 7, title: "Python lab", start: "2026-10-20T07:00:00Z", end: "2026-10-20T09:00:00Z", room: "B12", cancelled: false }],
+  events: [{ id: 7, title: "Python lab", start: "2026-10-20T07:00:00Z", end: "2026-10-20T09:00:00Z", room: "B12", cancelled: false, title_raw: "CM python raw" }],
   subjects: [{ id: 3, name: "Python Programming" }],
-  notes: [{ event_id: 7, event_title: "Python lab", snippet: "Remember python venv <img src=x onerror=alert(1)>" }],
+  notes: [{ id: 11, event_id: 7, event_title: "Python lab", snippet: "Remember python venv <img src=x onerror=alert(1)>" }],
   tasks: [
     { id: 1, title: "Python homework", done: false, due: "2026-10-25", event_id: 7 },
     { id: 2, title: "Python reading", done: true, due: null, event_id: null },
@@ -90,7 +90,7 @@ describe("SearchPalette", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull());
     await user.keyboard("?");
     const help = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
-    expect(within(help).getByText("Search")).toBeInTheDocument();
+    expect(within(help).getAllByText("Search")).toHaveLength(2);
   });
 
   it("shows quick actions for an empty query and filters them", async () => {
@@ -191,5 +191,62 @@ describe("SearchPalette", () => {
     await user.type(screen.getByRole("combobox", { name: translate("vi", "search.inputLabel") }), "python");
     await screen.findByText(translate("vi", "search.classes"));
     expect(translate("vi", "search.empty", { q: "x" })).toBe("Không có kết quả cho “x”");
+  });
+
+  it("opens with Meta+K, closes with Ctrl+K, and stays shut behind another dialog", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.keyboard("{Meta>}k{/Meta}");
+    expect(await palette()).toBeInTheDocument();
+    await user.keyboard("{Control>}k{/Control}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull());
+    await user.keyboard("?");
+    await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+    await user.keyboard("{Control>}k{/Control}");
+    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
+  });
+
+  it("does not open from / inside an input or contenteditable", async () => {
+    const user = userEvent.setup();
+    setup();
+    const editable = document.createElement("div");
+    editable.setAttribute("contenteditable", "true");
+    editable.tabIndex = 0;
+    document.body.appendChild(editable);
+    editable.focus();
+    await user.keyboard("/");
+    expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
+    editable.remove();
+  });
+
+  it("scrolls the active option into view and groups results accessibly", async () => {
+    const user = userEvent.setup();
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    setup();
+    await user.keyboard("/");
+    const box = await screen.findByRole("combobox", { name: "Search" });
+    expect(box).toHaveAttribute("aria-expanded", "true");
+    await user.type(box, "python");
+    await screen.findByRole("option", { name: /Python homework/ });
+    scroll.mockClear();
+    await user.keyboard("{ArrowDown}");
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    const group = screen.getByRole("group", { name: "Classes" });
+    expect(within(group).getAllByRole("option")).toHaveLength(1);
+    expect(group.textContent).toContain("CM python raw");
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it("highlights with the query the results came from while a new one loads", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.keyboard("/");
+    const box = await screen.findByRole("combobox", { name: "Search" });
+    await user.type(box, "python");
+    await screen.findByRole("option", { name: /Python homework/ });
+    await user.type(box, "x");
+    const marks = within(screen.getByRole("listbox")).getAllByText("Python", { selector: "mark" });
+    expect(marks.length).toBeGreaterThan(0);
   });
 });

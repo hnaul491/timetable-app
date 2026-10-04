@@ -24,7 +24,7 @@ const NON_TEXT_INPUTS = ["checkbox", "radio", "button", "submit", "reset", "rang
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target instanceof HTMLInputElement) return !NON_TEXT_INPUTS.includes(target.type);
-  return target.isContentEditable || ["TEXTAREA", "SELECT"].includes(target.tagName);
+  return target.isContentEditable || target.closest('[contenteditable=""], [contenteditable="true"]') !== null || ["TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 export function ShortcutProvider({ children }: { children: ReactNode }) {

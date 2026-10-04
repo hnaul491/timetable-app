@@ -33,8 +33,12 @@ export function Layout() {
   const { sidebarCollapsed, toggleSidebar, fullScreen, setFullScreen } = useChrome();
   const [helpOpen, setHelpOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  useShortcut("search", "Mod+k", () => setSearchOpen(true), { label: "shortcuts.search" });
-  useShortcut("search-slash", "/", () => setSearchOpen(true));
+  // Ctrl/Cmd+K toggles the palette, but never opens it on top of another dialog.
+  useShortcut("search", "Mod+k", () => {
+    if (searchOpen) setSearchOpen(false);
+    else if (document.querySelector('[aria-modal="true"]') === null) setSearchOpen(true);
+  }, { label: "shortcuts.search", inDialog: true });
+  useShortcut("search-slash", "/", () => setSearchOpen(true), { label: "shortcuts.search" });
   useShortcut("sidebar", "[", toggleSidebar, { label: "shortcuts.toggleSidebar" });
   useShortcut("help", "?", () => setHelpOpen(true), { label: "shortcuts.help" });
   useShortcut("exit-full-screen", "Escape", () => setFullScreen(false), { label: "shortcuts.exitFullScreen", enabled: fullScreen });
