@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.ai.provider import ToolDecl
 from app.models import Event, Note, PendingAction, Subject, Task
 from app.services.events_query import active_semester, list_visible_events
+from app.services.free_time import DEFAULT_WEEKDAYS, MAX_BUFFER, MAX_DAYS, MAX_MIN_FREE, FreeTimeParams, free_time_for_session
 from app.services.recurrence import PARIS
 
 MAX_EVENTS = 200
@@ -68,6 +69,15 @@ READ_TOOLS = [
                    "day_start": {**_TIME, "description": "Default 08:00"},
                    "day_end": {**_TIME, "description": "Default 20:00"}},
                   ["from_date", "to_date", "min_minutes"])),
+    ToolDecl("count_free_days", "Count the days in a period when a daily time window (for example 06:00-08:00) is "
+             "completely free of classes and events, optionally keeping travel minutes before each class.",
+             _obj({"from": _TIME, "to": _TIME, "start": _DATE, "end": _DATE,
+                   "weekdays": {"type": "array", "items": {"type": "integer"},
+                                "description": "Weekdays to count, Monday=0 .. Sunday=6 (default Monday-Friday)"},
+                   "buffer": {"type": "integer", "description": "Travel minutes before each class (0-240)"},
+                   "min_free": {"type": "integer",
+                                "description": "Also count days with at least this many free minutes in the window"}},
+                  ["from", "to", "start", "end"])),
 ]
 
 PROPOSE_TOOLS = [
@@ -234,6 +244,46 @@ def _find_free_slots(session: Session, args: dict) -> dict:
                        "date": paris_iso(a)[:10]} for a, b in slots[:MAX_SLOTS]]}
 
 
+def _opt_int(args: dict, field: str, low: int, high: int) -> int | None:
+    if args.get(field) is None:
+        return None
+    value = _int_arg(args[field])
+    if value is None or not low <= value <= high:
+        raise ToolError(f"{field} must be a whole number from {low} to {high}")
+    return value
+
+
+def _local_hm(iso_utc_z: str) -> str:
+    return paris_iso(datetime.fromisoformat(iso_utc_z[:-1]))[11:16]
+
+
+def _count_free_days(session: Session, args: dict) -> dict:
+    t_from, t_to = _clock(args.get("from"), "from"), _clock(args.get("to"), "to")
+    if t_from >= t_to:
+        raise ToolError("from must be before to")
+    first, last = _day(args.get("start"), "start"), _day(args.get("end"), "end")
+    if last < first:
+        raise ToolError("end is before start")
+    if (last - first).days + 1 > MAX_DAYS:
+        raise ToolError(f"period is limited to {MAX_DAYS} days")
+    raw = args.get("weekdays")
+    if raw is None:
+        weekdays = DEFAULT_WEEKDAYS
+    else:
+        found = [_int_arg(w) for w in raw] if isinstance(raw, list) else []
+        if not found or any(w is None or not 0 <= w <= 6 for w in found):
+            raise ToolError("weekdays must be a list of numbers 0 (Monday) to 6 (Sunday)")
+        weekdays = tuple(sorted(set(found)))
+    buffer = _opt_int(args, "buffer", 0, MAX_BUFFER) or 0
+    min_free = _opt_int(args, "min_free", 1, MAX_MIN_FREE)
+    result = free_time_for_session(session, FreeTimeParams(t_from, t_to, first, last, weekdays, buffer, min_free))
+    blocked = [{"date": d["date"], "status": d["status"],
+                "blockers": [f"{b['title']} {_local_hm(b['start'])}-{_local_hm(b['end'])}" for b in d["blockers"]]}
+               for d in result["days"] if d["status"] in ("partial", "busy") and not d["counts"]]
+    return {"free_days": result["free_days"], "counted_days": result["counted_days"],
+            "by_weekday": result["by_weekday"], "blocked_days": blocked[:10]}
+
+
 # ---- propose tools --------------------------------------------------------------------------------------
 
 def _pending(session: Session, kind: str, summary: str, payload: dict, now: datetime) -> dict:
@@ -324,7 +374,8 @@ def _propose_study_blocks(session: Session, args: dict, now: datetime) -> dict:
 
 
 _READ = {"get_events": _get_events, "get_tasks": _get_tasks, "get_notes": _get_notes,
-         "get_subjects": _get_subjects, "find_free_slots": _find_free_slots}
+         "get_subjects": _get_subjects, "find_free_slots": _find_free_slots,
+         "count_free_days": _count_free_days}
 _PROPOSE = {"propose_task": _propose_task, "propose_event": _propose_event, "propose_note": _propose_note,
             "propose_study_blocks": _propose_study_blocks}
 

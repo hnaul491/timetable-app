@@ -128,7 +128,7 @@ def test_bad_arguments_and_unknown_tool_are_error_results(session, semester):
 def test_model_cannot_write(session, semester):
     seed(session, semester)
     names = {t.name for t in READ_TOOLS + PROPOSE_TOOLS}
-    assert all(n.startswith(("get_", "find_", "propose_")) for n in names)
+    assert all(n.startswith(("get_", "find_", "count_", "propose_")) for n in names)
     before = counts(session)
     for name, args in [("propose_task", {"title": "Revise joins", "due_date": "2026-10-22"}),
                        ("propose_event", {"title": "Gym", "date": "2026-10-21", "start": "18:00", "end": "19:00",
