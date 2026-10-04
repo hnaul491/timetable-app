@@ -47,6 +47,9 @@ export async function streamChat(body: unknown, handlers: ChatStreamHandlers, si
   const decoder = new TextDecoder();
   let buffer = "";
   const drain = (flush: boolean) => {
+    // a lone trailing \r may be the first half of a CRLF split across chunks: keep it for the next read
+    const hold = !flush && buffer.endsWith("\r");
+    if (hold) buffer = buffer.slice(0, -1);
     buffer = buffer.replace(/\r\n?/g, "\n");
     let at: number;
     while ((at = buffer.indexOf("\n\n")) >= 0) {
@@ -54,6 +57,7 @@ export async function streamChat(body: unknown, handlers: ChatStreamHandlers, si
       buffer = buffer.slice(at + 2);
     }
     if (flush && buffer.trim()) dispatch(buffer);
+    if (hold) buffer += "\r";
   };
   for (;;) {
     const { done, value } = await reader.read();

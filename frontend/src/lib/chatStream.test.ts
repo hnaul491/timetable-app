@@ -29,6 +29,15 @@ describe("streamChat", () => {
     expect(h.onDone).toHaveBeenCalledWith(expect.objectContaining({ content: "Hello" }));
   });
 
+  it("keeps a trailing lone CR until the next chunk so a split CRLF is not a blank line", async () => {
+    const chunks = ['event: delta\r', '\ndata: {"text":"a"}\r\n\r', '\nevent: done\r\ndata: {"message":{"id":1,"role":"assistant","content":"a","actions":[]}}\r\n\r\n'];
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body(chunks), { status: 200 })));
+    const h = handlers();
+    await streamChat({}, h);
+    expect(h.onDelta.mock.calls.map((c) => c[0])).toEqual(["a"]);
+    expect(h.onDone).toHaveBeenCalledTimes(1);
+  });
+
   it("reports an error event", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(body(['event: error\ndata: {"message":"nope"}\n\n']), { status: 200 })));
     const h = handlers();

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -296,6 +296,107 @@ describe("AssistantPage", () => {
       expect(await screen.findByText(/AI limit reached, try again later/)).toBeInTheDocument();
       expect(apiFetch.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
       expect(screen.getByRole("textbox", { name: "Message the assistant" })).toHaveValue("hi");
+    });
+
+    const dying = (chunks: string[]) => async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(c) {
+            for (const ch of chunks) c.enqueue(enc.encode(ch));
+            setTimeout(() => c.error(new TypeError("network error")), 0);
+          },
+        }),
+        { status: 200 },
+      );
+    const chatInvalidations = (invalidate: { mock: { calls: unknown[][] } }) =>
+      invalidate.mock.calls.filter((c) => JSON.stringify((c[0] as { queryKey?: unknown })?.queryKey) === '["chat"]').length;
+
+    it("a stream that dies after a status keeps the partial bubble, toasts and does not fall back", async () => {
+      fetchMock.mockImplementation(dying([frame("status", { step: "tasks" })]));
+      route();
+      const { invalidate } = renderPage();
+      await typeHi();
+      expect(await screen.findByText("Stopped")).toBeInTheDocument();
+      expect(screen.getByText(/Could not send/)).toBeInTheDocument();
+      expect(apiFetch.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
+      expect(chatInvalidations(invalidate)).toBeGreaterThan(0);
+    });
+
+    it("translates a known error text for Vietnamese users", async () => {
+      fetchMock.mockImplementation(async () => new Response(sseBody([frame("error", { message: "AI limit reached, try again later" })]), { status: 200 }));
+      route();
+      renderPage("vi");
+      await typeHi("Nhắn cho trợ lý");
+      expect(await screen.findByText(/Đã đạt giới hạn AI, hãy thử lại sau/)).toBeInTheDocument();
+    });
+
+    it("a status after text resets the live bubble to the next round", async () => {
+      fetchMock.mockImplementation(hang([frame("delta", { text: "Round one" }), frame("status", { step: "tasks" }), frame("delta", { text: "Round two" })]));
+      route();
+      renderPage();
+      await typeHi();
+      expect(await screen.findByText("Round two")).toBeInTheDocument();
+      expect(screen.queryByText(/Round one/)).toBeNull();
+    });
+
+    it("blocks a second send fired in the same tick", async () => {
+      fetchMock.mockImplementation(hang([frame("delta", { text: "Partial" })]));
+      route();
+      renderPage();
+      const box = await screen.findByRole("textbox", { name: "Message the assistant" });
+      await userEvent.type(box, "hi");
+      const form = box.closest("form")!;
+      act(() => {
+        fireEvent.submit(form);
+        fireEvent.submit(form);
+      });
+      await screen.findByText("Partial");
+      expect(fetchMock.mock.calls.filter((c) => c[0] === "/api/chat/stream")).toHaveLength(1);
+    });
+
+    it("after Stop resyncs again shortly after and drops the stopped bubble once history has the exchange", async () => {
+      fetchMock.mockImplementation(hang([frame("delta", { text: "Partial" })]));
+      route();
+      const { invalidate } = renderPage();
+      await typeHi();
+      await screen.findByText("Partial");
+      history = [
+        { id: 100, role: "user", content: "hi", actions: [] },
+        { id: 101, role: "assistant", content: "Stored answer", actions: [] },
+      ];
+      await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+      expect(await screen.findByText("Stored answer")).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText("Stopped")).toBeNull());
+      await waitFor(() => expect(chatInvalidations(invalidate)).toBeGreaterThanOrEqual(2), { timeout: 3000 });
+    });
+
+    it("keeps the stopped bubble while history only holds an older identical message", async () => {
+      history = [
+        { id: 5, role: "user", content: "hi", actions: [] },
+        { id: 6, role: "assistant", content: "Old answer", actions: [] },
+      ];
+      fetchMock.mockImplementation(hang([frame("delta", { text: "Partial" })]));
+      route();
+      renderPage();
+      await typeHi();
+      await screen.findByText("Partial");
+      await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+      expect(await screen.findByText("Stopped")).toBeInTheDocument();
+    });
+
+    it("Clear chat also clears a stopped bubble", async () => {
+      history = [reply({ actions: [] })];
+      fetchMock.mockImplementation(hang([frame("delta", { text: "Partial" })]));
+      route();
+      renderPage();
+      await typeHi();
+      await screen.findByText("Partial");
+      await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+      await screen.findByText("Stopped");
+      await userEvent.click(screen.getByRole("button", { name: "Clear chat" }));
+      const dialog = await screen.findByRole("dialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Clear chat" }));
+      await waitFor(() => expect(screen.queryByText("Partial")).toBeNull());
     });
 
     it("shows status chips and Stop in Vietnamese", async () => {

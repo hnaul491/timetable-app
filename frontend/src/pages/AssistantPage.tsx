@@ -7,6 +7,7 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
+import { translateServerMessage } from "../i18n/serverMessages";
 import { aiErrorText } from "../lib/aiError";
 import { streamChat } from "../lib/chatStream";
 import { invalidateTaskViews } from "../lib/invalidate";
@@ -96,9 +97,11 @@ export function AssistantPage() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [hidePrivacy, setHidePrivacy] = useState(privacyDismissed);
-  const [live, setLive] = useState<{ user: string; text: string; steps: string[]; stopped: boolean } | null>(null);
+  const [live, setLive] = useState<{ user: string; text: string; steps: string[]; stopped: boolean; afterId: number } | null>(null);
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const busyRef = useRef(false); // set synchronously in submit: blocks a second send before state catches up
+  const resyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const status = useQuery({ queryKey: ["ai-status"], queryFn: () => apiFetch<AiStatus>("/api/ai/status") });
@@ -110,7 +113,20 @@ export function AssistantPage() {
     endRef.current?.scrollIntoView?.({ block: "end" });
   }, [messages.length, sending, live?.text, live?.steps.length]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      if (resyncRef.current) clearTimeout(resyncRef.current);
+    },
+    [],
+  );
+
+  // a stopped bubble goes away once the refetched history holds that exchange
+  useEffect(() => {
+    if (!live?.stopped || streaming) return;
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser && lastUser.id > live.afterId && lastUser.content === live.user) setLive(null);
+  }, [messages, live, streaming]);
 
   const commit = (message: string, answer: ChatMessage) => {
     queryClient.setQueryData<{ messages: ChatMessage[] }>(["chat"], (old) => {
@@ -160,6 +176,7 @@ export function AssistantPage() {
     mutationFn: () => apiFetch("/api/chat", { method: "DELETE" }),
     onSuccess: () => {
       queryClient.setQueryData(["chat"], { messages: [] });
+      setLive(null);
       toast.success(t("ai.cleared"));
     },
     onError: (error) => toast.error(t("ai.actionFailed", { message: error.message })),
@@ -171,22 +188,27 @@ export function AssistantPage() {
 
   const submit = async (message: string) => {
     const body = message.trim();
-    if (!body || send.isPending || streaming) return;
+    if (!body || send.isPending || streaming || busyRef.current) return;
+    busyRef.current = true;
     setText("");
-    setLive({ user: body, text: "", steps: [], stopped: false });
+    setLive({ user: body, text: "", steps: [], stopped: false, afterId: messages.reduce((m, x) => Math.max(m, x.id), 0) });
     setStreaming(true);
     const controller = new AbortController();
     abortRef.current = controller;
-    let gotDelta = false;
+    let gotAny = false; // a status or delta arrived
     let ended = false; // done or error event received
     let acc = "";
     try {
       await streamChat(
         { message: body, context: chatContext(), locale },
         {
-          onStatus: (step) => setLive((l) => l && (l.steps.includes(step) ? l : { ...l, steps: [...l.steps, step] })),
+          onStatus: (step) => {
+            gotAny = true;
+            acc = ""; // the final message holds only the last round's text
+            setLive((l) => l && { ...l, text: "", steps: l.steps.includes(step) ? l.steps : [...l.steps, step] });
+          },
           onDelta: (delta) => {
-            gotDelta = true;
+            gotAny = true;
             acc += delta;
             setLive((l) => l && { ...l, text: acc });
           },
@@ -199,7 +221,7 @@ export function AssistantPage() {
             ended = true;
             setLive(null);
             setText((cur) => cur || body);
-            toast.error(t("ai.sendFailed", { message: msg || t("ai.unavailable") }));
+            toast.error(t("ai.sendFailed", { message: translateServerMessage(msg, locale) || t("ai.unavailable") }));
           },
         },
         controller.signal,
@@ -207,19 +229,23 @@ export function AssistantPage() {
     } catch (error) {
       if (controller.signal.aborted) {
         setLive((l) => l && { ...l, stopped: true });
+        // the server may still store the exchange after the disconnect: look now and once more shortly after
         queryClient.invalidateQueries({ queryKey: ["chat"] });
-      } else if (!gotDelta && !ended) {
+        if (resyncRef.current) clearTimeout(resyncRef.current);
+        resyncRef.current = setTimeout(() => queryClient.invalidateQueries({ queryKey: ["chat"] }), 1500);
+      } else if (!gotAny && !ended) {
         // the stream never produced anything: use the non-streaming endpoint
         setLive(null);
         setSending(body);
         send.mutate(body);
       } else {
-        setLive(null);
+        setLive((l) => l && { ...l, stopped: true }); // keep what arrived, marked as cut off
         setText((cur) => cur || body);
         queryClient.invalidateQueries({ queryKey: ["chat"] });
         toast.error(t("ai.sendFailed", { message: aiErrorText(error as Error, t) }));
       }
     } finally {
+      busyRef.current = false;
       setStreaming(false);
       abortRef.current = null;
     }
