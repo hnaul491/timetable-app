@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
 import { translate } from "../i18n";
-import { ChromeProvider } from "../lib/chrome";
+import { calendarHref } from "../lib/calendarLocation";
+import { ChromeProvider, useChrome } from "../lib/chrome";
 import { ShortcutProvider } from "../lib/shortcuts";
 import { CalendarPage } from "./CalendarPage";
 
@@ -46,7 +47,12 @@ function Where() {
   );
 }
 
-function renderAt(path = "/?date=2026-10-19&view=week") {
+function FullScreenProbe() {
+  const { fullScreen } = useChrome();
+  return <p data-testid="fs">{String(fullScreen)}</p>;
+}
+
+function renderAt(path: string | string[] = "/?date=2026-10-19&view=week") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -54,10 +60,12 @@ function renderAt(path = "/?date=2026-10-19&view=week") {
         <ConfirmProvider>
           <ShortcutProvider>
             <ChromeProvider>
-              <MemoryRouter initialEntries={[path]}>
+              <MemoryRouter initialEntries={Array.isArray(path) ? path : [path]}>
                 <Routes>
                   <Route path="/" element={<CalendarPage />} />
+                  <Route path="/other" element={<p>Other page</p>} />
                 </Routes>
+                <FullScreenProbe />
                 <Where />
               </MemoryRouter>
             </ChromeProvider>
@@ -71,6 +79,7 @@ function renderAt(path = "/?date=2026-10-19&view=week") {
 describe("CalendarPage popups", () => {
   beforeEach(() => {
     apiFetch.mockReset();
+    sessionStorage.clear();
     apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
       if (path.startsWith("/api/events?")) return { events: [event()], missing_sections: [] };
       if (path === "/api/events" && init?.method === "POST") return event({ id: 99, title: "Gym" });
@@ -176,5 +185,82 @@ describe("CalendarPage popups", () => {
     await userEvent.keyboard("n");
     expect(await screen.findByRole("dialog", { name: "Add event" })).toBeInTheDocument();
     expect(screen.getByLabelText("Start")).toHaveValue("09:00");
+  });
+
+  it("does not remember the open popup in the calendar address", async () => {
+    renderAt("/?date=2026-10-19&view=week&event=5");
+    await screen.findByRole("dialog", { name: "Work shift" });
+    expect(calendarHref()).toBe("/?date=2026-10-19&view=week");
+  });
+
+  it("f toggles full screen and leaving the calendar resets it", async () => {
+    renderAt(["/other", "/?date=2026-10-19&view=week"]);
+    await screen.findByRole("heading", { level: 1 });
+    await userEvent.keyboard("f");
+    expect(screen.getByTestId("fs")).toHaveTextContent("true");
+    await userEvent.keyboard("f");
+    expect(screen.getByTestId("fs")).toHaveTextContent("false");
+    await userEvent.click(screen.getByRole("button", { name: "Full-screen calendar" }));
+    expect(screen.getByRole("button", { name: "Exit full screen" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Today" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "test-back" }));
+    expect(await screen.findByText("Other page")).toBeInTheDocument();
+    expect(screen.getByTestId("fs")).toHaveTextContent("false");
+  });
+
+  it("shows a grid skeleton while events load", async () => {
+    apiFetch.mockImplementation((path: string) => (path.startsWith("/api/events?") ? new Promise(() => {}) : Promise.resolve(undefined)));
+    renderAt();
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Loading…");
+    expect(screen.queryByRole("button", { name: /Open Work shift/ })).not.toBeInTheDocument();
+  });
+
+  it("closing a popup opened in the app goes back instead of leaving dead Back entries", async () => {
+    renderAt(["/other", "/?date=2026-10-19&view=week"]);
+    await userEvent.click(await screen.findByRole("button", { name: /Open Work shift/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "test-back" }));
+    expect(await screen.findByText("Other page")).toBeInTheDocument();
+  });
+
+  it("closing a popup from a deep link replaces the address", async () => {
+    renderAt(["/other", "/?date=2026-10-19&view=week&event=5"]);
+    await userEvent.click(await screen.findByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByTestId("where")).toHaveTextContent("/?date=2026-10-19&view=week");
+    await userEvent.click(screen.getByRole("button", { name: "test-back" }));
+    expect(await screen.findByText("Other page")).toBeInTheDocument();
+  });
+
+  it("saving an edit swaps edit= for event= without a new entry", async () => {
+    renderAt("/?date=2026-10-19&view=week&event=5");
+    await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Save event" }));
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("event=5"));
+    expect(screen.getByTestId("where")).not.toHaveTextContent("edit=");
+  });
+
+  it("ignores an invalid ?new= time", async () => {
+    renderAt("/?date=2026-10-19&view=week&new=2026-10-21T25:99");
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("?edit= on a school class shows the details instead", async () => {
+    apiFetch.mockImplementation(async (path: string) => (path === "/api/events/5" ? detail({ source: "zeus", kind: "class" }) : path.startsWith("/api/events?") ? { events: [], missing_sections: [] } : undefined));
+    renderAt("/?date=2026-10-19&view=week&edit=5");
+    expect(await screen.findByRole("dialog", { name: "Work shift" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Title")).not.toBeInTheDocument();
+  });
+
+  it("a missing event titles the panel as not found", async () => {
+    apiFetch.mockImplementation(async (path: string) => {
+      if (path === "/api/events/5") throw new Error("nope");
+      return path.startsWith("/api/events?") ? { events: [], missing_sections: [] } : undefined;
+    });
+    renderAt("/?date=2026-10-19&view=week&event=5");
+    expect(await screen.findByRole("dialog", { name: "Event not found" })).toBeInTheDocument();
   });
 });

@@ -104,15 +104,6 @@ export function Layout() {
         </button>
       </nav>
       )}
-      {fullScreen && (
-        <button
-          type="button"
-          onClick={() => setFullScreen(false)}
-          className="fixed top-3 right-3 z-40 h-10 rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold text-ink shadow-lg hover:bg-subtle"
-        >
-          {t("shortcuts.exitFullScreen")}
-        </button>
-      )}
       <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       <main className="min-w-0 flex-1 px-4 pt-5 pb-24 md:px-7 md:pb-8">
         <Outlet />

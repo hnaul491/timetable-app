@@ -114,9 +114,9 @@ describe("GoogleSettings", () => {
       { status: "failed", done: 0, failed: 3, remaining: 3, error: "boom" },
     ]);
     await userEvent.click(await screen.findByRole("button", { name: "Push now" }));
-    expect(await screen.findAllByText("4 changes sent")).toHaveLength(2);
+    expect(await screen.findAllByText("4 changes sent")).toHaveLength(1); // toast only, the progress line is cleared
     await userEvent.click(screen.getByRole("button", { name: "Push now" }));
-    expect((await screen.findAllByText("Push failed: boom")).length).toBeGreaterThanOrEqual(2);
+    expect(await screen.findAllByText("Push failed: boom")).toHaveLength(1);
   });
 
   it("says the calendar stays in Google after disconnecting", async () => {

@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { useEffect, useRef, type ReactNode } from "react";
+import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router";
 import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { EventForm, type FormValues } from "../components/EventForm";
 import { EventPanel } from "../components/EventPanel";
 import { Dialog } from "../components/ui/Dialog";
+import { Skeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/Toast";
 import { WeekGrid } from "../components/WeekGrid";
 import { useLocale, useT } from "../i18n";
@@ -32,7 +33,7 @@ type Popup = (typeof POPUP_PARAMS)[number];
 
 /** "2026-10-21T10:30" from the ?new= parameter, or null when it is not one. */
 function parseSlot(value: string | null): { date: string; start: string } | null {
-  const match = value ? /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(value) : null;
+  const match = value ? /^(\d{4}-\d{2}-\d{2})T((?:[01]\d|2[0-3]):[0-5]\d)$/.exec(value) : null;
   return match && parseDate(match[1]) ? { date: match[1], start: match[2] } : null;
 }
 
@@ -45,12 +46,23 @@ export function CalendarPage() {
   const locale = useLocale();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { setFullScreen } = useChrome();
+  const { fullScreen, setFullScreen } = useChrome();
+  const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const isPhone = useMediaQuery("(max-width: 767px)");
   // The shown date and view live in the address, so coming back from an event keeps the same week.
   const [params, setParams] = useSearchParams();
   const { search } = useLocation();
-  useEffect(() => rememberCalendarSearch(search), [search]);
+  // Full screen belongs to the calendar: leaving it always restores the normal layout.
+  useEffect(() => () => setFullScreen(false), [setFullScreen]);
+  // The remembered address is the week/view only; popups must not come back with "Back to calendar".
+  const remembered = (() => {
+    const next = new URLSearchParams(search);
+    for (const name of POPUP_PARAMS) next.delete(name);
+    const text = next.toString();
+    return text ? `?${text}` : "";
+  })();
+  useEffect(() => rememberCalendarSearch(remembered), [remembered]);
   const view = parseView(params.get("view")) ?? (isPhone ? "day" : "week");
   const anchor = parseDate(params.get("date")) ?? todayParis();
   const show = (next: { date?: string; view?: View }) =>
@@ -58,8 +70,16 @@ export function CalendarPage() {
   const setAnchor = (date: string) => show({ date });
   const setView = (next: View) => show({ view: next });
 
-  // Popups live in the address: opening pushes an entry (Back closes it), closing or swapping replaces.
-  const openPopup = (key: Popup, value: string, replace = false) =>
+  // Popups live in the address: opening pushes an entry (Back closes it), swapping replaces. Closing a popup
+  // that this page pushed goes back over those entries, so no dead Back steps remain; a deep link just replaces.
+  const pushed = useRef(0);
+  const hasPopup = POPUP_PARAMS.some((name) => params.has(name));
+  useEffect(() => {
+    if (!hasPopup) pushed.current = 0;
+    else if (navigationType === "POP") pushed.current = Math.max(0, pushed.current - 1);
+  }, [hasPopup, navigationType, search]);
+  const openPopup = (key: Popup, value: string, replace = false) => {
+    if (!replace) pushed.current += 1;
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -69,7 +89,14 @@ export function CalendarPage() {
       },
       { replace },
     );
-  const closePopup = () =>
+  };
+  const closePopup = () => {
+    if (pushed.current > 0) {
+      const steps = pushed.current;
+      pushed.current = 0;
+      navigate(-steps);
+      return;
+    }
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -78,6 +105,7 @@ export function CalendarPage() {
       },
       { replace: true },
     );
+  };
   const eventParam = params.get("event");
   const editParam = params.get("edit");
   const eventId = eventParam && /^\d+$/.test(eventParam) ? Number(eventParam) : null;
@@ -85,17 +113,17 @@ export function CalendarPage() {
   const slot = parseSlot(params.get("new"));
   const openNew = (date: string, start: string) => openPopup("new", `${date}T${start}`);
 
+  const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i)) : [anchor];
+  const range = rangeUtc(days[0], days.length);
+  const step = view === "week" ? 7 : 1;
+
   useShortcut("cal-previous", "ArrowLeft", () => setAnchor(addDays(anchor, -step)), { label: "shortcuts.previous" });
   useShortcut("cal-next", "ArrowRight", () => setAnchor(addDays(anchor, step)), { label: "shortcuts.next" });
   useShortcut("cal-today", "t", () => setAnchor(todayParis()), { label: "shortcuts.today" });
   useShortcut("cal-week", "w", () => setView("week"), { label: "shortcuts.weekView" });
   useShortcut("cal-day", "d", () => setView("day"), { label: "shortcuts.dayView" });
   useShortcut("cal-new", "n", () => openNew(anchor, "09:00"), { label: "shortcuts.newEvent" });
-  useShortcut("cal-full-screen", "f", () => setFullScreen(true), { label: "shortcuts.fullScreen" });
-
-  const days = view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i)) : [anchor];
-  const range = rangeUtc(days[0], days.length);
-  const step = view === "week" ? 7 : 1;
+  useShortcut("cal-full-screen", "f", () => setFullScreen(!fullScreen), { label: "shortcuts.fullScreen" });
 
   const events = useQuery({
     queryKey: ["events", range.start, range.end],
@@ -137,6 +165,18 @@ export function CalendarPage() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-pressed={fullScreen}
+          aria-label={t(fullScreen ? "shortcuts.exitFullScreen" : "shortcuts.fullScreen")}
+          title={t(fullScreen ? "shortcuts.exitFullScreen" : "shortcuts.fullScreen")}
+          onClick={() => setFullScreen(!fullScreen)}
+          className={`flex h-10 w-10 items-center justify-center rounded-xl border border-line hover:bg-surface-2 ${fullScreen ? "bg-subtle" : "bg-surface"}`}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            {fullScreen ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+          </svg>
+        </button>
         <button type="button" onClick={() => openNew(anchor, "09:00")} className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
           {t("calendar.header.addEvent")}
         </button>
@@ -144,10 +184,11 @@ export function CalendarPage() {
       <SyncBanner status={sync.data} />
       <GoogleBanner status={google.data} />
       <MissingSectionsBanner names={events.data?.missing_sections ?? []} />
-      {events.error ? <ErrorPanel error={events.error} onRetry={() => events.refetch()} /> : <WeekGrid days={days} events={events.data?.events ?? []} onSelect={(id) => openPopup("event", String(id))} onCreateAt={(date, minutes) => openNew(date, clock(minutes))} />}
+      {events.error ? <ErrorPanel error={events.error} onRetry={() => events.refetch()} /> : !events.data ? <CalendarSkeleton columns={days.length} /> : <WeekGrid days={days} events={events.data?.events ?? []} onSelect={(id) => openPopup("event", String(id))} onCreateAt={(date, minutes) => openNew(date, clock(minutes))} />}
       {editId !== null ? (
         <EditDialog
           id={editId}
+          fallback={<EventPanel eventId={editId} onClose={closePopup} onEdit={() => {}} onOpen={(id) => openPopup("event", String(id), true)} />}
           onClose={closePopup}
           onDone={(id) => {
             toast.success(t("event.updated"));
@@ -174,10 +215,28 @@ export function CalendarPage() {
   );
 }
 
-function EditDialog({ id, onClose, onDone }: { id: number; onClose: () => void; onDone: (id: number | null) => void }) {
+function CalendarSkeleton({ columns }: { columns: number }) {
+  const t = useT();
+  return (
+    <div role="status" className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      <span className="sr-only">{t("common.loading")}</span>
+      {Array.from({ length: columns }, (_, i) => (
+        <div key={i} aria-hidden="true" className="flex flex-col gap-2">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EditDialog({ id, fallback, onClose, onDone }: { id: number; fallback: ReactNode; onClose: () => void; onDone: (id: number | null) => void }) {
   const t = useT();
   const detail = useQuery({ queryKey: ["event", String(id)], queryFn: () => apiFetch<EventDetail>(`/api/events/${id}`) });
   const event = detail.data?.event;
+  if (event && event.source !== "custom") return <>{fallback}</>; // school classes cannot be edited: show the details instead
   let initial: Partial<FormValues> | undefined;
   if (event) {
     const start = parisParts(event.start);

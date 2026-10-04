@@ -50,6 +50,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
       invalidateTaskViews(queryClient);
       toast.success(t("event.deleted"));
       onClose();
+      queryClient.removeQueries({ queryKey: ["event", String(eventId)] });
     },
     onError: (error) => toast.error(t("event.deleteFailed", { message: error.message }), { retry: () => remove.mutate() }),
   });
@@ -72,7 +73,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
     }
   };
   useShortcut("panel-delete", "Mod+d", askDelete, { inDialog: true, label: "shortcuts.delete", enabled: own });
-  useShortcut("panel-delete-key", "Delete", askDelete, { inDialog: true, enabled: own });
+  useShortcut("panel-delete-key", "Delete", askDelete, { inDialog: true, label: "shortcuts.delete", enabled: own });
 
   const data = detail.data;
   const event = data?.event;
@@ -82,7 +83,7 @@ export function EventPanel({ eventId, onClose, onEdit, onOpen }: { eventId: numb
   const notes = data ? (["after", "before"] as NoteTab[]).filter((tab) => data.notes[tab].body.trim() !== "") : [];
 
   return (
-    <Dialog open onClose={onClose} size="side" title={event ? `${event.title}${event.section ? ` · ${event.section}` : ""}` : t("common.loading")}>
+    <Dialog open onClose={onClose} size="side" title={detail.error ? t("event.notFound") : event ? `${event.title}${event.section ? ` · ${event.section}` : ""}` : t("common.loading")}>
       {detail.error ? (
         <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />
       ) : !data || !event || !start ? (

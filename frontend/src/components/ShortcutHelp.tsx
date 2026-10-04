@@ -1,3 +1,4 @@
+import { useLocation } from "react-router";
 import { useT } from "../i18n";
 import { formatKeys, useShortcutList } from "../lib/shortcuts";
 import { Dialog } from "./ui/Dialog";
@@ -5,6 +6,7 @@ import { Dialog } from "./ui/Dialog";
 export function ShortcutHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
   const list = useShortcutList();
+  const onCalendar = useLocation().pathname === "/";
   return (
     <Dialog open={open} onClose={onClose} title={t("shortcuts.title")} size="sm">
       <ul className="flex flex-col gap-2.5">
@@ -22,6 +24,7 @@ export function ShortcutHelp({ open, onClose }: { open: boolean; onClose: () => 
           </li>
         ))}
       </ul>
+      {!onCalendar && <p className="mt-4 border-t border-line pt-3 text-xs text-muted">{t("shortcuts.contextHint")}</p>}
     </Dialog>
   );
 }

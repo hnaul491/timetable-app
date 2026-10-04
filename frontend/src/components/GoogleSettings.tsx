@@ -75,15 +75,19 @@ export function GoogleSettings() {
         const result = await apiFetch<PushResult>("/api/google/push", { method: "POST" });
         sent += result.done;
         setProgress(summary(t, locale, sent, result));
-        if (result.status !== "partial" || result.remaining === 0 || result.done === 0) return result;
+        if (result.status !== "partial" || result.remaining === 0 || result.done === 0) return { result, sent };
       }
       return null;
     },
-    onSuccess: (result) => {
-      if (result?.status === "failed") toast.error(summary(t, locale, 0, result), { retry: () => push.mutate() });
-      else if (result) toast.success(summary(t, locale, result.done, result));
+    onSuccess: (outcome) => {
+      setProgress(null);
+      if (outcome?.result.status === "failed") toast.error(summary(t, locale, 0, outcome.result), { retry: () => push.mutate() });
+      else if (outcome) toast.success(summary(t, locale, outcome.sent, outcome.result));
     },
-    onError: (error) => toast.error(error.message, { retry: () => push.mutate() }),
+    onError: (error) => {
+      setProgress(null);
+      toast.error(error.message, { retry: () => push.mutate() });
+    },
     onSettled: refresh,
   });
 
@@ -103,7 +107,7 @@ export function GoogleSettings() {
   };
 
   const s = status.data;
-  const error = (connect.error ?? kinds.error ?? disconnect.error ?? push.error) as Error | null;
+  const error = (connect.error ?? kinds.error ?? disconnect.error) as Error | null;
   return (
     <section className={card} aria-labelledby="google-heading">
       <h2 id="google-heading" className="text-base font-bold">

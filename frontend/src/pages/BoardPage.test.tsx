@@ -67,6 +67,25 @@ describe("BoardPage", () => {
     expect(screen.getByText("Set up venv")).toBeInTheDocument();
   });
 
+  it("Retry re-sends the failed task values", async () => {
+    let fail = true;
+    apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        if (fail) throw new Error("offline");
+        return {};
+      }
+      return TASKS;
+    });
+    renderBoard();
+    await userEvent.type(await screen.findByLabelText("New task"), "Print slides");
+    await userEvent.click(screen.getByRole("button", { name: "Add task" }));
+    fail = false;
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    const posts = apiFetch.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(posts).toHaveLength(2);
+    expect(posts[1][1].body).toBe(JSON.stringify({ title: "Print slides", due_date: null }));
+  });
+
   it("adds a manual task", async () => {
     renderBoard();
     await userEvent.type(await screen.findByLabelText("New task"), "Print slides");

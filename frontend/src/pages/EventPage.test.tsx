@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventDetail } from "../types";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
+import { ShortcutProvider } from "../lib/shortcuts";
 import { EventPage } from "./EventPage";
 
 const apiFetch = vi.fn();
@@ -37,12 +38,14 @@ function renderPage() {
     <QueryClientProvider client={client}>
       <ToastProvider>
         <ConfirmProvider>
-          <MemoryRouter initialEntries={["/events/7"]}>
-            <Routes>
-              <Route path="/events/:id" element={<EventPage />} />
-              <Route path="/" element={<p>Calendar home</p>} />
-            </Routes>
-          </MemoryRouter>
+          <ShortcutProvider>
+            <MemoryRouter initialEntries={["/events/7"]}>
+              <Routes>
+                <Route path="/events/:id" element={<EventPage />} />
+                <Route path="/" element={<p>Calendar home</p>} />
+              </Routes>
+            </MemoryRouter>
+          </ShortcutProvider>
         </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>,
@@ -63,6 +66,18 @@ describe("EventPage", () => {
     expect(screen.getByRole("link", { name: /Next class/ })).toHaveAttribute("href", "/events/8");
     await userEvent.click(screen.getByRole("tab", { name: "Before next class" }));
     expect(screen.getByRole("textbox", { name: "Before next class note" })).toHaveValue("Bring laptop");
+  });
+
+  it("Ctrl+S saves the note while typing", async () => {
+    apiFetch.mockResolvedValue(detail());
+    renderPage();
+    const box = await screen.findByRole("textbox", { name: "After class note" });
+    fireEvent.change(box, { target: { value: "changed" } });
+    box.focus();
+    await userEvent.keyboard("{Control>}s{/Control}");
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith("/api/events/7/notes/after", { method: "PUT", body: JSON.stringify({ body: "changed" }) }),
+    );
   });
 
   it("saves the edited note text", async () => {
@@ -89,7 +104,7 @@ describe("EventPage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Mark important" }));
     expect(apiFetch).toHaveBeenCalledWith("/api/events/7/important", { method: "PUT", body: JSON.stringify({ important: true }) });
     expect(await screen.findByRole("button", { name: "Important" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("status")).toHaveTextContent("Marked important");
+    expect(await screen.findByText("Marked important")).toBeInTheDocument(); // toast only
   });
 
   it("ticks a task", async () => {

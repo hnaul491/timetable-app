@@ -18,14 +18,14 @@ function Marker() {
   );
 }
 
-function setup() {
+function setup(path = "/") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <I18nProvider locale="en">
         <ShortcutProvider>
           <ChromeProvider>
-            <MemoryRouter initialEntries={["/"]}>
+            <MemoryRouter initialEntries={[path]}>
               <Routes>
                 <Route element={<Layout />}>
                   <Route path="*" element={<Marker />} />
@@ -73,15 +73,28 @@ describe("Layout shortcuts", () => {
     expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument();
   });
 
+  it("the shortcut help points to the calendar's extra shortcuts off the calendar page", async () => {
+    const user = userEvent.setup();
+    setup("/board");
+    await user.keyboard("?");
+    expect(await screen.findByText("More shortcuts appear on the calendar.")).toBeInTheDocument();
+  });
+
+  it("the shortcut help has no hint on the calendar", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.keyboard("?");
+    await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+    expect(screen.queryByText("More shortcuts appear on the calendar.")).toBeNull();
+  });
+
   it("full screen hides the navigation and Escape exits", async () => {
     const user = userEvent.setup();
     setup();
-    expect(screen.queryByRole("button", { name: "Exit full screen" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "enter-fs" }));
     expect(screen.queryByRole("navigation")).toBeNull();
-    expect(screen.getByRole("button", { name: "Exit full screen" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Exit full screen" })).toBeNull(); // the toggle lives in the calendar header
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("button", { name: "Exit full screen" })).toBeNull();
     expect(screen.getAllByRole("navigation").length).toBeGreaterThan(0);
   });
 });

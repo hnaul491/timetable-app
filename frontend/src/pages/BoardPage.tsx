@@ -38,14 +38,14 @@ export function BoardPage() {
     onError: (error, v) => toast.error(error.message, { retry: () => move.mutate(v) }),
   });
   const add = useMutation({
-    mutationFn: () => apiFetch("/api/tasks", { method: "POST", body: JSON.stringify({ title: title.trim(), due_date: due || null }) }),
+    mutationFn: (v: { title: string; due: string }) => apiFetch("/api/tasks", { method: "POST", body: JSON.stringify({ title: v.title, due_date: v.due || null }) }),
     onSuccess: () => {
       setTitle("");
       setDue("");
       refresh();
       toast.success(t("board.toast.added"));
     },
-    onError: (error) => toast.error(error.message, { retry: () => add.mutate() }),
+    onError: (error, v) => toast.error(error.message, { retry: () => add.mutate(v) }),
   });
   const remove = useMutation({
     mutationFn: (id: number) => apiFetch(`/api/tasks/${id}`, { method: "DELETE" }),
@@ -61,7 +61,7 @@ export function BoardPage() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (title.trim()) add.mutate();
+    if (title.trim()) add.mutate({ title: title.trim(), due });
   };
 
   if (tasks.error && !tasks.data) return <ErrorPanel error={tasks.error} onRetry={() => tasks.refetch()} />;

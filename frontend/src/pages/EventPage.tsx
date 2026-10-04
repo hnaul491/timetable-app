@@ -8,6 +8,7 @@ import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { calendarHref } from "../lib/calendarLocation";
 import { invalidateTaskViews } from "../lib/invalidate";
+import { useShortcut } from "../lib/shortcuts";
 import { dayLabel, formatLongDate, formatTime, parisParts } from "../lib/time";
 import type { EventDetail, NoteTab, Task } from "../types";
 
@@ -91,15 +92,12 @@ function EventPageInner() {
     },
     onError: (error, v) => toast.error(t("event.noteFailed", { message: error.message }), { retry: () => save.mutate(v) }),
   });
-  const [starNotice, setStarNotice] = useState("");
   const star = useMutation({
     mutationFn: (important: boolean) =>
       apiFetch<EventDetail>(`/api/events/${id}/important`, { method: "PUT", body: JSON.stringify({ important }) }),
     onSuccess: (data) => {
       queryClient.setQueryData(["event", id], data);
-      const notice = t(data.event.important ? "event.markedImportant" : "event.noLongerImportant");
-      setStarNotice(notice);
-      toast.success(notice);
+      toast.success(t(data.event.important ? "event.markedImportant" : "event.noLongerImportant"));
       invalidateLists();
     },
     onError: (error, important) => toast.error(t("event.starFailed", { message: error.message }), { retry: () => star.mutate(important) }),
@@ -122,6 +120,7 @@ function EventPageInner() {
       invalidateLists();
       toast.success(t("event.deleted"));
       navigate(calendarHref());
+      queryClient.removeQueries({ queryKey: ["event", id] });
     },
     onError: (error) => toast.error(t("event.deleteFailed", { message: error.message }), { retry: () => remove.mutate() }),
   });
@@ -135,6 +134,19 @@ function EventPageInner() {
     });
     if (ok) remove.mutate();
   };
+
+  useShortcut(
+    "note-save",
+    "Mod+s",
+    () => {
+      const data = detail.data;
+      if (!data || save.isPending) return;
+      const saved = data.notes[tab];
+      const current: Draft = drafts[tab] ?? { body: saved.body, important: saved.important };
+      if (current.body !== saved.body || current.important !== saved.important) save.mutate({ tab, draft: current });
+    },
+    { label: "shortcuts.save" },
+  );
 
   if (detail.error) return <ErrorPanel error={detail.error} onRetry={() => detail.refetch()} />;
   if (!detail.data) return <p className="text-muted">{t("common.loading")}</p>;
@@ -191,9 +203,6 @@ function EventPageInner() {
               {t(event.important ? "event.important" : "event.markImportant")}
             </button>
           </div>
-          <p role="status" className="min-h-0 text-sm text-muted empty:hidden">
-            {starNotice || (star.error ? (star.error as Error).message : "")}
-          </p>
           <h1 className="text-2xl font-bold tracking-tight">
             {event.title}
             {event.section ? ` · ${event.section}` : ""}
