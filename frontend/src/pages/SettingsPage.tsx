@@ -48,14 +48,14 @@ export function SettingsPage() {
     onError: (error, value) => toast.error(error.message, { retry: () => saveKey.mutate(value) }),
   });
   const activeSemester = semesters.data?.find((s) => s.is_active);
-  const useLinkGroup = useMutation({
+  const applyLinkGroup = useMutation({
     mutationFn: (v: { id: number; group: number }) =>
       apiFetch(`/api/semesters/${v.id}`, { method: "PATCH", body: JSON.stringify({ zeus_group_id: v.group }) }),
     onSuccess: () => {
       setMismatch(null);
       queryClient.invalidateQueries();
     },
-    onError: (error, v) => toast.error(error.message, { retry: () => useLinkGroup.mutate(v) }),
+    onError: (error, v) => toast.error(error.message, { retry: () => applyLinkGroup.mutate(v) }),
   });
   const syncNow = useMutation({
     mutationFn: () => apiFetch<SyncRun>("/api/sync", { method: "POST" }),
@@ -122,8 +122,8 @@ export function SettingsPage() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={!activeSemester || useLinkGroup.isPending}
-                  onClick={() => activeSemester && useLinkGroup.mutate({ id: activeSemester.id, group: mismatch.link_group })}
+                  disabled={!activeSemester || applyLinkGroup.isPending}
+                  onClick={() => activeSemester && applyLinkGroup.mutate({ id: activeSemester.id, group: mismatch.link_group })}
                   className={primary}
                 >
                   {t("settings.zeus.useGroup", { group: mismatch.link_group })}

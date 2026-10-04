@@ -16,7 +16,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       .then(({ data, error }) => {
         if (error) throw error;
         // keep a session an auth event already delivered
-        setSession((cur) => cur ?? data.session);
+        setSession((cur) => (cur !== undefined ? cur : data.session));
       })
       .catch(() => setFailed(true));
   }, []);

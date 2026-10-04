@@ -132,6 +132,20 @@ describe("EventPage", () => {
     expect(await screen.findByText("Calendar home")).toBeInTheDocument();
   });
 
+  it("deleting an event with an unsaved draft does not ask to leave and clears the drafts", async () => {
+    apiFetch.mockImplementation(async (path: string, init?: RequestInit) =>
+      init?.method === "DELETE" ? { deleted: true } : detail({ source: "custom", kind: "work", subject_name: null, subject_id: null, title: "Work shift" }),
+    );
+    renderPage();
+    await userEvent.type(await screen.findByLabelText("After class note"), " more");
+    expect(localStorage.getItem("timetable:draft:7:after")).not.toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Delete event and its notes" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete event" }));
+    expect(await screen.findByText("Calendar home")).toBeInTheDocument();
+    expect(screen.queryByText("Leave without saving?")).not.toBeInTheDocument();
+    expect(localStorage.getItem("timetable:draft:7:after")).toBeNull();
+  });
+
   it("does not leak drafts or delete confirmation into the next class", async () => {
     apiFetch.mockImplementation(async (path: string) =>
       path === "/api/events/8"

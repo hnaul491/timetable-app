@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider, createBrowserRouter } from "react-router";
+import { useState } from "react";
+import { RouterProvider, createBrowserRouter, useRouteError } from "react-router";
 import { AuthGate } from "./auth/AuthGate";
 import { I18nProvider } from "./i18n";
 import { LanguageRoot } from "./i18n/LanguageRoot";
+import { ErrorPanel } from "./components/Banners";
 import { Layout } from "./components/Layout";
 import { ConfirmProvider } from "./components/ui/Confirm";
 import { ToastProvider } from "./components/ui/Toast";
@@ -30,10 +32,20 @@ const queryClient = new QueryClient({
   },
 });
 
+function RootError() {
+  const error = useRouteError();
+  return (
+    <div className="p-4">
+      <ErrorPanel error={error} onRetry={() => window.location.reload()} />
+    </div>
+  );
+}
+
 // a data router, so EventPage can block navigation away from unsaved notes (useBlocker)
-const router = createBrowserRouter([
+const createRouter = () => createBrowserRouter([
   {
     element: <Layout />,
+    errorElement: <RootError />,
     children: [
       { index: true, element: <CalendarPage /> },
       { path: "board", element: <BoardPage /> },
@@ -48,6 +60,12 @@ const router = createBrowserRouter([
   },
 ]);
 
+// Created on the first render after sign-in, i.e. after Supabase has cleaned the OAuth return URL.
+function AuthedRouter() {
+  const [router] = useState(createRouter);
+  return <RouterProvider router={router} />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -59,7 +77,7 @@ export default function App() {
                 <TopProgress />
                 <ShortcutProvider>
                   <ChromeProvider>
-                    <RouterProvider router={router} />
+                    <AuthedRouter />
                   </ChromeProvider>
                 </ShortcutProvider>
               </ConfirmProvider>

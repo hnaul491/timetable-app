@@ -69,6 +69,7 @@ function EventPageInner() {
   const [tab, setTab] = useState<NoteTab>("after");
   const [drafts, setDrafts] = useState<Partial<Record<NoteTab, Draft>>>(() => loadDrafts(id));
   useEffect(() => storeDrafts(id, drafts), [id, drafts]);
+  const leavingRef = useRef(false);
   const confirm = useConfirm();
   const toast = useToast();
 
@@ -119,6 +120,10 @@ function EventPageInner() {
   const remove = useMutation({
     mutationFn: () => apiFetch(`/api/events/${id}`, { method: "DELETE" }),
     onSuccess: () => {
+      // the event is gone: its drafts go with it, and leaving must not ask about them
+      leavingRef.current = true;
+      setDrafts({});
+      storeDrafts(id, {});
       invalidateLists();
       toast.success(t("event.deleted"));
       navigate(calendarHref());
@@ -166,7 +171,9 @@ function EventPageInner() {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [hasUnsaved]);
-  const blocker = useBlocker(hasUnsaved);
+  const hasUnsavedRef = useRef(hasUnsaved);
+  hasUnsavedRef.current = hasUnsaved;
+  const blocker = useBlocker(() => hasUnsavedRef.current && !leavingRef.current);
   const blockerRef = useRef(blocker);
   blockerRef.current = blocker;
   const asking = useRef(false);
