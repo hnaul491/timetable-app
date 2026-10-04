@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { Banner, ErrorPanel, MissingSectionsBanner } from "../components/Banners";
 import { Skeleton } from "../components/ui/Skeleton";
@@ -10,6 +10,7 @@ import {
   BUFFER_PRESETS, buildQuery, computeRange, loadForm, saveForm, validate,
   type FreeDay, type FreeTimeForm, type FreeTimeResult, type Period, type Range,
 } from "../lib/freeTime";
+import { useShortcut } from "../lib/shortcuts";
 import { formatTime, todayParis } from "../lib/time";
 import type { Semester } from "../types";
 
@@ -58,6 +59,33 @@ export function FreeTimePage() {
   const [form, setForm] = useState<FreeTimeForm>(() => loadForm(today));
   const [focused, setFocused] = useState<string | null>(null);
   const set = (patch: Partial<FreeTimeForm>) => setForm((f) => ({ ...f, ...patch }));
+  const customStart = useRef<HTMLInputElement>(null);
+  const bufferInput = useRef<HTMLInputElement>(null);
+  const focusStartNext = useRef(false);
+  const toggleDay = (i: number) =>
+    setForm((f) => ({ ...f, weekdays: f.weekdays.includes(i) ? f.weekdays.filter((d) => d !== i) : [...f.weekdays, i] }));
+  useShortcut("free-week", "w", () => set({ period: "week" }), { label: "shortcuts.freeWeek" });
+  useShortcut("free-month", "m", () => set({ period: "month" }), { label: "shortcuts.freeMonth" });
+  useShortcut("free-semester", "s", () => set({ period: "semester" }), { label: "shortcuts.freeSemester" });
+  useShortcut("free-custom", "c", () => {
+    if (customStart.current) customStart.current.focus();
+    else {
+      focusStartNext.current = true;
+      set({ period: "custom" });
+    }
+  }, { label: "shortcuts.freeCustom" });
+  useShortcut("free-buffer", "b", () => bufferInput.current?.focus(), { label: "shortcuts.freeBuffer" });
+  useShortcut("free-day-1", "1", () => toggleDay(0), { label: "shortcuts.freeDay1" });
+  useShortcut("free-day-2", "2", () => toggleDay(1), { label: "shortcuts.freeDay2" });
+  useShortcut("free-day-3", "3", () => toggleDay(2), { label: "shortcuts.freeDay3" });
+  useShortcut("free-day-4", "4", () => toggleDay(3), { label: "shortcuts.freeDay4" });
+  useShortcut("free-day-5", "5", () => toggleDay(4), { label: "shortcuts.freeDay5" });
+  useShortcut("free-day-6", "6", () => toggleDay(5), { label: "shortcuts.freeDay6" });
+  useShortcut("free-day-7", "7", () => toggleDay(6), { label: "shortcuts.freeDay7" });
+  useEffect(() => {
+    if (form.period === "custom" && focusStartNext.current) customStart.current?.focus();
+    focusStartNext.current = false;
+  }, [form.period]);
 
   const semesters = useQuery({ queryKey: ["semesters"], queryFn: () => apiFetch<Semester[]>("/api/semesters") });
   const activeSemester = semesters.data?.find((s) => s.is_active);
@@ -129,7 +157,7 @@ export function FreeTimePage() {
         {form.period === "custom" && (
           <>
             <Field label={t("freeTime.customStart")}>
-              <input type="date" value={form.customStart} onChange={(e) => set({ customStart: e.target.value })} className={fieldClass} />
+              <input ref={customStart} type="date" value={form.customStart} onChange={(e) => set({ customStart: e.target.value })} className={fieldClass} />
             </Field>
             <Field label={t("freeTime.customEnd")} error={err("range")}>
               <input type="date" value={form.customEnd} onChange={(e) => set({ customEnd: e.target.value })} className={fieldClass} />
@@ -162,6 +190,7 @@ export function FreeTimePage() {
           <div className="flex flex-wrap items-center gap-1.5">
             <input
               type="number" inputMode="numeric" min={0} max={240} step={5}
+              ref={bufferInput}
               aria-label={t("freeTime.buffer")} value={form.buffer}
               aria-invalid={errors.buffer ? true : undefined}
               onChange={(e) => set({ buffer: e.target.value })}

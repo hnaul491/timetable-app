@@ -3,7 +3,9 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ShortcutHelp } from "../components/ShortcutHelp";
 import { I18nProvider } from "../i18n";
+import { ShortcutProvider } from "../lib/shortcuts";
 import type { FreeTimeResult } from "../lib/freeTime";
 import { addDays, todayParis } from "../lib/time";
 import { FreeTimePage } from "./FreeTimePage";
@@ -38,18 +40,21 @@ function Where() {
   return <p data-testid="where">{l.pathname + l.search}</p>;
 }
 
-function renderPage(locale: "en" | "vi" = "en") {
+function renderPage(locale: "en" | "vi" = "en", help = false, path = "/free-time") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <I18nProvider locale={locale}>
-        <MemoryRouter initialEntries={["/free-time"]}>
-          <Where />
-          <Routes>
-            <Route path="/free-time" element={<FreeTimePage />} />
-            <Route path="*" element={null} />
-          </Routes>
-        </MemoryRouter>
+        <ShortcutProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <Where />
+            <Routes>
+              <Route path="/free-time" element={<FreeTimePage />} />
+              <Route path="*" element={null} />
+            </Routes>
+            {help && <ShortcutHelp open onClose={() => {}} />}
+          </MemoryRouter>
+        </ShortcutProvider>
       </I18nProvider>
     </QueryClientProvider>,
   );
@@ -324,6 +329,113 @@ describe("FreeTimePage", () => {
     apiFetch.mockImplementation(() => new Promise(() => {}));
     renderPage();
     expect(await screen.findByRole("status", { name: "Calculating free days" })).toBeInTheDocument();
+  });
+
+  describe("shortcuts", () => {
+    it("w, m and s pick the period", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      const period = screen.getByRole("combobox", { name: "Period" });
+      await user.keyboard("w");
+      expect(period).toHaveValue("week");
+      await user.keyboard("s");
+      expect(period).toHaveValue("semester");
+      await user.keyboard("m");
+      expect(period).toHaveValue("month");
+    });
+
+    it("c switches to custom dates and focuses the first day, even from another period", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      await user.keyboard("c");
+      expect(screen.getByRole("combobox", { name: "Period" })).toHaveValue("custom");
+      const start = await screen.findByLabelText("First day");
+      expect(start).toHaveFocus();
+      (document.activeElement as HTMLElement).blur();
+      await user.keyboard("c");
+      expect(start).toHaveFocus();
+    });
+
+    it("b focuses the travel buffer without typing into it", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      const buffer = screen.getByRole("spinbutton", { name: "Travel buffer" });
+      await user.keyboard("b");
+      expect(buffer).toHaveFocus();
+      expect(buffer).toHaveValue(0);
+    });
+
+    it("1 to 7 toggle Monday to Sunday", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      await user.keyboard("16");
+      expect(screen.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("button", { name: "Saturday" })).toHaveAttribute("aria-pressed", "true");
+      await user.keyboard("7");
+      expect(screen.getByRole("button", { name: "Sunday" })).toHaveAttribute("aria-pressed", "true");
+      await waitFor(() => expect(lastParams().get("weekdays")).toBe("1,2,3,4,5,6"));
+      await user.keyboard("1");
+      expect(screen.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("do nothing while typing in a field", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      const buffer = screen.getByRole("spinbutton", { name: "Travel buffer" });
+      await user.clear(buffer);
+      await user.type(buffer, "15");
+      expect(buffer).toHaveValue(15);
+      expect(screen.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("combobox", { name: "Period" })).toHaveValue("month");
+    });
+
+    it("do nothing on other pages", async () => {
+      const user = userEvent.setup();
+      renderPage("en", false, "/board");
+      await user.keyboard("1wmsbc");
+      expect(screen.getByTestId("where")).toHaveTextContent("/board");
+      expect(document.body).toHaveFocus();
+    });
+
+    it("Enter and Space on a focused day open the calendar at that date", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const cell = await screen.findByRole("button", { name: /busy/ });
+      cell.focus();
+      await user.keyboard("{Enter}");
+      expect(screen.getByTestId("where")).toHaveTextContent("/?date=2026-10-01");
+    });
+
+    it("Space on a focused day opens it too", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const cell = await screen.findByRole("button", { name: /45 min free/ });
+      cell.focus();
+      await user.keyboard(" ");
+      expect(screen.getByTestId("where")).toHaveTextContent("/?date=2026-10-05");
+    });
+
+    it("the help groups them under Free time", async () => {
+      renderPage("en", true);
+      const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+      expect(within(dialog).getByRole("heading", { name: "Free time" })).toBeInTheDocument();
+      for (const label of ["This week", "This month", "Rest of semester", "Custom dates", "Travel buffer", "Toggle Monday", "Toggle Sunday"]) {
+        expect(within(dialog).getByText(label)).toBeInTheDocument();
+      }
+    });
+
+    it("the help is in Vietnamese", async () => {
+      renderPage("vi", true);
+      const dialog = await screen.findByRole("dialog", { name: "Phím tắt" });
+      expect(within(dialog).getByRole("heading", { name: "Thời gian rảnh" })).toBeInTheDocument();
+      expect(within(dialog).getByText("Bật/tắt thứ Hai")).toBeInTheDocument();
+      expect(within(dialog).getByText("Chọn ngày")).toBeInTheDocument();
+    });
   });
 
   it("speaks Vietnamese", async () => {

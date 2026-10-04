@@ -11,6 +11,7 @@ import { connectPending } from "../lib/google";
 import { useIsDesktop } from "../lib/useMediaQuery";
 import { SchoolSection } from "./settings/SchoolSection";
 import { SectionList } from "./settings/SectionList";
+import { useShortcut } from "../lib/shortcuts";
 import { SECTIONS, isSectionId, matchSections, type SectionId } from "./settings/sections";
 import { useSettingsStatus } from "./settings/useSettingsStatus";
 
@@ -49,6 +50,7 @@ export function SettingsPage() {
   const status = useSettingsStatus();
   const [query, setQuery] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
+  const finder = useRef<HTMLInputElement>(null);
 
   const matches = matchSections(query, (id) => t(`settings.sections.${id}`));
   const current = isSectionId(section) ? section : null;
@@ -60,6 +62,15 @@ export function SettingsPage() {
   useEffect(() => {
     if (!desktopRef.current && current) heading.current?.focus();
   }, [current]);
+
+  const openSection = (id: SectionId) => navigate(`/settings/${id}`, { state: { fromList: true } });
+  useShortcut("settings-section-1", "1", () => openSection(SECTIONS[0].id), { label: "shortcuts.settingsSection1" });
+  useShortcut("settings-section-2", "2", () => openSection(SECTIONS[1].id), { label: "shortcuts.settingsSection2" });
+  useShortcut("settings-section-3", "3", () => openSection(SECTIONS[2].id), { label: "shortcuts.settingsSection3" });
+  useShortcut("settings-section-4", "4", () => openSection(SECTIONS[3].id), { label: "shortcuts.settingsSection4" });
+  useShortcut("settings-section-5", "5", () => openSection(SECTIONS[4].id), { label: "shortcuts.settingsSection5" });
+  useShortcut("settings-section-6", "6", () => openSection(SECTIONS[5].id), { label: "shortcuts.settingsSection6" });
+  useShortcut("settings-find", "f", () => finder.current?.focus(), { label: "shortcuts.settingsFind", enabled: desktop });
 
   const goBack = () => {
     if ((location.state as { fromList?: boolean } | null)?.fromList) navigate(-1);
@@ -118,6 +129,7 @@ export function SettingsPage() {
           </svg>
           <span className="sr-only">{t("settings.find.label")}</span>
           <input
+            ref={finder}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

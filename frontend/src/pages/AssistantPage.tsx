@@ -10,6 +10,7 @@ import { apiFetch } from "../lib/api";
 import { translateServerMessage } from "../i18n/serverMessages";
 import { aiErrorText, sendFailedText } from "../lib/aiError";
 import { streamChat } from "../lib/chatStream";
+import { useShortcut } from "../lib/shortcuts";
 import { invalidateTaskViews } from "../lib/invalidate";
 import { formatLongDate, parisParts } from "../lib/time";
 import type { AiStatus, ChatMessage, EventDetail, PendingAction, SubjectDetail } from "../types";
@@ -103,6 +104,7 @@ export function AssistantPage() {
   const busyRef = useRef(false); // set synchronously in submit: blocks a second send before state catches up
   const resyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
 
   const status = useQuery({ queryKey: ["ai-status"], queryFn: () => apiFetch<AiStatus>("/api/ai/status") });
   const enabled = status.data?.enabled === true;
@@ -251,7 +253,15 @@ export function AssistantPage() {
     }
   };
   const stop = () => abortRef.current?.abort();
+  useShortcut("assistant-focus", "i", () => composer.current?.focus(), { label: "shortcuts.assistantFocus", enabled });
+  useShortcut("assistant-stop", "Escape", stop, { label: "shortcuts.assistantStop", enabled: streaming });
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // The engine ignores plain keys while typing, and focus stays in the box during a reply.
+    if (e.key === "Escape" && streaming) {
+      e.preventDefault();
+      stop();
+      return;
+    }
     if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
     if (e.shiftKey && !e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
@@ -405,6 +415,7 @@ export function AssistantPage() {
             className="flex items-end gap-2"
           >
             <textarea
+              ref={composer}
               aria-label={t("ai.composer")}
               value={text}
               onChange={(e) => setText(e.target.value)}

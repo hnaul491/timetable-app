@@ -108,7 +108,7 @@ describe("Layout shortcuts", () => {
     const user = userEvent.setup();
     setup("/board");
     await user.keyboard("?");
-    expect(await screen.findByText("More shortcuts appear on the calendar.")).toBeInTheDocument();
+    expect(await screen.findByText("More shortcuts appear on the Calendar, Settings, Free time and Assistant pages.")).toBeInTheDocument();
   });
 
   it("the shortcut help has no hint on the calendar", async () => {
@@ -116,7 +116,7 @@ describe("Layout shortcuts", () => {
     setup();
     await user.keyboard("?");
     await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
-    expect(screen.queryByText("More shortcuts appear on the calendar.")).toBeNull();
+    expect(screen.queryByText("More shortcuts appear on the Calendar, Settings, Free time and Assistant pages.")).toBeNull();
   });
 
   it("full screen hides the navigation and Escape exits", async () => {

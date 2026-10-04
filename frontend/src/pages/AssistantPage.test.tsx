@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ShortcutHelp } from "../components/ShortcutHelp";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
 import { I18nProvider } from "../i18n";
@@ -57,7 +58,7 @@ function route(extra: (path: string, init?: RequestInit) => unknown = () => unde
   });
 }
 
-function renderPage(locale: "en" | "vi" = "en", url = "/") {
+function renderPage(locale: "en" | "vi" = "en", url = "/", help = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = vi.spyOn(client, "invalidateQueries");
   render(
@@ -68,6 +69,7 @@ function renderPage(locale: "en" | "vi" = "en", url = "/") {
             <ShortcutProvider>
               <MemoryRouter initialEntries={[url]}>
                 <AssistantPage />
+                {help && <ShortcutHelp open onClose={() => {}} />}
               </MemoryRouter>
             </ShortcutProvider>
           </ConfirmProvider>
@@ -433,6 +435,86 @@ describe("AssistantPage", () => {
       await typeHi("Nhắn cho trợ lý");
       expect(await screen.findByText("Đang tìm thời gian trống…")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Dừng" })).toBeInTheDocument();
+    });
+  });
+
+  describe("shortcuts", () => {
+    const hang = (chunks: string[]) => async (_u: string, init: RequestInit) => new Response(sseBody(chunks, { hang: true, signal: init.signal as AbortSignal }), { status: 200 });
+
+    it("i focuses the message box but types nothing into it", async () => {
+      route();
+      renderPage();
+      const box = await screen.findByRole("textbox", { name: "Message the assistant" });
+      expect(box).not.toHaveFocus();
+      await userEvent.keyboard("i");
+      expect(box).toHaveFocus();
+      expect(box).toHaveValue("");
+      await userEvent.keyboard("i"); // now typing: the letter is text
+      expect(box).toHaveValue("i");
+    });
+
+    it("i does nothing while the assistant is off", async () => {
+      enabled = false;
+      route();
+      renderPage();
+      await screen.findByText("The assistant is not set up");
+      await userEvent.keyboard("i");
+      expect(document.body).toHaveFocus();
+    });
+
+    it("Escape stops a streaming reply, from the box or from the page", async () => {
+      let signal: AbortSignal | undefined;
+      fetchMock.mockImplementation(async (u: string, init: RequestInit) => {
+        signal = init.signal as AbortSignal;
+        return hang([frame("delta", { text: "Partial" })])(u, init);
+      });
+      route();
+      renderPage();
+      await userEvent.type(await screen.findByRole("textbox", { name: "Message the assistant" }), "hi{Enter}");
+      await screen.findByText("Partial");
+      await userEvent.keyboard("{Escape}");
+      expect(signal?.aborted).toBe(true);
+      expect(await screen.findByText("Stopped")).toBeInTheDocument();
+    });
+
+    it("Escape from the page (focus outside the box) also stops", async () => {
+      let signal: AbortSignal | undefined;
+      fetchMock.mockImplementation(async (u: string, init: RequestInit) => {
+        signal = init.signal as AbortSignal;
+        return hang([frame("delta", { text: "Partial" })])(u, init);
+      });
+      route();
+      renderPage();
+      await userEvent.type(await screen.findByRole("textbox", { name: "Message the assistant" }), "hi{Enter}");
+      await screen.findByText("Partial");
+      (document.activeElement as HTMLElement).blur();
+      await userEvent.keyboard("{Escape}");
+      expect(signal?.aborted).toBe(true);
+    });
+
+    it("the help lists the focus key, and no stop key while idle", async () => {
+      route();
+      renderPage("en", "/assistant", true);
+      const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+      await screen.findByText("Write a message");
+      expect(within(dialog).getByRole("heading", { name: "Assistant" })).toBeInTheDocument();
+      expect(within(dialog).queryByText("Stop the reply")).toBeNull();
+    });
+
+    it("the help is in Vietnamese", async () => {
+      route();
+      renderPage("vi", "/assistant", true);
+      const dialog = await screen.findByRole("dialog", { name: "Phím tắt" });
+      expect(await within(dialog).findByText("Soạn tin nhắn")).toBeInTheDocument();
+      expect(within(dialog).getByRole("heading", { name: "Trợ lý" })).toBeInTheDocument();
+    });
+
+    it("Escape does nothing when no reply is streaming", async () => {
+      route();
+      renderPage();
+      await screen.findByRole("textbox", { name: "Message the assistant" });
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByText("Stopped")).toBeNull();
     });
   });
 });
