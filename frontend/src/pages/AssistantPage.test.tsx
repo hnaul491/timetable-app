@@ -16,7 +16,24 @@ const apiFetch = vi.fn();
 vi.mock("../lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/api")>()),
   apiFetch: (...args: unknown[]) => apiFetch(...args),
+  authHeaders: async () => ({}),
 }));
+
+const enc = new TextEncoder();
+function sseBody(chunks: string[], opts: { hang?: boolean; signal?: AbortSignal } = {}) {
+  return new ReadableStream<Uint8Array>({
+    start(c) {
+      for (const ch of chunks) c.enqueue(enc.encode(ch));
+      if (opts.hang) opts.signal?.addEventListener("abort", () => c.error(new DOMException("aborted", "AbortError")));
+      else c.close();
+    },
+  });
+}
+const frame = (event: string, data: unknown) => `event: ${event}
+data: ${JSON.stringify(data)}
+
+`;
+const fetchMock = vi.fn();
 
 const action = (over: Partial<PendingAction> = {}): PendingAction => ({ ...taskAction, ...over });
 const reply = (over: Partial<ChatMessage> = {}): ChatMessage => ({ id: 2, role: "assistant", content: "Here is a plan.\n- Read notes\n- Do ex 3", actions: [action()], ...over });
@@ -68,6 +85,9 @@ describe("AssistantPage", () => {
     history = [];
     enabled = true;
     sendAnswer = () => reply();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => new Response("{}", { status: 404 })); // no stream: fall back to POST
+    vi.stubGlobal("fetch", fetchMock);
   });
 
   it("sends a message and shows the reply as text with its action card", async () => {
@@ -205,6 +225,87 @@ describe("AssistantPage", () => {
     renderPage("vi");
     expect(await screen.findByRole("textbox", { name: "Nhắn cho trợ lý" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tuần này có gì đến hạn?" })).toBeInTheDocument();
+  });
+
+  describe("streaming", () => {
+    const final = (over: Partial<ChatMessage> = {}) => reply({ id: 101, content: "Hello there", ...over });
+    const hang = (chunks: string[]) => async (_u: string, init: RequestInit) => new Response(sseBody(chunks, { hang: true, signal: init.signal as AbortSignal }), { status: 200 });
+    const typeHi = async (name = "Message the assistant") => userEvent.type(await screen.findByRole("textbox", { name }), "hi{Enter}");
+
+    it("renders deltas live, then the final message with cards", async () => {
+      const finalMsg = final();
+      fetchMock.mockImplementation(async () => {
+        const text = frame("status", { step: "tasks" }) + frame("delta", { text: "Hello " }) + frame("delta", { text: "there" }) + frame("done", { message: finalMsg });
+        return new Response(sseBody([text.slice(0, 30), text.slice(30, 110), text.slice(110)]), { status: 200 });
+      });
+      route();
+      history = [{ id: 100, role: "user", content: "hi", actions: [] }, finalMsg]; // what the server stored after done
+      renderPage();
+      await typeHi();
+      expect(await screen.findByText("Task: Revise chapter 3")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledWith("/api/chat/stream", expect.objectContaining({ method: "POST" }));
+      expect(apiFetch.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
+      expect(screen.getByText("hi")).toBeInTheDocument();
+      expect(screen.getByText("Hello there")).toBeInTheDocument();
+    });
+
+    it("shows the status chip and partial text while streaming, as text only", async () => {
+      fetchMock.mockImplementation(hang([frame("status", { step: "tasks" }), frame("delta", { text: "Partial <b>x</b>" })]));
+      route();
+      renderPage();
+      await typeHi();
+      expect(await screen.findByText(/Partial <b>x<\/b>/)).toBeInTheDocument();
+      expect(screen.getByText("Looking at your tasks…")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    });
+
+    it("Stop aborts, keeps the partial text marked stopped and resyncs the chat", async () => {
+      let signal: AbortSignal | undefined;
+      fetchMock.mockImplementation(async (u: string, init: RequestInit) => {
+        signal = init.signal as AbortSignal;
+        return hang([frame("delta", { text: "Partial" })])(u, init);
+      });
+      route();
+      const { invalidate } = renderPage();
+      await typeHi();
+      await screen.findByText("Partial");
+      await userEvent.click(screen.getByRole("button", { name: "Stop" }));
+      expect(signal?.aborted).toBe(true);
+      expect(await screen.findByText("Stopped")).toBeInTheDocument();
+      expect(screen.getByText("Partial")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+      expect(invalidate.mock.calls.some((c) => JSON.stringify((c[0] as { queryKey?: unknown })?.queryKey) === '["chat"]')).toBe(true);
+      expect(apiFetch.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
+    });
+
+    it("falls back to POST /api/chat on a 500 before any data", async () => {
+      fetchMock.mockImplementation(async () => new Response("boom", { status: 500 }));
+      sendAnswer = () => reply({ id: 101, content: "Fallback answer", actions: [] });
+      route();
+      renderPage();
+      await typeHi();
+      expect(await screen.findByText("Fallback answer")).toBeInTheDocument();
+      expect(apiFetch.mock.calls.some((c) => c[0] === "/api/chat" && c[1]?.method === "POST")).toBe(true);
+    });
+
+    it("an error event shows a toast and does not fall back", async () => {
+      fetchMock.mockImplementation(async () => new Response(sseBody([frame("error", { message: "AI limit reached, try again later" })]), { status: 200 }));
+      route();
+      renderPage();
+      await typeHi();
+      expect(await screen.findByText(/AI limit reached, try again later/)).toBeInTheDocument();
+      expect(apiFetch.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
+      expect(screen.getByRole("textbox", { name: "Message the assistant" })).toHaveValue("hi");
+    });
+
+    it("shows status chips and Stop in Vietnamese", async () => {
+      fetchMock.mockImplementation(hang([frame("status", { step: "free_slots" })]));
+      route();
+      renderPage("vi");
+      await typeHi("Nhắn cho trợ lý");
+      expect(await screen.findByText("Đang tìm thời gian trống…")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Dừng" })).toBeInTheDocument();
+    });
   });
 });
 
