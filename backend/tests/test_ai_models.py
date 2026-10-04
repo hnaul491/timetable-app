@@ -100,7 +100,8 @@ def make_fb(plans, selected=A):
         made.append(model)
         return providers[model]
 
-    return FallbackProvider(selected, make), providers, made
+    # a frozen clock: with the real one each attempt's timeout is a few microseconds short of the budget on Linux CI
+    return FallbackProvider(selected, make, clock=lambda: 1000.0), providers, made
 
 
 def ok(text):
