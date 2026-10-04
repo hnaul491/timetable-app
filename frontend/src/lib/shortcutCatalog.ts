@@ -55,6 +55,8 @@ export const SHORTCUT_CATALOG: CatalogEntry[] = [
   { id: "settings-find", keys: "f", label: "shortcuts.settingsFind", group: "settings" },
   { id: "free-week", keys: "w", label: "shortcuts.freeWeek", group: "freeTime" },
   { id: "free-month", keys: "m", label: "shortcuts.freeMonth", group: "freeTime" },
+  { id: "free-next-week", keys: "Shift+w", label: "shortcuts.freeNextWeek", group: "freeTime" },
+  { id: "free-next-month", keys: "Shift+m", label: "shortcuts.freeNextMonth", group: "freeTime" },
   { id: "free-semester", keys: "s", label: "shortcuts.freeSemester", group: "freeTime" },
   { id: "free-custom", keys: "c", label: "shortcuts.freeCustom", group: "freeTime" },
   { id: "free-buffer", keys: "b", label: "shortcuts.freeBuffer", group: "freeTime" },

@@ -37,6 +37,8 @@ export const shortcuts: Messages["shortcuts"] = {
   settingsFind: "Tìm một cài đặt",
   freeWeek: "Tuần này",
   freeMonth: "Tháng này",
+  freeNextWeek: "Tuần sau",
+  freeNextMonth: "Tháng sau",
   freeSemester: "Phần còn lại của học kỳ",
   freeCustom: "Chọn ngày",
   freeBuffer: "Thời gian di chuyển",

@@ -66,6 +66,8 @@ export function FreeTimePage() {
     setForm((f) => ({ ...f, weekdays: f.weekdays.includes(i) ? f.weekdays.filter((d) => d !== i) : [...f.weekdays, i] }));
   useShortcut("free-week", "w", () => set({ period: "week" }), { label: "shortcuts.freeWeek" });
   useShortcut("free-month", "m", () => set({ period: "month" }), { label: "shortcuts.freeMonth" });
+  useShortcut("free-next-week", "Shift+w", () => set({ period: "nextWeek" }), { label: "shortcuts.freeNextWeek" });
+  useShortcut("free-next-month", "Shift+m", () => set({ period: "nextMonth" }), { label: "shortcuts.freeNextMonth" });
   useShortcut("free-semester", "s", () => set({ period: "semester" }), { label: "shortcuts.freeSemester" });
   useShortcut("free-custom", "c", () => {
     if (customStart.current) customStart.current.focus();

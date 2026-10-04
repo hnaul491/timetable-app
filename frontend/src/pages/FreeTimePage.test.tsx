@@ -345,6 +345,19 @@ describe("FreeTimePage", () => {
       expect(period).toHaveValue("month");
     });
 
+    it("Shift+W and Shift+M pick next week and next month", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByTestId("free-big");
+      const period = screen.getByRole("combobox", { name: "Period" });
+      await user.keyboard("{Shift>}W{/Shift}");
+      expect(period).toHaveValue("nextWeek");
+      await user.keyboard("{Shift>}M{/Shift}");
+      expect(period).toHaveValue("nextMonth");
+      await user.keyboard("w");
+      expect(period).toHaveValue("week");
+    });
+
     it("c switches to custom dates and focuses the first day, even from another period", async () => {
       const user = userEvent.setup();
       renderPage();

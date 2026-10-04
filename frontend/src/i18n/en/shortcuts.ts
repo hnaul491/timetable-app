@@ -35,6 +35,8 @@ export const shortcuts = {
   settingsFind: "Find a setting",
   freeWeek: "This week",
   freeMonth: "This month",
+  freeNextWeek: "Next week",
+  freeNextMonth: "Next month",
   freeSemester: "Rest of semester",
   freeCustom: "Custom dates",
   freeBuffer: "Travel buffer",
