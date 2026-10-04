@@ -3,7 +3,7 @@ import { hintChips, useHintKeys } from "../lib/shortcutHints";
 import { isSequence } from "../lib/shortcutKeys";
 
 /** Small key chips for a shortcut's effective keys. Hidden below md unless `always`; screen readers use aria-keyshortcuts instead. */
-export function ShortcutHint({ id, always = false, className = "" }: { id: string; always?: boolean; className?: string }) {
+export function ShortcutHint({ id, always = false, inverse = false, className = "" }: { id: string; always?: boolean; inverse?: boolean; className?: string }) {
   const t = useT();
   const keys = useHintKeys()(id);
   if (!keys) return null;
@@ -13,7 +13,7 @@ export function ShortcutHint({ id, always = false, className = "" }: { id: strin
       {hintChips(keys).map((chip, i) => (
         <span key={i} className="inline-flex items-center gap-1">
           {i > 0 && sequence && <span className="text-[10px] text-muted">{t("shortcuts.then")}</span>}
-          <kbd className="rounded border border-line px-1 text-[11px] leading-4 font-medium text-muted tabular-nums">{chip}</kbd>
+          <kbd className={`rounded border px-1 text-[11px] leading-4 font-medium tabular-nums ${inverse ? "border-on-accent/50 text-on-accent/85" : "border-line text-muted"}`}>{chip}</kbd>
         </span>
       ))}
     </span>

@@ -8,13 +8,20 @@ import { INTL_LOCALE } from "../i18n/locale";
 import { apiFetch } from "../lib/api";
 import {
   BUFFER_PRESETS, PERIOD_PRESETS, buildQuery, computeRange, isStepping, loadForm, samePeriod, saveForm, validate,
-  type FreeDay, type FreeTimeForm, type FreeTimeResult, type Period, type PeriodUnit, type Range,
+  type FreeDay, type FreeTimeForm, type FreeTimeResult, type Period, type PeriodKey, type PeriodUnit, type Range,
 } from "../lib/freeTime";
 import { useShortcut } from "../lib/shortcuts";
+import { ShortcutHint } from "../components/ShortcutHint";
+import { useAriaKeyshortcutsFor, useHintTitle } from "../lib/shortcutHints";
 import { formatTime, todayParis } from "../lib/time";
 import type { Semester } from "../types";
 
 const DEBOUNCE_MS = 300;
+/** The page shortcut that picks each period chip (ids registered below, keys may be customised). */
+const PRESET_SHORTCUT: Record<PeriodKey, string> = {
+  today: "free-today", tomorrow: "free-tomorrow", week: "free-week", nextWeek: "free-next-week",
+  month: "free-month", nextMonth: "free-next-month", semester: "free-semester", custom: "free-custom",
+};
 const MONDAY = "2024-01-01"; // a Monday, used only to get localized weekday names
 
 const fieldClass = "h-9 rounded-[9px] border border-line bg-surface px-2.5 text-[13px] font-semibold text-ink tabular-nums";
@@ -69,6 +76,8 @@ function Field({ label, error, children }: { label: string; error?: ReactNode; c
 
 export function FreeTimePage() {
   const t = useT();
+  const hintTitle = useHintTitle();
+  const ariaKeys = useAriaKeyshortcutsFor();
   const locale = useLocale();
   const navigate = useNavigate();
   const [today, setToday] = useState(() => todayParis());
@@ -181,8 +190,9 @@ export function FreeTimePage() {
               {PERIOD_PRESETS.map((p) => {
                 const on = samePeriod(form.period, p.period);
                 return (
-                  <button key={p.key} type="button" aria-pressed={on} onClick={() => setPeriod({ ...p.period })} className={`shrink-0 whitespace-nowrap ${chipClass(on)}`}>
+                  <button key={p.key} type="button" aria-pressed={on} aria-keyshortcuts={ariaKeys(PRESET_SHORTCUT[p.key])} onClick={() => setPeriod({ ...p.period })} className={`shrink-0 whitespace-nowrap ${chipClass(on)}`}>
                     {t(`freeTime.periods.${p.key}` as MessageKey)}
+                    <ShortcutHint id={PRESET_SHORTCUT[p.key]} inverse={on} className="ml-1.5" />
                   </button>
                 );
               })}
@@ -191,6 +201,8 @@ export function FreeTimePage() {
               <button
                 type="button" disabled={!stepping} onClick={() => step(-1)}
                 aria-label={t(`freeTime.step.${stepKeys[0]}` as MessageKey)}
+                title={hintTitle(t(`freeTime.step.${stepKeys[0]}` as MessageKey), "free-prev", t("shortcuts.then"))}
+                aria-keyshortcuts={ariaKeys("free-prev")}
                 className={`w-9 text-base disabled:opacity-40 ${chipClass(false)}`}
               >
                 ‹
@@ -201,6 +213,8 @@ export function FreeTimePage() {
               <button
                 type="button" disabled={!stepping} onClick={() => step(1)}
                 aria-label={t(`freeTime.step.${stepKeys[1]}` as MessageKey)}
+                title={hintTitle(t(`freeTime.step.${stepKeys[1]}` as MessageKey), "free-next", t("shortcuts.then"))}
+                aria-keyshortcuts={ariaKeys("free-next")}
                 className={`w-9 text-base disabled:opacity-40 ${chipClass(false)}`}
               >
                 ›
@@ -230,6 +244,8 @@ export function FreeTimePage() {
                   type="button"
                   aria-pressed={on}
                   aria-label={weekdayName(i, locale, "long")}
+                  title={hintTitle(weekdayName(i, locale, "long"), `free-day-${i + 1}`, t("shortcuts.then"))}
+                  aria-keyshortcuts={ariaKeys(`free-day-${i + 1}`)}
                   onClick={() => set({ weekdays: on ? form.weekdays.filter((d) => d !== i) : [...form.weekdays, i] })}
                   className={`min-w-10 ${chipClass(on)}`}
                 >
@@ -247,6 +263,8 @@ export function FreeTimePage() {
               type="number" inputMode="numeric" min={0} max={240} step={5}
               ref={bufferInput}
               aria-label={t("freeTime.buffer")} value={form.buffer}
+              title={hintTitle(t("freeTime.buffer"), "free-buffer", t("shortcuts.then"))}
+              aria-keyshortcuts={ariaKeys("free-buffer")}
               aria-invalid={errors.buffer ? true : undefined}
               onChange={(e) => set({ buffer: e.target.value })}
               className={`w-20 ${fieldClass}`}

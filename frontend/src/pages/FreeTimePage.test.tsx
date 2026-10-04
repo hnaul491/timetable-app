@@ -63,7 +63,13 @@ function renderPage(locale: "en" | "vi" = "en", help = false, path = "/free-time
 /** The period chip (it has aria-pressed); the step buttons can share a name such as "Next week". */
 const chip = (name: string) => screen.getAllByRole("button", { name }).find((b) => b.hasAttribute("aria-pressed"))!;
 const stepButton = (name: string) => screen.getByRole("button", { name: `Go to ${name.toLowerCase()}` });
-const pressedChips = () => within(screen.getByRole("group", { name: "Period" })).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
+/** A chip's visible label without its key-hint chip ("Today", not "TodayT"). */
+const label = (b: HTMLElement) => {
+  const copy = b.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll("[data-shortcut-hint]").forEach((n) => n.remove());
+  return copy.textContent;
+};
+const pressedChips = () => within(screen.getByRole("group", { name: "Period" })).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map(label);
 
 const freeCalls = () => apiFetch.mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/api/free-time"));
 const lastParams = () => new URLSearchParams(freeCalls().at(-1)!.split("?")[1]);
@@ -336,6 +342,16 @@ describe("FreeTimePage", () => {
     expect(await screen.findByRole("status", { name: "Calculating free days" })).toBeInTheDocument();
   });
 
+  it("shows each period chip's key, and tooltips name the step, weekday and buffer keys", async () => {
+    renderPage();
+    await screen.findByTestId("free-big");
+    expect(chip("Today").querySelector('[data-shortcut-hint="free-today"]')?.textContent).toBe("T");
+    expect(chip("Next week").querySelector('[data-shortcut-hint="free-next-week"]')?.textContent).toContain("W");
+    expect(chip("Rest of semester")).toHaveAttribute("aria-keyshortcuts", "S");
+    expect(screen.getByRole("button", { name: "Monday" }).title).toBe("Monday (1)");
+    expect(screen.getByRole("spinbutton", { name: "Travel buffer" }).title).toBe("Travel buffer (B)");
+  });
+
   describe("shortcuts", () => {
     it("w, m and s pick the period", async () => {
       const user = userEvent.setup();
@@ -471,7 +487,7 @@ describe("FreeTimePage", () => {
       renderPage();
       await screen.findByTestId("free-big");
       const group = screen.getByRole("group", { name: "Period" });
-      expect(within(group).getAllByRole("button", { pressed: false }).concat(within(group).getAllByRole("button", { pressed: true })).map((b) => b.textContent))
+      expect(within(group).getAllByRole("button", { pressed: false }).concat(within(group).getAllByRole("button", { pressed: true })).map(label))
         .toEqual(expect.arrayContaining(["Today", "Tomorrow", "This week", "Next week", "This month", "Next month", "Rest of semester", "Custom"]));
       expect(pressedChips()).toEqual(["This month"]);
       await user.click(chip("Tomorrow"));
