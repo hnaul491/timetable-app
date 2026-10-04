@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useT } from "../i18n";
+import { translateServerMessage } from "../i18n/serverMessages";
 import { apiFetch, authHeaders, toApiError } from "../lib/api";
 import { formatLongDate, parisParts } from "../lib/time";
 import { useToast } from "./ui/Toast";
@@ -42,7 +43,7 @@ export function BackupSettings() {
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
     onSuccess: () => toast.success(t("backup.downloaded")),
-    onError: (error) => toast.error(t("backup.downloadFailed", { error: message(error) })),
+    onError: (error) => toast.error(t("backup.downloadFailed", { error: translateServerMessage(message(error), locale) })),
   });
   const drive = useMutation({
     mutationFn: () => apiFetch<{ file_name: string }>("/api/backup/drive", { method: "POST" }),
@@ -50,14 +51,14 @@ export function BackupSettings() {
       toast.success(t("backup.driveDone", { name: result.file_name }));
       void queryClient.invalidateQueries({ queryKey: ["backup"] });
     },
-    onError: (error) => toast.error(t("backup.driveFailed", { error: message(error) })),
+    onError: (error) => toast.error(t("backup.driveFailed", { error: translateServerMessage(message(error), locale) })),
   });
 
   const available = status.data?.drive_available === true;
   const last = status.data?.last_at;
   return (
     <section className={card}>
-      <h2 className="text-lg font-semibold">{t("backup.title")}</h2>
+      <h2 className="text-base font-bold">{t("backup.title")}</h2>
       <p className="text-sm text-muted">{t("backup.help")}</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={primary} disabled={download.isPending} onClick={() => download.mutate()}>

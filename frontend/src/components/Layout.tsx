@@ -134,7 +134,7 @@ export function Layout() {
           <Icon><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Icon>
         </button>
       )}
-      <main className="min-w-0 flex-1 px-4 pt-5 pb-24 md:px-7 md:pb-8">
+      <main className="min-w-0 flex-1 px-4 pt-16 md:pt-5 pb-24 md:px-7 md:pb-8">
         <Outlet />
       </main>
       {!fullScreen && (

@@ -21,6 +21,7 @@ PENDING_KEEP = timedelta(days=7)
 TOTAL_BUDGET = 40.0  # seconds for a whole question (the web proxy gives up after about a minute)
 MIN_REMAINING = 8.0
 CALL_TIMEOUT = 25.0
+STREAM_READ_TIMEOUT = 12.0  # a stalled stream must not run past the deadline by more than this
 LIMIT_REPLY = {
     "en": "I've reached the limit of steps for this question — try narrowing it down.",
     "vi": "Mình đã dùng hết số bước cho câu hỏi này — hãy thử hỏi cụ thể hơn nhé.",
@@ -180,7 +181,7 @@ def stream_chat(session: Session, llm: LLMProvider, user_text: str, context: Cha
             text_parts: list[str] = []
             calls: list[FunctionCall] = []
             expired = False
-            parts = llm.stream(system, turns, TOOLS, timeout=min(CALL_TIMEOUT, remaining - 3))
+            parts = llm.stream(system, turns, TOOLS, timeout=min(STREAM_READ_TIMEOUT, remaining - 3))
             try:
                 it = iter(parts)
                 for part in it:

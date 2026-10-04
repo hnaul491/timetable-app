@@ -186,7 +186,7 @@ def run_weekly_backup(session: Session, settings: Settings, factory: DriveFactor
         if deadline - clock() < MIN_BUDGET_S:
             return
         last = last_backup_at(session)
-        if last is not None and now - last < EVERY:
+        if last is not None and now - last < EVERY - timedelta(hours=6):  # cron start times drift by minutes
             return
         try:
             backup_now(session, settings, factory, now, deadline)
