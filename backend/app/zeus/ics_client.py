@@ -2,7 +2,7 @@ import re
 
 import httpx
 
-GROUP_RE = re.compile(r"/group/(\d+)/ics/")
+GROUP_RE = re.compile(r"/group/([1-9]\d{0,8})/ics/")
 KEY_RE = re.compile(r"[A-Za-z0-9_-]{4,128}")
 LINK_RE = re.compile(r"/ics/([^/?#\s]+)")
 

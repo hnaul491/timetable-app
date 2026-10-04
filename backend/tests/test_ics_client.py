@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from app.zeus.ics_client import ZeusFetchError, build_ics_url, extract_key, fetch_ics
+from app.zeus.ics_client import ZeusFetchError, build_ics_url, extract_group_id, extract_key, fetch_ics
 
 KEY = "AbC123xyZ9"
 URL = f"https://zeus.ionis-it.com/api/group/802/ics/{KEY}"
@@ -55,3 +55,8 @@ def test_extract_key(value):
 def test_extract_key_rejects_garbage(value):
     with pytest.raises(ValueError):
         extract_key(value)
+
+
+@pytest.mark.parametrize("gid,expected", [("802", 802), ("0", None), ("1234567890", None), ("012", None)])
+def test_extract_group_id_bounds(gid, expected):
+    assert extract_group_id(f"https://zeus.ionis-it.com/api/group/{gid}/ics/{KEY}") == expected
