@@ -316,6 +316,9 @@ describe("AssistantPage context chip", () => {
     history = [];
     enabled = true;
     sendAnswer = () => reply({ actions: [] });
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => new Response(sseBody([frame("done", { message: reply({ actions: [] }) })]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
   });
   const eventDetail = { event: { id: 7, title: "DB lecture", start: "2026-10-20T08:00:00Z" } };
   const subjectDetail = { subject: { id: 3, display_name: "Databases" } };
@@ -324,7 +327,7 @@ describe("AssistantPage context chip", () => {
     if (path === "/api/subjects/3") return subjectDetail;
     return undefined;
   };
-  const posted = () => JSON.parse(String(apiFetch.mock.calls.find((c) => c[0] === "/api/chat" && c[1]?.method === "POST")![1].body));
+  const posted = () => JSON.parse(String(fetchMock.mock.calls.find((c) => c[0] === "/api/chat/stream")![1].body));
 
   it("shows an event chip, adapts quick prompts and sends event_id", async () => {
     route(ctx);
