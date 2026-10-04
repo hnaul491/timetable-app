@@ -6,12 +6,13 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
       - name: Trigger sync
         env:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsS -X POST "$APP_URL/api/sync" -H "X-Cron-Secret: $CRON_SECRET" -o result.json
+          curl -fsS --max-time 70 -X POST "$APP_URL/api/sync" -H "X-Cron-Secret: $CRON_SECRET" -o result.json
           cat result.json
           grep -q '"status":"ok"' result.json
