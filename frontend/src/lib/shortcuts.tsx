@@ -19,9 +19,12 @@ function parse(keys: string): { mod: boolean; steps: string[] } {
   return { mod: false, steps: keys.split(" ").map(normalise) };
 }
 
+const NON_TEXT_INPUTS = ["checkbox", "radio", "button", "submit", "reset", "range", "color", "file"];
+
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+  if (target instanceof HTMLInputElement) return !NON_TEXT_INPUTS.includes(target.type);
+  return target.isContentEditable || ["TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 export function ShortcutProvider({ children }: { children: ReactNode }) {
@@ -34,6 +37,10 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
       if (e.altKey || e.defaultPrevented || ["Control", "Meta", "Shift", "Alt"].includes(e.key)) return;
       const mod = e.ctrlKey || e.metaKey;
       const key = normalise(e.key);
+      const arrow = key.startsWith("Arrow");
+      // Held letter keys must not retrigger actions, and Shift+letter/arrow belongs to text selection.
+      if (e.repeat && !arrow) return;
+      if (e.shiftKey && (arrow || /^[a-z]$/.test(key))) return;
       const typing = isTyping(e.target);
       const inDialog = document.querySelector('[aria-modal="true"]') !== null;
       const eligible = [...entries.current.values()].filter((en) => {

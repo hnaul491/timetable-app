@@ -31,9 +31,8 @@ export const event = {
   doing: "Doing",
   due: "due {date}",
   deleteWithNotes: "Delete event and its notes",
-  deleteWithNotesConfirm: "Click again to delete event and notes",
   deleteEvent: "Delete event",
-  deleteConfirm: "Click again to delete",
+  notFound: "Event not found",
   newTitle: "Add event",
   fieldTitle: "Title",
   fieldType: "Type",
@@ -67,5 +66,4 @@ export const event = {
   starFailed: "Could not change the star: {message}",
   taskFailed: "Could not update the task: {message}",
   deleteFailed: "Could not delete the event: {message}",
-  nextClassButton: "Next class",
 };

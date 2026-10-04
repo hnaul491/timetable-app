@@ -17,5 +17,6 @@ export const shortcuts = {
   save: "Save",
   delete: "Delete",
   help: "Show shortcuts",
+  contextHint: "More shortcuts appear on the calendar.",
   then: "then",
 };

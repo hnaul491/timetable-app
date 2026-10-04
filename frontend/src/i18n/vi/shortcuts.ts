@@ -19,5 +19,6 @@ export const shortcuts: Messages["shortcuts"] = {
   save: "Lưu",
   delete: "Xoá",
   help: "Hiện phím tắt",
+  contextHint: "Có thêm phím tắt khi ở trang Lịch.",
   then: "rồi",
 };

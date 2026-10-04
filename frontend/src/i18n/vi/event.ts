@@ -33,9 +33,8 @@ export const event: Messages["event"] = {
   doing: "Đang làm",
   due: "hạn {date}",
   deleteWithNotes: "Xoá sự kiện và ghi chú",
-  deleteWithNotesConfirm: "Bấm lần nữa để xoá sự kiện và ghi chú",
   deleteEvent: "Xoá sự kiện",
-  deleteConfirm: "Bấm lần nữa để xoá",
+  notFound: "Không tìm thấy sự kiện",
   newTitle: "Thêm sự kiện",
   fieldTitle: "Tiêu đề",
   fieldType: "Loại",
@@ -69,5 +68,4 @@ export const event: Messages["event"] = {
   starFailed: "Không đổi được dấu sao: {message}",
   taskFailed: "Không cập nhật được việc: {message}",
   deleteFailed: "Không xoá được sự kiện: {message}",
-  nextClassButton: "Buổi học tới",
 };

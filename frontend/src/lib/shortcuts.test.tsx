@@ -79,6 +79,61 @@ describe("shortcuts", () => {
   });
 });
 
+describe("shortcut guards", () => {
+  function Keys({ n, left, help }: { n: () => void; left: () => void; help: () => void }) {
+    useShortcut("n", "n", n);
+    useShortcut("left", "ArrowLeft", left);
+    useShortcut("help", "?", help);
+    return (
+      <>
+        <input type="checkbox" aria-label="box" />
+        <input type="text" aria-label="text" />
+      </>
+    );
+  }
+  const mount = () => {
+    const fns = { n: vi.fn(), left: vi.fn(), help: vi.fn() };
+    render(
+      <ShortcutProvider>
+        <Keys {...fns} />
+      </ShortcutProvider>,
+    );
+    return fns;
+  };
+  const press = (init: KeyboardEventInit, target: Element | Window = window) =>
+    act(() => void target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, ...init })));
+
+  it("a focused checkbox is not typing", async () => {
+    const { n } = mount();
+    const box = document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    box.focus();
+    press({ key: "n" }, box);
+    expect(n).toHaveBeenCalledTimes(1);
+    const text = document.querySelector<HTMLInputElement>('input[type="text"]')!;
+    text.focus();
+    press({ key: "n" }, text);
+    expect(n).toHaveBeenCalledTimes(1);
+  });
+
+  it("held letters do not repeat but arrows do", () => {
+    const { n, left } = mount();
+    press({ key: "n", repeat: true });
+    expect(n).not.toHaveBeenCalled();
+    press({ key: "ArrowLeft", repeat: true });
+    expect(left).toHaveBeenCalledTimes(1);
+  });
+
+  it("Shift with a letter or arrow does not fire, but ? still does", () => {
+    const { n, left, help } = mount();
+    press({ key: "N", shiftKey: true });
+    press({ key: "ArrowLeft", shiftKey: true });
+    expect(n).not.toHaveBeenCalled();
+    expect(left).not.toHaveBeenCalled();
+    press({ key: "?", shiftKey: true });
+    expect(help).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("formatKeys", () => {
   it("formats modifiers and sequences", () => {
     expect(formatKeys("Mod+s", false)).toEqual(["Ctrl", "S"]);
