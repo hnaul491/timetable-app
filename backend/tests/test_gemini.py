@@ -154,3 +154,22 @@ def test_empty_stop_candidate_is_empty_reply_but_safety_is_unavailable():
     p, _ = make(lambda r: httpx.Response(200, json={"candidates": [{"finishReason": "SAFETY"}]}))
     with pytest.raises(AIUnavailable):
         p.generate("S", [Turn("user", text="x")], [])
+
+
+def test_google_error_is_logged_without_the_key(caplog):
+    import httpx as _httpx
+
+    from app.ai.gemini import GeminiProvider
+    from app.ai.provider import AIUnavailable
+
+    def handler(request):
+        return _httpx.Response(400, json={"error": {"code": 400, "status": "INVALID_ARGUMENT", "message": "API key not valid."}})
+
+    provider = GeminiProvider("secret-key-123", "gemini-2.5-flash", http=_httpx.Client(transport=_httpx.MockTransport(handler)))
+    with caplog.at_level("WARNING"):
+        try:
+            provider.generate("sys", [], [])
+        except AIUnavailable:
+            pass
+    assert "INVALID_ARGUMENT" in caplog.text and "API key not valid." in caplog.text
+    assert "secret-key-123" not in caplog.text

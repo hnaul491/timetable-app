@@ -1,8 +1,21 @@
 import json
+import logging
 
 import httpx
 
 from app.ai.provider import AIRateLimited, AIUnavailable, FunctionCall, LLMReply, ToolDecl, Turn
+
+logger = logging.getLogger(__name__)
+
+
+def _log_google_error(resp: httpx.Response) -> None:
+    """Log Gemini's error status and message (never the key or the request) so failures can be diagnosed."""
+    try:
+        error = resp.json().get("error", {})
+        status, message = error.get("status", ""), str(error.get("message", ""))[:300]
+    except (ValueError, AttributeError):
+        status, message = "", ""
+    logger.warning("Gemini request failed: HTTP %s %s %s", resp.status_code, status, message)
 
 BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 RATE_MSG = "AI limit reached, try again later"
@@ -45,6 +58,7 @@ class GeminiProvider:
             if resp.status_code == 429:
                 failure = AIRateLimited(RATE_MSG)
             elif resp.status_code >= 400:
+                _log_google_error(resp)
                 failure = AIUnavailable(UNAVAILABLE_MSG)
             else:
                 try:
