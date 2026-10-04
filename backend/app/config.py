@@ -16,10 +16,16 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     app_url: str = "https://timetable-app-lake.vercel.app"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
 
     @property
     def google_configured(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret and self.token_encryption_key)
+
+    @property
+    def ai_enabled(self) -> bool:
+        return bool(self.gemini_api_key)
 
     @property
     def allowed_email_set(self) -> set[str]:
