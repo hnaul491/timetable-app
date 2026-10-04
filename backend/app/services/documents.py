@@ -117,6 +117,8 @@ def begin_upload(session: Session, drive: GoogleDrive, body: UploadStartIn, subj
         raise HTTPException(status_code=404, detail="semester not found")
     session.execute(delete(DocumentUpload).where(DocumentUpload.created_at < now - STALE_AFTER))
     session.commit()
+    if subject.drive_folder_id and not drive.folder_exists(subject.drive_folder_id):
+        forget_missing_folders(session, drive, semester, subject)  # binned or deleted by hand
     folder = ensure_folders(session, drive, semester, subject)
     try:
         uri = drive.start_upload(body.name, body.mime_type, body.size, folder)
@@ -136,6 +138,8 @@ def check_chunk(upload: DocumentUpload, data: bytes, offset: int) -> None:
     if offset != upload.received:
         raise HTTPException(status_code=409, detail=f"expected offset {upload.received}")
     remaining = upload.size - upload.received
+    if upload.size == 0 and not data:
+        return  # a zero-byte file is finished by one empty request
     if not data:
         raise HTTPException(status_code=422, detail="empty chunk")
     if len(data) > CHUNK_SIZE:
@@ -150,13 +154,13 @@ def send_chunk(session: Session, drive: GoogleDrive, upload: DocumentUpload, dat
                now: datetime) -> Document | None:
     """Forward one chunk; returns the new Document when it was the last one."""
     try:
-        done = drive.upload_chunk(upload.session_uri, data, offset, upload.size)
+        done, kept = drive.upload_chunk(upload.session_uri, data, offset, upload.size)
     except GoogleNotFound:  # the Drive session expired: this upload cannot continue
         session.delete(upload)
         session.commit()
         raise
     if done is None:
-        upload.received = offset + len(data)
+        upload.received = kept  # what Drive really holds: the browser resumes from there
         session.commit()
         return None
     document = Document(subject_id=upload.subject_id, event_id=upload.event_id, drive_file_id=done.id,

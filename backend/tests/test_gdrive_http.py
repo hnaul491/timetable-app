@@ -68,9 +68,10 @@ def test_upload_chunk_308_then_200():
             "webViewLink": "https://drive.google.com/file/d/d1/view"}
     google = Google([httpx.Response(308), httpx.Response(200, json=done)])
     gdrive = drive(google)
-    assert gdrive.upload_chunk(SESSION_URI, b"abc", 0, 6) is None
+    assert gdrive.upload_chunk(SESSION_URI, b"abc", 0, 6) == (None, 0)
     result = gdrive.upload_chunk(SESSION_URI, b"def", 3, 6)
-    assert result == DriveFile("d1", "a.pdf", "application/pdf", 6, "https://drive.google.com/file/d/d1/view")
+    assert result[1] == 6
+    assert result[0] == DriveFile("d1", "a.pdf", "application/pdf", 6, "https://drive.google.com/file/d/d1/view")
     first, second = google.requests[-2:]
     assert first.method == "PUT" and str(first.url) == SESSION_URI
     assert first.headers["Content-Range"] == "bytes 0-2/6" and second.headers["Content-Range"] == "bytes 3-5/6"
@@ -112,3 +113,59 @@ def test_errors_never_contain_secrets():
     text = str(caught.value)
     assert "1//refresh" not in text and "csecret" not in text and "at1" not in text
     assert "500" in text and "backendError" in text
+
+
+DONE = {"id": "d1", "name": "a.pdf", "mimeType": "application/pdf", "size": "6", "webViewLink": ""}
+
+
+def test_upload_chunk_308_reports_what_drive_kept():
+    google = Google([httpx.Response(308, headers={"Range": "bytes=0-262143"}), httpx.Response(308)])
+    gdrive = drive(google)
+    assert gdrive.upload_chunk(SESSION_URI, bytes(262144), 0, 999999) == (None, 262144)
+    assert gdrive.upload_chunk(SESSION_URI, bytes(262144), 0, 999999) == (None, 0)
+
+
+def test_upload_put_has_a_long_read_timeout_and_no_bearer():
+    google = Google([httpx.Response(308)])
+    drive(google).upload_chunk(SESSION_URI, b"abc", 0, 6)
+    request = google.requests[-1]
+    assert request.extensions["timeout"] == {"connect": 5.0, "read": 40.0, "write": 5.0, "pool": 5.0}
+    assert "Authorization" not in request.headers
+
+
+class TimeoutThenAnswer(Google):
+    def __init__(self, answer):
+        super().__init__([answer])
+        self.puts = 0
+
+    def __call__(self, request):
+        if request.method == "PUT":
+            self.puts += 1
+            self.requests.append(request)
+            if self.puts == 1:
+                raise httpx.ReadTimeout("slow", request=request)
+            return self.api.pop(0)
+        return super().__call__(request)
+
+
+def test_timeout_then_status_says_incomplete_returns_kept():
+    google = TimeoutThenAnswer(httpx.Response(308, headers={"Range": "bytes=0-5"}))
+    assert drive(google).upload_chunk(SESSION_URI, b"abcdef", 0, 12) == (None, 6)
+    status = google.requests[-1]
+    assert status.headers["Content-Range"] == "bytes */12" and status.content == b""
+    assert "Authorization" not in status.headers
+
+
+def test_timeout_then_status_says_finished_returns_the_file():
+    google = TimeoutThenAnswer(httpx.Response(200, json=DONE))
+    file, kept = drive(google).upload_chunk(SESSION_URI, b"abcdef", 0, 6)
+    assert file == DriveFile("d1", "a.pdf", "application/pdf", 6, "") and kept == 6
+
+
+def test_5xx_is_recovered_the_same_way_and_other_failures_raise():
+    google = Google([httpx.Response(503), httpx.Response(308, headers={"Range": "bytes=0-2"})])
+    assert drive(google).upload_chunk(SESSION_URI, b"abc", 0, 6) == (None, 3)
+    with pytest.raises(GoogleError):
+        drive(Google([httpx.Response(503), httpx.Response(500)])).upload_chunk(SESSION_URI, b"abc", 0, 6)
+    with pytest.raises(GoogleNotFound):
+        drive(Google([httpx.Response(404)])).upload_chunk(SESSION_URI, b"abc", 0, 6)

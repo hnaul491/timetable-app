@@ -67,8 +67,8 @@ def start_upload(body: UploadStartIn, session: Session = Depends(get_session),
 
 
 @router.put("/documents/uploads/{upload_id}", response_model=UploadChunkOut)
-def upload_chunk(upload_id: str, data: Annotated[bytes, Body(media_type="application/octet-stream")],
-                 offset: int = Query(ge=0), session: Session = Depends(get_session),
+def upload_chunk(upload_id: str, offset: int = Query(ge=0), data: Annotated[bytes, Body(media_type="application/octet-stream")] = b"",
+                 session: Session = Depends(get_session),
                  settings: Settings = Depends(get_settings), factory: DriveFactory = Depends(get_drive_factory),
                  now: datetime = Depends(get_now)) -> UploadChunkOut:
     upload = session.get(DocumentUpload, upload_id)

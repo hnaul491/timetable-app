@@ -156,7 +156,8 @@ def test_chunk_longer_than_remaining_or_empty_is_rejected(client, settings, subj
 def test_too_large_is_rejected(client, settings, subject):
     configure(client, settings, FakeDrive())
     assert start(client, subject, 104857601).status_code == 422
-    assert start(client, subject, 0).status_code == 422
+    assert start(client, subject, -1).status_code == 422
+    assert start(client, subject, 0).status_code == 200
     assert start(client, subject, 104857600).status_code == 200
 
 
@@ -281,3 +282,45 @@ def test_expired_session_drops_the_upload(client, settings, session, subject):
     assert put(client, upload_id, b"abc", 0).status_code == 502
     session.expire_all()
     assert session.get(DocumentUpload, upload_id) is None
+
+
+def test_zero_byte_file_uploads_with_one_empty_request(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    upload_id = start(client, subject, 0).json()["upload_id"]
+    result = put(client, upload_id, b"", 0)
+    assert result.status_code == 200 and result.json()["document"]["size"] == 0
+    assert put(client, start(client, subject, 0).json()["upload_id"], b"x", 0).status_code == 422
+
+
+def test_mime_type_must_be_printable_ascii(client, settings, subject):
+    configure(client, settings, FakeDrive())
+    assert start(client, subject, 1, mime_type="text/pl\u00e9in").status_code == 422
+    assert start(client, subject, 1, mime_type="").status_code == 422
+    assert start(client, subject, 1, mime_type="application/octet-stream").status_code == 200
+
+
+def test_binned_subject_folder_is_recreated_before_the_upload(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    upload(client, subject)
+    drive.trashed_folders.add("folder3")
+    upload(client, subject, name="two.pdf")
+    assert drive.sessions["https://upload.example/session2"]["parent"] == "folder4"
+    session.expire_all()
+    assert session.get(Subject, subject.id).drive_folder_id == "folder4"
+
+
+def test_received_is_what_drive_kept(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    data = bytes(CHUNK_SIZE) + b"tail"
+    upload_id = start(client, subject, len(data)).json()["upload_id"]
+    drive.keep_limit = 262144
+    first = put(client, upload_id, data[:CHUNK_SIZE], 0)
+    assert first.json() == {"received": 262144, "document": None}
+    assert put(client, upload_id, data[CHUNK_SIZE:], CHUNK_SIZE).json()["detail"] == "expected offset 262144"
+    drive.keep_limit = None
+    last = put(client, upload_id, data[262144:], 262144)
+    assert last.json()["document"]["size"] == len(data)
+    assert drive.contents["file1"] == data

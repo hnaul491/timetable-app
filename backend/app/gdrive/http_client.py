@@ -1,9 +1,10 @@
+import re
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
-from app.gcal.api import GoogleError, GoogleNotFound
+from app.gcal.api import GoogleAuthError, GoogleError, GoogleNotFound, GoogleRateLimited
 from app.gcal.http_client import UNEXPECTED, GoogleSession, _json
 from app.gdrive.api import FOLDER_MIME, DriveFile
 
@@ -11,6 +12,8 @@ FILES = "https://www.googleapis.com/drive/v3/files"
 UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 SERVICE = "Google Drive"
 FILE_FIELDS = "id,name,mimeType,size,webViewLink"
+UPLOAD_TIMEOUT = httpx.Timeout(5.0, read=40.0)  # Drive can be slow to answer the last chunk
+_RANGE = re.compile(r"^bytes=0-(\d+)$")
 
 
 def _file_url(file_id: str) -> str:
@@ -53,13 +56,25 @@ class HttpGoogleDrive:
             raise GoogleError(UNEXPECTED)
         return location
 
-    def upload_chunk(self, session_uri: str, data: bytes, offset: int, total: int) -> DriveFile | None:
+    def upload_chunk(self, session_uri: str, data: bytes, offset: int, total: int) -> tuple[DriveFile | None, int]:
+        if data:
+            content_range = f"bytes {offset}-{offset + len(data) - 1}/{total}"
+        else:
+            content_range = f"bytes */{total}"  # a zero-byte file is finished by an empty range
+        try:
+            return self._put(session_uri, data, content_range, total)
+        except (GoogleAuthError, GoogleNotFound, GoogleRateLimited):
+            raise
+        except GoogleError:  # timeout, network error or 5xx: ask Drive what it actually received
+            return self._put(session_uri, b"", f"bytes */{total}", total)
+
+    def _put(self, session_uri: str, data: bytes, content_range: str, total: int) -> tuple[DriveFile | None, int]:
         # The session URI is its own credential: no Bearer token is sent to it.
-        response = self._call(
-            "PUT", session_uri, content=data, bearer=False, expect=(308,),
-            headers={"Content-Range": f"bytes {offset}-{offset + len(data) - 1}/{total}"})
+        response = self._call("PUT", session_uri, content=data, bearer=False, expect=(308,),
+                              headers={"Content-Range": content_range}, timeout=UPLOAD_TIMEOUT)
         if response.status_code == 308:
-            return None
+            match = _RANGE.match(response.headers.get("Range", ""))
+            return None, int(match.group(1)) + 1 if match else 0
         body = _json(response)
         file_id, name = body.get("id"), body.get("name")
         link = body.get("webViewLink")
@@ -70,7 +85,7 @@ class HttpGoogleDrive:
         except (TypeError, ValueError):
             raise GoogleError(UNEXPECTED) from None
         return DriveFile(id=file_id, name=name, mime_type=str(body.get("mimeType", "")), size=size,
-                         web_view_link=link if isinstance(link, str) else "")
+                         web_view_link=link if isinstance(link, str) else ""), total
 
     def trash(self, file_id: str) -> None:
         self._call("PATCH", _file_url(file_id), json={"trashed": True})

@@ -174,3 +174,20 @@ def test_connect_without_drive_scope_or_with_tokeninfo_error(client, settings, s
     assert body.status_code == 200 and body.json()["drive_enabled"] is False
     session.expire_all()
     assert session.get(GoogleAccount, 1).scopes == ""
+
+
+def test_reconnect_keeps_the_calendar_and_refreshes_scopes(client, settings, session, semester):
+    calendar = "https://www.googleapis.com/auth/calendar.app.created"
+    drive_scope = "https://www.googleapis.com/auth/drive.file"
+    first = FakeCalendar(scopes={calendar})
+    configure(client, settings, first)
+    assert connect(client).json()["drive_enabled"] is False
+    calendar_id = session.get(GoogleAccount, 1).calendar_id
+    second = FakeCalendar(scopes={calendar, drive_scope})
+    configure(client, settings, second)
+    assert connect(client).json()["drive_enabled"] is True
+    session.expire_all()
+    account = session.get(GoogleAccount, 1)
+    assert account.calendar_id == calendar_id and calendar_id
+    assert drive_scope in account.scopes.split()
+    assert not any(c[0] == "create_calendar" for c in second.calls)

@@ -325,8 +325,8 @@ class UploadStartIn(BaseModel):
     event_id: int | None = None
     tag: Literal["slides", "exercises", "other"]
     name: str = Field(min_length=1, max_length=255)
-    mime_type: str = Field(min_length=1, max_length=255)
-    size: int = Field(ge=1, le=104857600)
+    mime_type: str = Field(pattern=r"^[ -~]{1,255}$")
+    size: int = Field(ge=0, le=104857600)
 
 
 class UploadStartOut(BaseModel):

@@ -109,12 +109,12 @@ class GoogleSession:
     def request(self, method: str, url: str, *, json: Any = None, content: bytes | None = None,
                 headers: dict[str, str] | None = None, params: dict[str, str] | None = None,
                 expect: tuple[int, ...] = (200,), service: str = CALENDAR,
-                bearer: bool = True) -> httpx.Response:
+                bearer: bool = True, timeout: httpx.Timeout | None = None) -> httpx.Response:
         """Send a request as the user. Statuses below 400 and those in `expect` are returned as they are."""
-        response = self._send(method, url, json, content, headers, params, bearer)
+        response = self._send(method, url, json, content, headers, params, bearer, timeout)
         if response.status_code == 401 and bearer:
             self._access_token = None  # expired access token: refresh once and retry
-            response = self._send(method, url, json, content, headers, params, bearer)
+            response = self._send(method, url, json, content, headers, params, bearer, timeout)
         status = response.status_code
         if status < 400 or status in expect:
             return response
@@ -132,12 +132,14 @@ class GoogleSession:
         raise GoogleError(f"{service} returned {status} ({reason or 'no reason'})")
 
     def _send(self, method: str, url: str, json: Any, content: bytes | None, headers: dict[str, str] | None,
-              params: dict[str, str] | None, bearer: bool) -> httpx.Response:
+              params: dict[str, str] | None, bearer: bool, timeout: httpx.Timeout | None) -> httpx.Response:
         sent = dict(headers or {})
         if bearer:
             sent["Authorization"] = f"Bearer {self._token()}"
         try:
-            return self._http.request(method, url, json=json, content=content, headers=sent, params=params)
+            extra = {} if timeout is None else {"timeout": timeout}
+            return self._http.request(method, url, json=json, content=content, headers=sent, params=params,
+                                      **extra)
         except httpx.HTTPError:
             raise GoogleError(UNREACHABLE) from None
 

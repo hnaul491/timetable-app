@@ -24,8 +24,8 @@ class GoogleDrive(Protocol):
         """Open a resumable upload and return its session URI (never shown to the browser)."""
         ...
 
-    def upload_chunk(self, session_uri: str, data: bytes, offset: int, total: int) -> DriveFile | None:
-        """Send one chunk; None while the upload is incomplete."""
+    def upload_chunk(self, session_uri: str, data: bytes, offset: int, total: int) -> tuple[DriveFile | None, int]:
+        """Send one chunk; (file, total) when finished, else (None, bytes Drive kept so far)."""
         ...
 
     def trash(self, file_id: str) -> None: ...
