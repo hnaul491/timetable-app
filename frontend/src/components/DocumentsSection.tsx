@@ -39,7 +39,8 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
   });
   const { askDelete, pending: deleting } = useDeleteDocument();
   // the subject's Drive folder link comes with the all-documents list (ids only, no Google call)
-  const folders = useQuery({ queryKey: ["documents", "all"], queryFn: () => apiFetch<AllDocuments>("/api/documents"), enabled: !compact });
+  // only the folder link is needed here: reuse a recent copy instead of refetching the whole list on every visit
+  const folders = useQuery({ queryKey: ["documents", "all"], queryFn: () => apiFetch<AllDocuments>("/api/documents"), enabled: !compact, staleTime: 5 * 60_000 });
   const folderUrl = folders.data?.subjects?.find((s) => s.id === subjectId)?.folder_url ?? null;
 
   const all = docs.data ?? [];

@@ -535,3 +535,12 @@ def test_all_documents_uses_a_fixed_number_of_queries(client, session, semester,
     sa_event.listen(engine, "before_cursor_execute", lambda *a: count.append(1))
     client.get("/api/documents", headers=AUTH)
     assert len(count) <= 6
+
+
+def test_a_non_google_view_link_is_never_sent(client, session, semester):
+    from app.models import Document, Subject
+    from app.services.documents import _link
+    doc = Document(drive_file_id="abc", web_view_link="javascript:alert(1)")
+    assert _link(doc) == "https://drive.google.com/file/d/abc/view"
+    doc.web_view_link = "https://docs.google.com/presentation/d/abc/edit"
+    assert _link(doc) == "https://docs.google.com/presentation/d/abc/edit"

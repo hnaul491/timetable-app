@@ -235,7 +235,10 @@ def send_chunk(session: Session, drive: GoogleDrive, upload: DocumentUpload, dat
 # --- output ------------------------------------------------------------------------------------
 
 def _link(d: Document) -> str:
-    return d.web_view_link or f"https://drive.google.com/file/d/{d.drive_file_id}/view"
+    # only an https link is used as an href; anything else (e.g. javascript:) falls back to the plain file URL
+    if d.web_view_link and d.web_view_link.startswith("https://"):
+        return d.web_view_link
+    return f"https://drive.google.com/file/d/{d.drive_file_id}/view"
 
 
 def document_outs(session: Session, documents: list[Document]) -> list[DocumentOut]:

@@ -127,6 +127,8 @@ export function DocumentsPage() {
   };
 
   const subjectsList = data.data?.subjects.map((s) => ({ id: s.id, name: s.name })) ?? [];
+  // the main Upload button starts on the first subject that is not hidden
+  const firstVisible = data.data?.subjects.find((s) => !s.hidden) ?? data.data?.subjects[0];
   const hasDocs = (data.data?.documents.length ?? 0) > 0;
 
   const body = () => {
@@ -146,7 +148,7 @@ export function DocumentsPage() {
           <h2 className="text-base font-bold">{t("documents.page.emptyTitle")}</h2>
           <p className="text-sm text-ink-2">{t("documents.page.emptyBody")}</p>
           {driveOn && subjectsList.length > 0 && (
-            <button type="button" onClick={() => setUploadFor(subjectsList[0].id)} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
+            <button type="button" onClick={() => setUploadFor((firstVisible ?? subjectsList[0]).id)} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
               {t("documents.page.uploadShort")}
             </button>
           )}
@@ -219,7 +221,7 @@ export function DocumentsPage() {
           </a>
         )}
         {driveOn && subjectsList.length > 0 && (
-          <button type="button" onClick={() => setUploadFor(subjectsList[0].id)} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
+          <button type="button" onClick={() => setUploadFor((firstVisible ?? subjectsList[0]).id)} className="h-10 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
             {t("documents.page.uploadShort")}
           </button>
         )}
