@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass
 
 SECTION_RE = re.compile(r"^(G\d+|GR\d+)\s*-\s*(.+)$")
+GROUP_HOLIDAY_RE = re.compile(r"^(?:G|GR)\d+\s*-\s*(.+)$", re.IGNORECASE)
 EXAM_RE = re.compile(r"\s+exam$", re.IGNORECASE)
 HOLIDAY_TITLES = {"vacances", "bank holiday"}
 
@@ -15,7 +16,9 @@ class ParsedTitle:
 
 def parse_title(raw: str) -> ParsedTitle:
     title = " ".join(raw.split())
-    if title.casefold() in HOLIDAY_TITLES:
+    grouped = GROUP_HOLIDAY_RE.match(title)
+    # A holiday may carry a group prefix ("GR1 - Vacances"); it is still no class, section or subject.
+    if title.casefold() in HOLIDAY_TITLES or (grouped and grouped.group(1).strip().casefold() in HOLIDAY_TITLES):
         return ParsedTitle(None, None, "holiday")
     section = None
     match = SECTION_RE.match(title)

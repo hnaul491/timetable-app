@@ -26,3 +26,13 @@ def test_parse_title(raw, expected):
 
 def test_collapses_inner_whitespace():
     assert parse_title("GR5  -   French  for Fall 26 T1").base_name == "French for Fall 26 T1"
+
+
+@pytest.mark.parametrize("raw", ["GR1 - Vacances", "G2 - Bank holiday", "gr12  -  vacances", "  G3 -BANK   HOLIDAY ",
+                                 "GR1 - VACANCES"])
+def test_holidays_with_a_group_are_holidays(raw):
+    assert parse_title(raw) == ParsedTitle(None, None, "holiday")
+
+
+def test_a_group_class_that_merely_contains_vacances_is_not_a_holiday():
+    assert parse_title("GR1 - Vacances Studies") == ParsedTitle("Vacances Studies", "GR1", "class")
