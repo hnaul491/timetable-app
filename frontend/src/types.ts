@@ -221,3 +221,11 @@ export interface ChatMessage {
   content: string;
   actions: PendingAction[];
 }
+
+export interface SearchResults {
+  events: { id: number; title: string; start: string; end: string; room: string | null; cancelled: boolean }[];
+  subjects: { id: number; name: string }[];
+  notes: { event_id: number; event_title: string; snippet: string }[];
+  tasks: { id: number; title: string; done: boolean; due: string | null; event_id: number | null }[];
+  documents: { id: number; name: string; subject_id: number; web_view_link: string | null }[];
+}

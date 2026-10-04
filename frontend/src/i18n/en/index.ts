@@ -9,8 +9,9 @@ import { google } from "./google";
 import { nav } from "./nav";
 import { review } from "./review";
 import { settings } from "./settings";
+import { search } from "./search";
 import { shortcuts } from "./shortcuts";
 import { subjects } from "./subjects";
 import { ui } from "./ui";
 
-export const en = { ai, common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts };
+export const en = { ai, common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts, search };

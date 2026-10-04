@@ -17,6 +17,7 @@ export const shortcuts = {
   goSettings: "Go to Settings",
   save: "Save",
   delete: "Delete",
+  search: "Search",
   help: "Show shortcuts",
   contextHint: "More shortcuts appear on the calendar.",
   then: "then",
