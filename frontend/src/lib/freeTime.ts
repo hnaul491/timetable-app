@@ -1,6 +1,25 @@
 import { addDays, startOfWeek } from "./time";
 
-export type Period = "week" | "nextWeek" | "month" | "nextMonth" | "semester" | "custom";
+export type PeriodUnit = "day" | "week" | "month" | "semester" | "custom";
+/** `offset` counts units away from the current one; semester and custom ignore it. */
+export interface Period { unit: PeriodUnit; offset: number }
+
+export const PERIOD_PRESETS = [
+  { key: "today", period: { unit: "day", offset: 0 } },
+  { key: "tomorrow", period: { unit: "day", offset: 1 } },
+  { key: "week", period: { unit: "week", offset: 0 } },
+  { key: "nextWeek", period: { unit: "week", offset: 1 } },
+  { key: "month", period: { unit: "month", offset: 0 } },
+  { key: "nextMonth", period: { unit: "month", offset: 1 } },
+  { key: "semester", period: { unit: "semester", offset: 0 } },
+  { key: "custom", period: { unit: "custom", offset: 0 } },
+] as const satisfies readonly { key: string; period: Period }[];
+export type PeriodKey = (typeof PERIOD_PRESETS)[number]["key"];
+
+export const isStepping = (p: Period): boolean => p.unit === "day" || p.unit === "week" || p.unit === "month";
+export function samePeriod(a: Period, b: Period): boolean {
+  return a.unit === b.unit && (!isStepping(a) || a.offset === b.offset);
+}
 
 export interface FreeTimeForm {
   from: string;
@@ -55,7 +74,7 @@ const STORAGE_KEY = "timetable:free-time";
 
 export function defaultForm(today: string): FreeTimeForm {
   return {
-    from: "06:00", to: "08:00", period: "month", customStart: today, customEnd: addDays(today, 30),
+    from: "06:00", to: "08:00", period: { unit: "month", offset: 0 }, customStart: today, customEnd: addDays(today, 30),
     weekdays: [0, 1, 2, 3, 4], buffer: "0", useMinFree: false, minFree: "60",
   };
 }
@@ -79,19 +98,18 @@ function monthRange(today: string, offset: number): Range {
 
 /** The inclusive Paris-date range for a period, or null when it cannot be computed (no/over semester end). */
 export function computeRange(form: FreeTimeForm, today: string, semesterEnd: string | null): Range | null {
-  switch (form.period) {
-    case "week": {
-      const start = startOfWeek(today);
-      return { start, end: addDays(start, 6) };
+  const { unit, offset } = form.period;
+  switch (unit) {
+    case "day": {
+      const day = addDays(today, offset);
+      return { start: day, end: day };
     }
-    case "nextWeek": {
-      const start = addDays(startOfWeek(today), 7);
+    case "week": {
+      const start = addDays(startOfWeek(today), 7 * offset);
       return { start, end: addDays(start, 6) };
     }
     case "month":
-      return monthRange(today, 0);
-    case "nextMonth":
-      return monthRange(today, 1);
+      return monthRange(today, offset);
     case "semester":
       return semesterEnd && semesterEnd >= today ? { start: today, end: semesterEnd < addDays(today, MAX_DAYS - 1) ? semesterEnd : addDays(today, MAX_DAYS - 1) } : null;
     case "custom":
@@ -111,7 +129,7 @@ export function validate(form: FreeTimeForm, range: Range | null, semesterReason
   if (!isInt(buffer) || Number(buffer) > MAX_BUFFER) errors.buffer = "buffer";
   if (form.useMinFree && (!isInt(form.minFree) || Number(form.minFree) < 1 || Number(form.minFree) > 1440)) errors.minFree = "minFree";
   if (form.weekdays.length === 0) errors.weekdays = "weekdays";
-  if (!range) errors.range = form.period === "semester" ? semesterReason : "dates";
+  if (!range) errors.range = form.period.unit === "semester" ? semesterReason : "dates";
   else if (range.end < range.start) errors.range = "rangeOrder";
   else if (daysBetween(range.start, range.end) > MAX_DAYS) errors.range = "rangeLong";
   return errors;
@@ -126,16 +144,32 @@ export function buildQuery(form: FreeTimeForm, range: Range): string {
   return q.toString();
 }
 
+const LEGACY_PERIODS: Record<string, Period> = {
+  week: { unit: "week", offset: 0 }, nextWeek: { unit: "week", offset: 1 },
+  month: { unit: "month", offset: 0 }, nextMonth: { unit: "month", offset: 1 },
+  semester: { unit: "semester", offset: 0 }, custom: { unit: "custom", offset: 0 },
+};
+const UNITS: PeriodUnit[] = ["day", "week", "month", "semester", "custom"];
+
+/** Accepts the current shape and the old string values; anything else is rejected. */
+function parsePeriod(raw: unknown): Period | null {
+  if (typeof raw === "string") return Object.prototype.hasOwnProperty.call(LEGACY_PERIODS, raw) ? { ...LEGACY_PERIODS[raw] } : null;
+  if (raw && typeof raw === "object") {
+    const { unit, offset } = raw as { unit?: unknown; offset?: unknown };
+    if (UNITS.includes(unit as PeriodUnit) && typeof offset === "number" && Number.isInteger(offset)) return { unit: unit as PeriodUnit, offset };
+  }
+  return null;
+}
+
 export function loadForm(today: string): FreeTimeForm {
   const base = defaultForm(today);
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as Partial<FreeTimeForm> | null;
     if (!raw || typeof raw !== "object") return base;
-    const periods: Period[] = ["week", "nextWeek", "month", "nextMonth", "semester", "custom"];
     return {
       from: typeof raw.from === "string" ? raw.from : base.from,
       to: typeof raw.to === "string" ? raw.to : base.to,
-      period: periods.includes(raw.period as Period) ? (raw.period as Period) : base.period,
+      period: parsePeriod(raw.period) ?? base.period,
       customStart: typeof raw.customStart === "string" ? raw.customStart : base.customStart,
       customEnd: typeof raw.customEnd === "string" ? raw.customEnd : base.customEnd,
       weekdays: Array.isArray(raw.weekdays) && raw.weekdays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6) ? raw.weekdays : base.weekdays,

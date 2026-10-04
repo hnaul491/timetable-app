@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { configure, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfirmProvider } from "../components/ui/Confirm";
@@ -15,6 +15,9 @@ vi.mock("../lib/api", async (importOriginal) => ({
   apiFetch: (...args: unknown[]) => apiFetch(...args),
   authHeaders: async () => ({}),
 }));
+
+// these pages wait for two queries before the target control mounts; 1 s was too short when the suite runs under load
+configure({ asyncUtilTimeout: 4000 });
 
 function Where() {
   const loc = useLocation();
