@@ -185,3 +185,27 @@ def test_move_sends_add_and_remove_parents_as_query_params():
     request = google.requests[1]
     assert (request.method, request.url.path) == ("PATCH", "/drive/v3/files/d1")
     assert request.url.params["addParents"] == "new" and request.url.params["removeParents"] == "old"
+
+
+def test_upload_file_sends_multipart_with_metadata_and_data():
+    done = {"id": "d1", "name": "b.json", "mimeType": "application/json", "size": "2"}
+    google = Google([httpx.Response(200, json=done)])
+    result = drive(google).upload_file("b.json", "application/json", b"{}", "folder1")
+    assert result.id == "d1" and result.name == "b.json"
+    request = google.requests[1]
+    assert request.method == "POST" and "uploadType=multipart" in str(request.url)
+    assert request.headers["Content-Type"].startswith("multipart/related; boundary=")
+    assert b'"parents": ["folder1"]' in request.content and b'"name": "b.json"' in request.content
+    assert request.content.count(b"{}") == 1
+
+
+def test_list_files_follows_pages_and_queries_the_folder():
+    google = Google([
+        httpx.Response(200, json={"files": [{"id": "a", "name": "x.json"}], "nextPageToken": "p2"}),
+        httpx.Response(200, json={"files": [{"id": "b", "name": "y.json", "size": "3"}]}),
+    ])
+    files = drive(google).list_files("folder1")
+    assert [f.id for f in files] == ["a", "b"]
+    first, second = google.requests[1:]
+    assert "'folder1' in parents" in first.url.params["q"] and "trashed = false" in first.url.params["q"]
+    assert second.url.params["pageToken"] == "p2"

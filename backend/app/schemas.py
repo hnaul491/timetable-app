@@ -472,3 +472,13 @@ class SearchResponse(BaseModel):
     notes: list[SearchNote]
     tasks: list[SearchTask]
     documents: list[SearchDocument]
+
+
+class BackupStatusOut(BaseModel):
+    drive_available: bool
+    last_at: str | None
+
+
+class BackupDriveOut(BaseModel):
+    file_name: str
+    created_at: str

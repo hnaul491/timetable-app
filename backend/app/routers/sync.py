@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 from app.auth import require_cron_or_user, require_user
 from app.config import Settings, get_settings
 from app.db import get_session
-from app.deps import get_fetcher, get_gcal_factory, get_now
+from app.deps import get_drive_factory, get_fetcher, get_gcal_factory, get_now
 from app.gcal.api import GcalFactory
+from app.gdrive.api import DriveFactory
+from app.services.backup import run_weekly_backup
 from app.gcal.push import run_push
 from app.models import SyncRun
 from app.schemas import SyncRunOut, SyncStatusOut
@@ -32,16 +34,20 @@ def to_out(run: SyncRun) -> SyncRunOut:
 
 @router.post("/sync", response_model=SyncRunOut)
 def trigger_sync(
-    _caller: str = Depends(require_cron_or_user),
+    caller: str = Depends(require_cron_or_user),
     session: Session = Depends(get_session),
     fetch: Fetcher = Depends(get_fetcher),
     now: datetime = Depends(get_now),
     settings: Settings = Depends(get_settings),
     gcal_factory: GcalFactory = Depends(get_gcal_factory),
+    drive_factory: DriveFactory = Depends(get_drive_factory),
 ) -> SyncRunOut:
     started = time.monotonic()
     out = to_out(run_sync(session, fetch, now))
-    run_push(session, settings, gcal_factory, now, started + SYNC_AND_PUSH_BUDGET_S)  # never raises
+    deadline = started + SYNC_AND_PUSH_BUDGET_S
+    run_push(session, settings, gcal_factory, now, deadline)  # never raises
+    if caller == "cron":
+        run_weekly_backup(session, settings, drive_factory, now, deadline)  # never raises
     return out
 
 

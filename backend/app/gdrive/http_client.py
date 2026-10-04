@@ -1,4 +1,6 @@
+import json
 import re
+import uuid
 from typing import Any
 from urllib.parse import quote
 
@@ -13,7 +15,20 @@ UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 SERVICE = "Google Drive"
 FILE_FIELDS = "id,name,mimeType,size,webViewLink"
 UPLOAD_TIMEOUT = httpx.Timeout(5.0, read=40.0)  # Drive can be slow to answer the last chunk
+SMALL_UPLOAD_TIMEOUT = httpx.Timeout(5.0, read=10.0)  # a backup is small: fail fast inside the cron budget
 _RANGE = re.compile(r"^bytes=0-(\d+)$")
+
+
+def _drive_file(body: dict[str, Any]) -> DriveFile | None:
+    file_id, name, link = body.get("id"), body.get("name"), body.get("webViewLink")
+    if not isinstance(file_id, str) or not isinstance(name, str):
+        return None
+    try:
+        size = int(body.get("size", 0))
+    except (TypeError, ValueError):
+        return None
+    return DriveFile(id=file_id, name=name, mime_type=str(body.get("mimeType", "")), size=size,
+                     web_view_link=link if isinstance(link, str) else "")
 
 
 def _file_url(file_id: str) -> str:
@@ -86,6 +101,37 @@ class HttpGoogleDrive:
             raise GoogleError(UNEXPECTED) from None
         return DriveFile(id=file_id, name=name, mime_type=str(body.get("mimeType", "")), size=size,
                          web_view_link=link if isinstance(link, str) else ""), total
+
+    def upload_file(self, name: str, mime_type: str, data: bytes, parent_id: str) -> DriveFile:
+        boundary = f"tt{uuid.uuid4().hex}"
+        meta = json.dumps({"name": name, "parents": [parent_id]})
+        body = (f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n"
+                f"--{boundary}\r\nContent-Type: {mime_type}\r\n\r\n").encode() + data + f"\r\n--{boundary}--".encode()
+        response = self._call("POST", UPLOAD, params={"uploadType": "multipart", "fields": FILE_FIELDS},
+                              content=body, headers={"Content-Type": f"multipart/related; boundary={boundary}"},
+                              timeout=SMALL_UPLOAD_TIMEOUT)
+        file = _drive_file(_json(response))
+        if file is None:
+            raise GoogleError(UNEXPECTED)
+        return file
+
+    def list_files(self, parent_id: str) -> list[DriveFile]:
+        found: list[DriveFile] = []
+        page_token: str | None = None
+        for _ in range(10):  # a folder of backups never holds more than a few hundred files
+            params = {"q": f"'{parent_id}' in parents and trashed = false and mimeType != '{FOLDER_MIME}'",
+                      "fields": f"nextPageToken,files({FILE_FIELDS})", "pageSize": "100"}
+            if page_token:
+                params["pageToken"] = page_token
+            body = _json(self._call("GET", FILES, params=params))
+            for item in body.get("files", []):
+                file = _drive_file(item) if isinstance(item, dict) else None
+                if file is not None:
+                    found.append(file)
+            page_token = body.get("nextPageToken")
+            if not isinstance(page_token, str) or not page_token:
+                break
+        return found
 
     def trash(self, file_id: str) -> None:
         self._call("PATCH", _file_url(file_id), json={"trashed": True})

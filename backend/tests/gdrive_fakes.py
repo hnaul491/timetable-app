@@ -70,6 +70,22 @@ class FakeDrive:
         self.parents[file_id] = state["parent"]
         return done, total
 
+    def upload_file(self, name: str, mime_type: str, data: bytes, parent_id: str) -> DriveFile:
+        self._check("upload_file")
+        if parent_id not in self.folders:
+            raise GoogleNotFound("Google Drive returned 404")
+        self._files += 1
+        file_id = f"file{self._files}"
+        done = DriveFile(id=file_id, name=name, mime_type=mime_type, size=len(data),
+                         web_view_link=f"https://drive.example/{file_id}")
+        self.files[file_id], self.contents[file_id], self.parents[file_id] = done, data, parent_id
+        self.calls.append(("upload_file", file_id))
+        return done
+
+    def list_files(self, parent_id: str) -> list[DriveFile]:
+        self._check("list_files")
+        return [f for fid, f in self.files.items() if self.parents.get(fid) == parent_id and fid not in self.trashed]
+
     def rename(self, file_id: str, name: str) -> None:
         self._check("rename")
         if file_id not in self.folders and file_id not in self.files:

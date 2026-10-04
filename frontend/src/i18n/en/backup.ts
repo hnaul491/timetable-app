@@ -1,0 +1,16 @@
+export const backup = {
+  title: "Backup",
+  help: "Your notes and tasks are stored only in this app. A copy is saved to your Google Drive every week (last 8 kept).",
+  download: "Download backup (.json)",
+  downloading: "Preparing…",
+  downloaded: "Backup downloaded",
+  downloadFailed: "Could not download the backup: {error}",
+  drive: "Back up to Google Drive now",
+  driving: "Backing up…",
+  driveDone: "Backup saved to Google Drive as {name}",
+  driveFailed: "Could not back up to Google Drive: {error}",
+  needDrive: "Connect Google with Drive access (Google card above) to back up to Drive.",
+  lastAt: "Last Drive backup: {date}",
+  never: "Last Drive backup: never",
+  statusFailed: "Could not load the backup status: {error}",
+};
