@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -104,7 +104,7 @@ describe("quick-action button", () => {
     setup("/board");
     await user.click(fab());
     await user.click(screen.getByRole("menuitem", { name: /New event/ }));
-    expect(screen.getByTestId("where").textContent).toMatch(/^\/\?new=\d{4}-\d{2}-\d{2}T09:00$/);
+    expect(screen.getByTestId("where").textContent).toBe("/?new=today");
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
@@ -144,6 +144,46 @@ describe("quick-action button", () => {
     expect(fab().parentElement!.className).toMatch(/md:bottom-6/);
     await user.click(fab());
     expect(screen.getByRole("menu").className).toMatch(/motion-safe:animate-\[quick-in_150ms/);
+  });
+
+  it("hints are aria-hidden and exposed as aria-keyshortcuts", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(fab());
+    const item = screen.getByRole("menuitem", { name: "New event" });
+    expect(item).toHaveAttribute("aria-keyshortcuts", "N");
+    expect(item.querySelector("kbd")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("menuitem", { name: "New task" })).not.toHaveAttribute("aria-keyshortcuts");
+  });
+
+  it("is hidden below md on the assistant page only", () => {
+    setup("/assistant");
+    expect(fab().parentElement!.className).toContain("max-md:hidden");
+  });
+
+  it("is not hidden on other pages", () => {
+    setup("/board");
+    expect(fab().parentElement!.className).not.toContain("max-md:hidden");
+  });
+
+  it("fades out for 120 ms before unmounting, keeping Escape focus return", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));
+    setup();
+    await user.click(fab());
+    await user.keyboard("{Escape}");
+    expect(fab()).toHaveFocus();
+    expect(screen.getByRole("menu").className).toContain("quick-out_120ms");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  });
+
+  it("closes instantly under reduced motion", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));
+    setup();
+    await user.click(fab());
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 
   it("is translated to Vietnamese", async () => {

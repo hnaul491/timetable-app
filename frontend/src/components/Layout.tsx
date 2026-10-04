@@ -151,7 +151,7 @@ export function Layout() {
         </button>
       )}
       {!fullScreen && <QuickActions />}
-      <main className="min-w-0 flex-1 px-4 pt-16 md:pt-5 pb-24 md:px-7 md:pb-8">
+      <main className="min-w-0 flex-1 px-4 pt-16 md:pt-5 pb-36 md:px-7 md:pb-24">
         <Outlet />
       </main>
       {!fullScreen && (

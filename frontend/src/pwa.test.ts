@@ -23,7 +23,7 @@ describe("installable app", () => {
 
   it("declares the four home-screen shortcuts with existing 96px icons", () => {
     const manifest = JSON.parse(read("public/manifest.webmanifest").toString());
-    expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(["/events/new", "/free-time", "/assistant", "/?search=1"]);
+    expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(["/?new=today", "/free-time", "/assistant", "/?search=1"]);
     for (const s of manifest.shortcuts) {
       expect(s.name).toBeTruthy();
       expect(s.short_name).toBeTruthy();
