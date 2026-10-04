@@ -15,7 +15,7 @@ import { formatTime, todayParis } from "../lib/time";
 import type { Semester } from "../types";
 
 const DEBOUNCE_MS = 300;
-const PERIODS: Period[] = ["week", "month", "semester", "custom"];
+const PERIODS: Period[] = ["week", "nextWeek", "month", "nextMonth", "semester", "custom"];
 const MONDAY = "2024-01-01"; // a Monday, used only to get localized weekday names
 
 const fieldClass = "h-9 rounded-[9px] border border-line bg-surface px-2.5 text-[13px] font-semibold text-ink tabular-nums";

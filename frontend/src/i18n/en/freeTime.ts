@@ -4,7 +4,7 @@ export const freeTime = {
   from: "From",
   to: "To",
   period: "Period",
-  periods: { week: "This week", month: "This month", semester: "Rest of semester", custom: "Custom" },
+  periods: { week: "This week", nextWeek: "Next week", month: "This month", nextMonth: "Next month", semester: "Rest of semester", custom: "Custom" },
   customStart: "First day",
   customEnd: "Last day",
   weekdays: "Weekdays",
@@ -30,7 +30,9 @@ export const freeTime = {
   summaryWindow: "free from {from} to {to}",
   summaryPeriod: {
     week: " this week",
+    nextWeek: " next week",
     month: " in {month}",
+    nextMonth: " in {month}",
     semester: " for the rest of the semester",
     custom: " from {start} to {end}",
   },
