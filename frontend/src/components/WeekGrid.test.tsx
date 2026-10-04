@@ -93,4 +93,27 @@ describe("WeekGrid", () => {
     render(<WeekGrid days={WEEK} events={[event({ title: "French (external)", kind: "french_ext", color: null, section: null, subject_id: null })]} />);
     expect(screen.getByRole("group").dataset.kind).toBe("french_ext");
   });
+
+  it("draws an event that ends on a later Paris day on each day it covers", async () => {
+    const onSelect = vi.fn();
+    // Mon 19 Oct 22:00 Paris (20:00Z) to Tue 20 Oct 02:00 Paris (00:00Z)
+    render(<WeekGrid days={WEEK} events={[event({ id: 9, title: "Night shift", section: null, room: null, kind: "work", color: null, start: "2026-10-19T20:00:00Z", end: "2026-10-20T00:00:00Z" })]} onSelect={onSelect} />);
+    const blocks = screen.getAllByRole("group", { name: /Night shift/ });
+    expect(blocks).toHaveLength(2);
+    const [first, second] = blocks;
+    expect(first.closest("[data-date]")).toHaveAttribute("data-date", "2026-10-19");
+    expect(second.closest("[data-date]")).toHaveAttribute("data-date", "2026-10-20");
+    // the grid grows to 00:00-24:00 bounds as needed; first part: 22:00 to 24:00, second: 00:00 to 02:00
+    expect(first.style.height).toBe(`${2 * 52 - 4}px`);
+    expect(second.style.height).toBe(`${2 * 52 - 4}px`);
+    for (const b of blocks) await userEvent.click(b.querySelector("button")!);
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenNthCalledWith(1, 9);
+    expect(onSelect).toHaveBeenNthCalledWith(2, 9);
+  });
+
+  it("does not add a day when the event ends exactly at midnight", () => {
+    render(<WeekGrid days={WEEK} events={[event({ id: 9, title: "Late", section: null, room: null, start: "2026-10-19T20:00:00Z", end: "2026-10-19T22:00:00Z" })]} />);
+    expect(screen.getAllByRole("group", { name: /Late/ })).toHaveLength(1);
+  });
 });
