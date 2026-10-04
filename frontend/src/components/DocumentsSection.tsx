@@ -1,16 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { docBadge, formatSize } from "../lib/documents";
+import { useDeleteDocument } from "../lib/useDeleteDocument";
 import { dayLabel, formatLongDate, parisParts } from "../lib/time";
-import type { DocumentItem, DocumentTag, GoogleStatus } from "../types";
+import type { AllDocuments, DocumentItem, DocumentTag, GoogleStatus } from "../types";
 import { ErrorPanel } from "./Banners";
 import { UploadDialog } from "./UploadDialog";
-import { useConfirm } from "./ui/Confirm";
 import { SkeletonRows } from "./ui/Skeleton";
-import { useToast } from "./ui/Toast";
 
 type Filter = "all" | DocumentTag;
 const FILTERS: { value: Filter; label: MessageKey }[] = [
@@ -28,9 +27,6 @@ const TAG_LABEL: Record<DocumentTag, MessageKey> = {
 export function DocumentsSection({ subjectId, eventId }: { subjectId: number; eventId?: number }) {
   const t = useT();
   const locale = useLocale();
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const toast = useToast();
   const [filter, setFilter] = useState<Filter>("all");
   const [uploading, setUploading] = useState(false);
   const compact = eventId !== undefined;
@@ -41,18 +37,10 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
     queryKey: compact ? ["documents", "event", eventId] : ["documents", "subject", subjectId],
     queryFn: () => apiFetch<DocumentItem[]>(compact ? `/api/events/${eventId}/documents` : `/api/subjects/${subjectId}/documents`),
   });
-  const remove = useMutation({
-    mutationFn: (doc: DocumentItem) => apiFetch(`/api/documents/${doc.id}`, { method: "DELETE" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["documents"] });
-      toast.success(t("documents.deleted"));
-    },
-    onError: (error, doc) => toast.error(t("documents.deleteFailed", { message: error.message }), { retry: () => remove.mutate(doc) }),
-  });
-  const askDelete = async (doc: DocumentItem) => {
-    const ok = await confirm({ title: t("documents.deleteTitle"), body: t("documents.deleteBody", { name: doc.name }), confirmLabel: t("documents.delete"), tone: "danger" });
-    if (ok) remove.mutate(doc);
-  };
+  const { askDelete, pending: deleting } = useDeleteDocument();
+  // the subject's Drive folder link comes with the all-documents list (ids only, no Google call)
+  const folders = useQuery({ queryKey: ["documents", "all"], queryFn: () => apiFetch<AllDocuments>("/api/documents"), enabled: !compact });
+  const folderUrl = folders.data?.subjects?.find((s) => s.id === subjectId)?.folder_url ?? null;
 
   const all = docs.data ?? [];
   const shown = all.filter((d) => filter === "all" || d.tag === filter);
@@ -88,7 +76,7 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
         type="button"
         aria-label={t("documents.deleteNamed", { name: doc.name })}
         onClick={() => askDelete(doc)}
-        disabled={remove.isPending}
+        disabled={deleting}
         className="h-9 rounded-lg border border-danger-line px-3 text-sm font-semibold text-danger disabled:opacity-60"
       >
         {t("documents.delete")}
@@ -103,6 +91,11 @@ export function DocumentsSection({ subjectId, eventId }: { subjectId: number; ev
           {t("documents.title")}
           {docs.data && <span className="ml-2 font-normal text-muted">{t("documents.count", { count: all.length })}</span>}
         </h2>
+        {folderUrl && (
+          <a href={folderUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-accent">
+            {t("documents.page.openFolder")}
+          </a>
+        )}
         {driveOn && (
           <button type="button" onClick={() => setUploading(true)} className="h-9 rounded-xl bg-accent px-3.5 text-sm font-semibold text-on-accent hover:bg-accent-strong">
             {t("documents.upload")}

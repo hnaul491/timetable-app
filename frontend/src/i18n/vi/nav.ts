@@ -5,6 +5,7 @@ export const nav: Messages["nav"] = {
   calendar: "Lịch",
   board: "Bảng việc",
   subjects: "Môn học",
+  documents: "Tài liệu",
   review: "Ôn tập",
   assistant: "Trợ lý",
   settings: "Cài đặt",

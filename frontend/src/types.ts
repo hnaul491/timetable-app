@@ -196,6 +196,32 @@ export interface DocumentItem {
   created_at: string;
 }
 
+export interface DocSubject {
+  id: number;
+  name: string;
+  color: string;
+  hidden: boolean;
+}
+
+export interface DocListItem {
+  id: number;
+  subject: DocSubject;
+  event: { id: number; title: string; start: string } | null;
+  tag: DocumentTag;
+  name: string;
+  mime_type: string;
+  size: number;
+  web_view_link: string;
+  created_at: string;
+}
+
+export interface AllDocuments {
+  documents: DocListItem[];
+  subjects: (DocSubject & { folder_url: string | null })[];
+  root_url: string | null;
+  semester_url: string | null;
+}
+
 export interface AiStatus {
   enabled: boolean;
   model: string | null;

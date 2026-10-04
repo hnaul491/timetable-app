@@ -57,6 +57,13 @@ describe("Subjects", () => {
     expect(screen.getByText("Hidden")).toBeInTheDocument();
   });
 
+  it("links to all documents (shown on phones)", async () => {
+    renderAt("/subjects");
+    const link = await screen.findByRole("link", { name: "All documents" });
+    expect(link).toHaveAttribute("href", "/documents");
+    expect(link.className).toContain("md:hidden");
+  });
+
   it("shows a subject's exam, sessions and note snippets", async () => {
     renderAt("/subjects/1");
     expect(await screen.findByRole("heading", { name: "Relational Databases" })).toBeInTheDocument();

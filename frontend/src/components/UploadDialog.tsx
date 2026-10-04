@@ -19,11 +19,25 @@ interface Item {
 
 const field = "h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink";
 
-export function UploadDialog({ open, onClose, subjectId, eventId }: { open: boolean; onClose: () => void; subjectId: number; eventId: number | null }) {
+export function UploadDialog({
+  open,
+  onClose,
+  subjectId: initialSubject,
+  eventId,
+  subjects,
+}: {
+  open: boolean;
+  onClose: () => void;
+  subjectId: number;
+  eventId: number | null;
+  /** When given, the dialog shows a subject picker (the all-documents page). */
+  subjects?: { id: number; name: string }[];
+}) {
   const t = useT();
   const locale = useLocale();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const [subjectId, setSubjectId] = useState(initialSubject);
   const detail = useQuery({ queryKey: ["subject", String(subjectId)], queryFn: () => apiFetch<SubjectDetail>(`/api/subjects/${subjectId}`), enabled: open });
   const [items, setItems] = useState<Item[]>([]);
   const [rejected, setRejected] = useState<string[]>([]);
@@ -106,6 +120,26 @@ export function UploadDialog({ open, onClose, subjectId, eventId }: { open: bool
       }
     >
       <div className="flex flex-col gap-4">
+        {subjects && (
+          <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
+            {t("documents.subjectLabel")}
+            <select
+              value={subjectId}
+              disabled={busy}
+              onChange={(e) => {
+                setSubjectId(Number(e.target.value));
+                setClassId("");
+              }}
+              className={field}
+            >
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
             {t("documents.classLabel")}

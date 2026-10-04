@@ -15,6 +15,7 @@ import { initialLanguage } from "./lib/language";
 import { ShortcutRoot } from "./components/ShortcutRoot";
 import { AssistantPage } from "./pages/AssistantPage";
 import { BoardPage } from "./pages/BoardPage";
+import { DocumentsPage } from "./pages/DocumentsPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
 import { FreeTimePage } from "./pages/FreeTimePage";
@@ -54,6 +55,7 @@ const createRouter = () => createBrowserRouter([
       { path: "assistant", element: <AssistantPage /> },
       { path: "review", element: <ReviewPage /> },
       { path: "free-time", element: <FreeTimePage /> },
+      { path: "documents", element: <DocumentsPage /> },
       { path: "subjects", element: <SubjectsPage /> },
       { path: "subjects/:id", element: <SubjectPage /> },
       { path: "events/new", element: <NewEventPage /> },

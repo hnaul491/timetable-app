@@ -34,6 +34,7 @@ export const SHORTCUT_CATALOG: CatalogEntry[] = [
   { id: "go-calendar", keys: "g c", label: "shortcuts.goCalendar", group: "everywhere" },
   { id: "go-board", keys: "g b", label: "shortcuts.goBoard", group: "everywhere" },
   { id: "go-subjects", keys: "g s", label: "shortcuts.goSubjects", group: "everywhere" },
+  { id: "go-documents", keys: "g o", label: "shortcuts.goDocuments", group: "everywhere" },
   { id: "go-review", keys: "g r", label: "shortcuts.goReview", group: "everywhere" },
   { id: "go-assistant", keys: "g a", label: "shortcuts.goAssistant", group: "everywhere" },
   { id: "go-settings", keys: "g ,", label: "shortcuts.goSettings", group: "everywhere" },

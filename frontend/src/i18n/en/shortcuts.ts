@@ -12,6 +12,7 @@ export const shortcuts = {
   goCalendar: "Go to Calendar",
   goBoard: "Go to Board",
   goSubjects: "Go to Subjects",
+  goDocuments: "Go to Documents",
   goReview: "Go to Review",
   goAssistant: "Go to Assistant",
   goSettings: "Go to Settings",

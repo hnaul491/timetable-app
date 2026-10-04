@@ -81,6 +81,20 @@ describe("Layout shortcuts", () => {
     expect(screen.getByTestId("path")).toHaveTextContent("/board");
   });
 
+  it("g then o navigates to documents; the sidebar links it after Subjects but the phone bar does not", async () => {
+    const user = userEvent.setup();
+    setup();
+    const side = screen.getAllByRole("navigation", { name: "Main" }).find((n) => n.className.includes("md:flex"))!;
+    const labels = within(side).getAllByRole("link").map((a) => a.textContent);
+    expect(labels.findIndex((l) => l?.startsWith("Documents"))).toBe(labels.findIndex((l) => l?.startsWith("Subjects")) + 1);
+    expect(within(side).getByRole("link", { name: /Documents/ })).toHaveAttribute("href", "/documents");
+    expect(side.querySelector('[data-shortcut-hint="go-documents"]')).not.toBeNull();
+    const phone = screen.getAllByRole("navigation", { name: "Main" }).find((n) => n.className.includes("md:hidden"))!;
+    expect(within(phone).queryByRole("link", { name: "Documents" })).toBeNull();
+    await user.keyboard("go");
+    expect(screen.getByTestId("path")).toHaveTextContent("/documents");
+  });
+
   it("g then a navigates to the assistant", async () => {
     const user = userEvent.setup();
     setup();

@@ -40,7 +40,7 @@ const DETAIL = {
 } as unknown as SubjectDetail;
 
 let calls: [string, RequestInit | undefined][] = [];
-function setup(options: { googleError?: boolean; status?: Partial<GoogleStatus>; docs?: DocumentItem[]; eventId?: number; locale?: "en" | "vi" } = {}) {
+function setup(options: { googleError?: boolean; status?: Partial<GoogleStatus>; docs?: DocumentItem[]; eventId?: number; locale?: "en" | "vi"; folder?: string } = {}) {
   calls = [];
   apiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
     calls.push([path, init]);
@@ -48,6 +48,7 @@ function setup(options: { googleError?: boolean; status?: Partial<GoogleStatus>;
       if (options.googleError) throw new Error("google down");
       return { ...google, ...options.status };
     }
+    if (path === "/api/documents") return { documents: [], subjects: [{ id: 3, name: "DB", color: "#000000", hidden: false, folder_url: options.folder ?? null }], root_url: null, semester_url: null };
     if (path.endsWith("/documents")) return options.docs ?? DOCS;
     if (path === "/api/subjects/3") return DETAIL;
     return undefined;
@@ -72,6 +73,19 @@ describe("DocumentsSection", () => {
   beforeEach(() => {
     apiFetch.mockReset();
     uploadFile.mockReset();
+  });
+
+  it("links to the subject's Drive folder when it has one", async () => {
+    setup({ folder: "https://drive.google.com/drive/folders/F1" });
+    const link = await screen.findByRole("link", { name: "Open folder in Drive" });
+    expect(link).toHaveAttribute("href", "https://drive.google.com/drive/folders/F1");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("has no folder link without a folder or for a single class", async () => {
+    setup();
+    await screen.findByText("syllabus.pdf");
+    expect(screen.queryByRole("link", { name: "Open folder in Drive" })).not.toBeInTheDocument();
   });
 
   it("lists documents grouped by class and filters by tag", async () => {

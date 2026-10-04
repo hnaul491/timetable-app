@@ -20,6 +20,7 @@ const ACTIONS: { key: string; label: MessageKey; to?: string }[] = [
   { key: "calendar", label: "shortcuts.goCalendar", to: "/" },
   { key: "board", label: "shortcuts.goBoard", to: "/board" },
   { key: "subjects", label: "shortcuts.goSubjects", to: "/subjects" },
+  { key: "documents", label: "shortcuts.goDocuments", to: "/documents" },
   { key: "review", label: "shortcuts.goReview", to: "/review" },
   { key: "assistant", label: "shortcuts.goAssistant", to: "/assistant" },
   { key: "settings", label: "shortcuts.goSettings", to: "/settings" },

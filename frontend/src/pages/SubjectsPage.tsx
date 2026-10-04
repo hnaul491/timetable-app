@@ -26,7 +26,12 @@ export function SubjectsPage() {
     );
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold tracking-tight">{t("subjects.title")}</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="mr-auto text-2xl font-bold tracking-tight">{t("subjects.title")}</h1>
+        <Link to="/documents" className="text-sm font-semibold text-accent md:hidden">
+          {t("documents.page.allDocuments")}
+        </Link>
+      </div>
       {subjects.data.length === 0 && <p className="text-sm text-muted">{t("subjects.empty")}</p>}
       <div className="grid gap-3 md:grid-cols-2">
         {subjects.data.map((s) => (

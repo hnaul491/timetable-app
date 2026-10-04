@@ -19,10 +19,11 @@ const Icon = ({ children }: { children: ReactNode }) => (
   </svg>
 );
 
-const links: { to: string; label: MessageKey; keys: string; goId: string; goLabel: MessageKey; icon: ReactNode }[] = [
+const links: { to: string; label: MessageKey; keys: string; goId: string; goLabel: MessageKey; icon: ReactNode; phone?: false }[] = [
   { to: "/", label: "nav.calendar", keys: "g c", goId: "go-calendar", goLabel: "shortcuts.goCalendar", icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></Icon> },
   { to: "/board", label: "nav.board", keys: "g b", goId: "go-board", goLabel: "shortcuts.goBoard", icon: <Icon><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="4" height="13" rx="1" /></Icon> },
   { to: "/subjects", label: "nav.subjects", keys: "g s", goId: "go-subjects", goLabel: "shortcuts.goSubjects", icon: <Icon><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5z" /><path d="M4 19a2 2 0 0 1 2-2h13" /></Icon> },
+  { to: "/documents", label: "nav.documents", keys: "g o", goId: "go-documents", goLabel: "shortcuts.goDocuments", phone: false, icon: <Icon><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></Icon> },
   { to: "/review", label: "nav.review", keys: "g r", goId: "go-review", goLabel: "shortcuts.goReview", icon: <Icon><path d="M20 12a8 8 0 1 1-2.3-5.7" /><path d="M20 4v5h-5" /></Icon> },
   { to: "/assistant", label: "nav.assistant", keys: "g a", goId: "go-assistant", goLabel: "shortcuts.goAssistant", icon: <Icon><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z" /></Icon> },
   { to: "/settings", label: "nav.settings", keys: "g ,", goId: "go-settings", goLabel: "shortcuts.goSettings", icon: <Icon><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></Icon> },
@@ -64,6 +65,7 @@ export function Layout() {
   useShortcut("go-calendar", "g c", () => navigate("/"), { label: "shortcuts.goCalendar" });
   useShortcut("go-board", "g b", () => navigate("/board"), { label: "shortcuts.goBoard" });
   useShortcut("go-subjects", "g s", () => navigate("/subjects"), { label: "shortcuts.goSubjects" });
+  useShortcut("go-documents", "g o", () => navigate("/documents"), { label: "shortcuts.goDocuments" });
   useShortcut("go-review", "g r", () => navigate("/review"), { label: "shortcuts.goReview" });
   useShortcut("go-assistant", "g a", () => navigate("/assistant"), { label: "shortcuts.goAssistant" });
   useShortcut("go-settings", "g ,", () => navigate("/settings"), { label: "shortcuts.goSettings" });
@@ -163,7 +165,7 @@ export function Layout() {
       </main>
       {!fullScreen && (
       <nav aria-label={t("nav.main")} className="fixed inset-x-0 bottom-0 grid grid-cols-6 border-t border-line bg-surface px-2 pt-1.5 pb-3 md:hidden">
-        {links.map((l) => (
+        {links.filter((l) => l.phone !== false).map((l) => (
           <NavLink key={l.to} to={l.to} end={l.to === "/"} className={({ isActive }) => `flex h-12 items-center justify-center text-xs ${isActive ? "font-semibold text-accent-strong" : "text-ink-2"}`}>
             {t(l.label)}
           </NavLink>

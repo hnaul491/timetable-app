@@ -3,6 +3,7 @@ export const nav = {
   calendar: "Calendar",
   board: "Board",
   subjects: "Subjects",
+  documents: "Documents",
   review: "Review",
   assistant: "Assistant",
   settings: "Settings",
