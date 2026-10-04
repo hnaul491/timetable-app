@@ -30,6 +30,8 @@ class GoogleDrive(Protocol):
 
     def trash(self, file_id: str) -> None: ...
 
+    def rename(self, file_id: str, name: str) -> None: ...
+
 
 DriveFactory = Callable[[str], GoogleDrive]
 """Builds a client from a refresh token."""

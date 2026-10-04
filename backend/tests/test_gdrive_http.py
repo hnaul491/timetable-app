@@ -169,3 +169,11 @@ def test_5xx_is_recovered_the_same_way_and_other_failures_raise():
         drive(Google([httpx.Response(503), httpx.Response(500)])).upload_chunk(SESSION_URI, b"abc", 0, 6)
     with pytest.raises(GoogleNotFound):
         drive(Google([httpx.Response(404)])).upload_chunk(SESSION_URI, b"abc", 0, 6)
+
+
+def test_rename_patches_the_name():
+    google = Google([httpx.Response(200, json={})])
+    drive(google).rename("d1", "New name")
+    request = google.requests[1]
+    assert (request.method, request.url.path) == ("PATCH", "/drive/v3/files/d1")
+    assert json.loads(request.content) == {"name": "New name"}

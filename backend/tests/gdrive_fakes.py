@@ -68,6 +68,14 @@ class FakeDrive:
         self.contents[file_id] = state["data"]
         return done, total
 
+    def rename(self, file_id: str, name: str) -> None:
+        self._check("rename")
+        if file_id not in self.folders and file_id not in self.files:
+            raise GoogleNotFound("Google Drive returned 404")
+        if file_id in self.folders:
+            self.folders[file_id] = (name, self.folders[file_id][1])
+        self.calls.append(("rename", file_id))
+
     def trash(self, file_id: str) -> None:
         self._check("trash")
         if file_id not in self.files:

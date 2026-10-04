@@ -5,10 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth import require_user
+from app.config import Settings, get_settings
 from app.db import get_session
-from app.deps import get_now
+from app.deps import get_drive_factory, get_now
+from app.gdrive.api import DriveFactory
 from app.models import Subject, Task
 from app.schemas import MergeIn, SessionOut, SubjectDetailOut, SubjectPatch, SubjectSummaryOut
+from app.services.documents import rename_subject_folder
 from app.services.events_query import active_semester
 from app.services.subjects_query import (SubjectSummary, merge_subjects, note_snippets, subject_sessions,
                                          subject_summaries)
@@ -72,9 +75,11 @@ def get_subject(subject_id: int, session: Session = Depends(get_session),
 
 @router.patch("/subjects/{subject_id}", response_model=SubjectSummaryOut)
 def patch_subject(subject_id: int, body: SubjectPatch, session: Session = Depends(get_session),
-                  now: datetime = Depends(get_now)) -> SubjectSummaryOut:
+                  now: datetime = Depends(get_now), settings: Settings = Depends(get_settings),
+                  drive_factory: DriveFactory = Depends(get_drive_factory)) -> SubjectSummaryOut:
     subject = _subject(session, subject_id)
-    if body.display_name is not None and body.display_name != subject.display_name:
+    renamed = body.display_name is not None and body.display_name != subject.display_name
+    if renamed:
         new_key = body.display_name.casefold()
         others = session.scalars(select(Subject).where(
             Subject.semester_id == subject.semester_id, Subject.id != subject.id))
@@ -93,6 +98,8 @@ def patch_subject(subject_id: int, body: SubjectPatch, session: Session = Depend
     if body.hidden is not None:
         subject.hidden = body.hidden
     session.commit()
+    if renamed:
+        rename_subject_folder(session, settings, drive_factory, subject)
     return _summary_of(session, subject, now)
 
 

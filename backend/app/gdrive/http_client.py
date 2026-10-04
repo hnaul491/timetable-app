@@ -89,3 +89,6 @@ class HttpGoogleDrive:
 
     def trash(self, file_id: str) -> None:
         self._call("PATCH", _file_url(file_id), json={"trashed": True})
+
+    def rename(self, file_id: str, name: str) -> None:
+        self._call("PATCH", _file_url(file_id), json={"name": name})

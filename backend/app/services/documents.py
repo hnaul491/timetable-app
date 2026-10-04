@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timedelta
 
@@ -13,6 +14,8 @@ from app.models import AppSetting, Document, DocumentUpload, Event, GoogleAccoun
 from app.schemas import DocumentOut, UploadStartIn
 from app.secret_store import SecretStore
 from app.timeutil import iso_utc
+
+logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 4 * 1024 * 1024
 CHUNK_ALIGN = 256 * 1024  # Drive wants every chunk but the last to be a multiple of this
@@ -44,6 +47,27 @@ def open_drive(session: Session, settings: Settings, factory: DriveFactory) -> G
 
 def close_drive(drive: object) -> None:
     _close(drive)
+
+
+def rename_subject_folder(session: Session, settings: Settings, factory: DriveFactory, subject: Subject) -> None:
+    """Make the subject's Drive folder carry its current name. Best effort: never raises, logs the error type only."""
+    try:
+        if not subject.drive_folder_id:
+            return
+        account = session.get(GoogleAccount, ACCOUNT_ID)
+        if not drive_enabled(account):
+            return
+        token = SecretStore(session, settings.token_encryption_key).get(REFRESH_TOKEN_NAME)
+        if not token:
+            return
+        drive = factory(token)
+        try:
+            drive.rename(subject.drive_folder_id, subject.display_name)
+        finally:
+            close_drive(drive)
+    except Exception as exc:  # noqa: BLE001 - the rename is a courtesy; the PATCH already succeeded
+        logger.warning("Renaming the Drive folder failed (%s)", type(exc).__name__)
+        session.rollback()
 
 
 def event_for_subject(session: Session, event_id: int, subject_id: int) -> Event:

@@ -333,3 +333,50 @@ def test_empty_web_view_link_falls_back_to_the_drive_viewer(client, settings, se
     session.commit()
     listed = client.get(f"/api/subjects/{subject.id}/documents", headers=AUTH).json()
     assert listed[0]["web_view_link"] == "https://drive.google.com/file/d/file1/view"
+
+
+def folder_of(session, subject):
+    session.expire_all()
+    return session.get(Subject, subject.id).drive_folder_id
+
+
+def test_renaming_a_subject_renames_its_drive_folder(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    upload(client, subject)
+    folder = folder_of(session, subject)
+    assert drive.folders[folder][0] == "Relational Databases"
+    response = client.patch(f"/api/subjects/{subject.id}", headers=AUTH, json={"display_name": "Databases"})
+    assert response.status_code == 200
+    assert drive.folders[folder] == ("Databases", drive.folders[folder][1])
+    assert ("rename", folder) in drive.calls
+
+
+def test_rename_without_a_drive_folder_or_drive_touches_nothing(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)  # connected, but the subject has no folder yet
+    assert client.patch(f"/api/subjects/{subject.id}", headers=AUTH, json={"display_name": "Databases"}).status_code == 200
+    assert not [c for c in drive.calls if c[0] == "rename"]
+    configure(client, settings, drive, scopes=(CALENDAR_SCOPE,))  # no Drive scope
+    subject_row = session.get(Subject, subject.id)
+    subject_row.drive_folder_id = "folderX"
+    session.commit()
+    assert client.patch(f"/api/subjects/{subject.id}", headers=AUTH, json={"display_name": "DB"}).status_code == 200
+    assert not [c for c in drive.calls if c[0] == "rename"]
+
+
+def test_other_patches_do_not_rename_the_folder(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    upload(client, subject)
+    assert client.patch(f"/api/subjects/{subject.id}", headers=AUTH, json={"color": "#112233"}).status_code == 200
+    assert not [c for c in drive.calls if c[0] == "rename"]
+
+
+@pytest.mark.parametrize("error", [GoogleError("boom"), GoogleAuthError("revoked"), RuntimeError("odd")])
+def test_rename_failure_does_not_fail_the_patch(client, settings, session, subject, error):
+    drive = FakeDrive(fail={"rename": [error]})
+    configure(client, settings, drive)
+    upload(client, subject)
+    response = client.patch(f"/api/subjects/{subject.id}", headers=AUTH, json={"display_name": "Databases"})
+    assert response.status_code == 200 and response.json()["display_name"] == "Databases"
