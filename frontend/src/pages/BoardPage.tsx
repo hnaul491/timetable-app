@@ -28,18 +28,19 @@ export function BoardPage() {
   const [due, setDue] = useState("");
   // "/board?new=1" (quick-action menu) focuses the new-task input once, then drops the param.
   const [params, setParams] = useSearchParams();
-  const titleInput = useRef<HTMLInputElement>(null);
+  // a state ref so the effect re-runs once the input has actually mounted (it can appear after the tasks load)
+  const [titleInput, setTitleInput] = useState<HTMLInputElement | null>(null);
   const wantsNew = params.get("new") === "1";
   const ready = Boolean(tasks.data);
   useEffect(() => {
-    if (!wantsNew || !ready) return;
-    titleInput.current?.focus();
+    if (!wantsNew || !ready || !titleInput) return;
+    titleInput.focus();
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("new");
       return next;
     }, { replace: true });
-  }, [wantsNew, ready, setParams]);
+  }, [wantsNew, ready, titleInput, setParams]);
 
   const refresh = () => invalidateTaskViews(queryClient);
   const move = useMutation({
@@ -123,7 +124,7 @@ export function BoardPage() {
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2 rounded-2xl border border-line bg-surface p-3">
         <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-semibold text-muted">
           {t("board.newTask")}
-          <input ref={titleInput} className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} placeholder={t("board.newTaskPlaceholder")} />
+          <input ref={setTitleInput} className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} placeholder={t("board.newTaskPlaceholder")} />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
           {t("board.due")}
