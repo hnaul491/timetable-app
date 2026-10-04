@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -113,10 +113,17 @@ def test_run_sync_success_records_counts(session, semester):
         "DTSTART:20261019T110000Z", "DTEND:20261019T130000Z", "LOCATION:KB602", "END:VEVENT",
         "END:VCALENDAR", "",
     ])
-    run = run_sync(session, lambda sem: text, NOW)
+    run = run_sync(session, lambda sem: text, NOW, clock=lambda: NOW)
     assert (run.status, run.fetched, run.inserted, run.error) == ("ok", 1, 1, None)
     assert run.finished_at == NOW
     assert session.scalar(select(SyncRun)).id == run.id
+
+
+def test_run_sync_finished_at_is_the_real_end_time(session, semester):
+    end = NOW + timedelta(seconds=7)
+    run = run_sync(session, lambda sem: "", NOW, clock=lambda: end)
+    assert run.started_at == NOW
+    assert run.finished_at == end
 
 
 def test_run_sync_auth_failure(session, semester):

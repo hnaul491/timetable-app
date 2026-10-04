@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -93,7 +93,12 @@ def apply_feed(session: Session, semester: Semester, feed: ParsedFeed, now: date
     return result
 
 
-def run_sync(session: Session, fetch: Fetcher, now: datetime) -> SyncRun:
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def run_sync(session: Session, fetch: Fetcher, now: datetime,
+             clock: Callable[[], datetime] = _utcnow) -> SyncRun:
     run = SyncRun(started_at=now, status="running", fetched=0, inserted=0, updated=0,
                   cancelled=0, skipped=0)
     session.add(run)
@@ -123,6 +128,6 @@ def run_sync(session: Session, fetch: Fetcher, now: datetime) -> SyncRun:
                          "(guard: more than 30% would be cancelled)")
         else:
             run.status = "ok"
-    run.finished_at = now
+    run.finished_at = clock()
     session.commit()
     return run
