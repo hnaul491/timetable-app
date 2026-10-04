@@ -12,7 +12,7 @@ from app.gcal.push import _close
 from app.gdrive.api import DRIVE_SCOPE, DriveFactory, GoogleDrive
 from app.models import AppSetting, Document, DocumentUpload, Event, GoogleAccount, Semester, Subject
 from app.schemas import DocumentOut, UploadStartIn
-from app.secret_store import SecretStore
+from app.secret_store import SecretStore, decrypt_text, encrypt_text
 from app.timeutil import iso_utc
 
 logger = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ def forget_missing_folders(session: Session, drive: GoogleDrive, semester: Semes
 # --- uploads -----------------------------------------------------------------------------------
 
 def begin_upload(session: Session, drive: GoogleDrive, body: UploadStartIn, subject: Subject,
-                 now: datetime) -> DocumentUpload:
+                 now: datetime, key: str) -> DocumentUpload:
     semester = session.get(Semester, subject.semester_id)
     if semester is None:
         raise HTTPException(status_code=404, detail="semester not found")
@@ -150,7 +150,7 @@ def begin_upload(session: Session, drive: GoogleDrive, body: UploadStartIn, subj
         forget_missing_folders(session, drive, semester, subject)
         folder = ensure_folders(session, drive, semester, subject)
         uri = drive.start_upload(body.name, body.mime_type, body.size, folder)
-    upload = DocumentUpload(id=str(uuid.uuid4()), session_uri=uri, subject_id=subject.id, event_id=body.event_id,
+    upload = DocumentUpload(id=str(uuid.uuid4()), session_uri=encrypt_text(key, uri), subject_id=subject.id, event_id=body.event_id,
                             tag=body.tag, name=body.name, mime_type=body.mime_type, size=body.size, received=0,
                             created_at=now)
     session.add(upload)
@@ -175,10 +175,15 @@ def check_chunk(upload: DocumentUpload, data: bytes, offset: int) -> None:
 
 
 def send_chunk(session: Session, drive: GoogleDrive, upload: DocumentUpload, data: bytes, offset: int,
-               now: datetime) -> Document | None:
+               now: datetime, key: str) -> Document | None:
     """Forward one chunk; returns the new Document when it was the last one."""
+    uri = decrypt_text(key, upload.session_uri)
+    if uri is None:  # a plain-text row from before the URI was encrypted: treat it as expired
+        session.delete(upload)
+        session.commit()
+        raise HTTPException(status_code=404, detail="upload not found")
     try:
-        done, kept = drive.upload_chunk(upload.session_uri, data, offset, upload.size)
+        done, kept = drive.upload_chunk(uri, data, offset, upload.size)
     except GoogleNotFound:  # the Drive session expired: this upload cannot continue
         session.delete(upload)
         session.commit()

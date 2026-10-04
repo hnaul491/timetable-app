@@ -380,3 +380,24 @@ def test_rename_failure_does_not_fail_the_patch(client, settings, session, subje
     upload(client, subject)
     response = client.patch(f"/api/subjects/{subject.id}", headers=AUTH, json={"display_name": "Databases"})
     assert response.status_code == 200 and response.json()["display_name"] == "Databases"
+
+
+def test_session_uri_is_encrypted_at_rest(client, settings, session, subject):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    started = start(client, subject, 10)
+    stored = session.get(DocumentUpload, started.json()["upload_id"]).session_uri
+    assert stored not in drive.sessions and "upload.example" not in stored
+    done = put(client, started.json()["upload_id"], b"0123456789", 0)
+    assert done.status_code == 200 and done.json()["document"] is not None
+
+
+def test_plaintext_session_uri_is_treated_as_expired(client, settings, session, subject):
+    configure(client, settings, FakeDrive())
+    session.add(DocumentUpload(id="legacy", session_uri="https://upload.example/legacy", subject_id=subject.id,
+                               event_id=None, tag="other", name="x", mime_type="text/plain", size=1, received=0,
+                               created_at=NOW))
+    session.commit()
+    assert put(client, "legacy", b"a", 0).status_code == 404
+    session.expire_all()
+    assert session.get(DocumentUpload, "legacy") is None

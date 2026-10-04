@@ -57,7 +57,7 @@ def start_upload(body: UploadStartIn, session: Session = Depends(get_session),
         docs.event_for_subject(session, body.event_id, subject.id)
     drive = docs.open_drive(session, settings, factory)
     try:
-        upload = docs.begin_upload(session, drive, body, subject, now)
+        upload = docs.begin_upload(session, drive, body, subject, now, settings.token_encryption_key)
     except GoogleError as exc:
         session.rollback()
         raise docs.google_error(exc) from None
@@ -77,7 +77,7 @@ def upload_chunk(upload_id: str, offset: int = Query(ge=0), data: Annotated[byte
     docs.check_chunk(upload, data, offset)
     drive = docs.open_drive(session, settings, factory)
     try:
-        document = docs.send_chunk(session, drive, upload, data, offset, now)
+        document = docs.send_chunk(session, drive, upload, data, offset, now, settings.token_encryption_key)
     except GoogleError as exc:
         session.rollback()
         raise docs.google_error(exc) from None

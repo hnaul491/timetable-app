@@ -33,6 +33,23 @@ class SecretStore:
             return None
 
 
+def encrypt_text(encryption_key: str, value: str) -> str:
+    """A Fernet token for `value`, for columns that must not hold the plain text."""
+    if not encryption_key:
+        raise ValueError("TOKEN_ENCRYPTION_KEY is not set")
+    return Fernet(encryption_key.encode()).encrypt(value.encode()).decode()
+
+
+def decrypt_text(encryption_key: str, token: str) -> str | None:
+    """The text inside a token made by `encrypt_text`; None when it is not one (e.g. a legacy plain value)."""
+    if not encryption_key:
+        raise ValueError("TOKEN_ENCRYPTION_KEY is not set")
+    try:
+        return Fernet(encryption_key.encode()).decrypt(token.encode()).decode()
+    except InvalidToken:
+        return None
+
+
 def get_zeus_key(session: Session, settings: Settings) -> str | None:
     if settings.token_encryption_key:
         stored = SecretStore(session, settings.token_encryption_key).get(ZEUS_KEY_NAME)
