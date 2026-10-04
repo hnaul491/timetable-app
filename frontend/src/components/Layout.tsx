@@ -48,6 +48,7 @@ export function Layout() {
   useShortcut("go-review", "g r", () => navigate("/review"), { label: "shortcuts.goReview" });
   useShortcut("go-assistant", "g a", () => navigate("/assistant"), { label: "shortcuts.goAssistant" });
   useShortcut("go-settings", "g ,", () => navigate("/settings"), { label: "shortcuts.goSettings" });
+  useShortcut("go-free-time", "g f", () => navigate("/free-time"), { label: "shortcuts.goFreeTime" });
   const collapsed = sidebarCollapsed;
   const queryClient = useQueryClient();
   const switchSemester = useMutation({

@@ -17,6 +17,7 @@ import { AssistantPage } from "./pages/AssistantPage";
 import { BoardPage } from "./pages/BoardPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
+import { FreeTimePage } from "./pages/FreeTimePage";
 import { NewEventPage } from "./pages/NewEventPage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -52,6 +53,7 @@ const createRouter = () => createBrowserRouter([
       { path: "settings", element: <SettingsPage /> },
       { path: "assistant", element: <AssistantPage /> },
       { path: "review", element: <ReviewPage /> },
+      { path: "free-time", element: <FreeTimePage /> },
       { path: "subjects", element: <SubjectsPage /> },
       { path: "subjects/:id", element: <SubjectPage /> },
       { path: "events/new", element: <NewEventPage /> },

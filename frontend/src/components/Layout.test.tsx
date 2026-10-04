@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,6 +86,15 @@ describe("Layout shortcuts", () => {
     setup();
     await user.keyboard("ga");
     expect(screen.getByTestId("path")).toHaveTextContent("/assistant");
+  });
+
+  it("g then f navigates to free time and the help lists it", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.keyboard("?");
+    expect(within(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).getByText("Go to Free time")).toBeInTheDocument();
+    await user.keyboard("{Escape}gf");
+    expect(screen.getByTestId("path")).toHaveTextContent("/free-time");
   });
 
   it("? opens the shortcuts dialog", async () => {

@@ -7,6 +7,7 @@ import { common } from "./common";
 import { documents } from "./documents";
 import { errors } from "./errors";
 import { event } from "./event";
+import { freeTime } from "./freeTime";
 import { google } from "./google";
 import { nav } from "./nav";
 import { review } from "./review";
@@ -16,4 +17,4 @@ import { shortcuts } from "./shortcuts";
 import { subjects } from "./subjects";
 import { ui } from "./ui";
 
-export const vi: Messages = { ai, backup, common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts, search };
+export const vi: Messages = { ai, backup, common, documents, errors, nav, calendar, event, board, subjects, review, settings, google, ui, shortcuts, search, freeTime };
