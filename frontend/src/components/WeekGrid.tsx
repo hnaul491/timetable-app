@@ -80,7 +80,7 @@ export function WeekGrid({ days, events, hourHeight = 52, onSelect }: Props) {
             className="relative border-l border-subtle"
             style={{
               height,
-              backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, #EEF0F3 ${hourHeight - 1}px, #EEF0F3 ${hourHeight}px)`,
+              backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, var(--tt-subtle) ${hourHeight - 1}px, #EEF0F3 ${hourHeight}px)`,
             }}
           >
             {layoutDay(byDay.get(date) ?? []).map(({ item, column, columns: count }) => (
