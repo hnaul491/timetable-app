@@ -29,6 +29,8 @@ FAR_FUTURE = datetime(2100, 1, 1)
 FAR_PAST = datetime(2000, 1, 1)
 LEASE = timedelta(minutes=2)
 SAME_ERROR_LIMIT = 3
+SWEEP_EVERY = timedelta(hours=24)
+SWEEP_MIN_LEFT_S = 5.0
 CALENDAR_GONE = 'The "My Timetable" calendar is gone from Google; it will be recreated on the next push.'
 
 
@@ -333,6 +335,8 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
     else:
         if result.remaining or result.failed:
             result.status = "partial"
+        else:
+            _sweep_orphans(session, account, gcal, now, deadline, clock)
     finally:
         if workers is not None:
             workers.close()
@@ -340,6 +344,34 @@ def push(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: da
     account.last_push_error = result.error
     session.commit()
     return result
+
+
+def _sweep_orphans(session: Session, account: GoogleAccount, gcal: GoogleCalendar, now: datetime, deadline: float,
+                   clock: Callable[[], float]) -> None:
+    """Delete Google events in the app's calendar that no timetable row (or tombstone) points at.
+
+    Runs after a complete push, at most once per 24 h. Best effort: Google errors never fail the push; an
+    interrupted sweep is not recorded as done, so it continues on the next push.
+    """
+    if account.calendar_id is None or deadline - clock() < SWEEP_MIN_LEFT_S:
+        return
+    if account.last_sweep_at is not None and now - account.last_sweep_at < SWEEP_EVERY:
+        return
+    try:
+        listed = gcal.list_app_event_ids(account.calendar_id)
+        known = set(session.scalars(select(Event.gcal_event_id).where(Event.gcal_event_id.is_not(None))))
+        known.update(session.scalars(select(GcalTombstone.gcal_event_id)))
+        for gcal_event_id, _marker in listed:
+            if gcal_event_id in known:
+                continue
+            if deadline - clock() < SWEEP_MIN_LEFT_S:
+                return
+            _delete_quietly(gcal, account.calendar_id, gcal_event_id)
+        account.last_sweep_at = now
+    except GoogleAuthError:
+        account.needs_reconnect = True
+    except GoogleError as exc:
+        logger.warning("Orphan sweep failed (%s)", type(exc).__name__)
 
 
 def _close(gcal: object) -> None:

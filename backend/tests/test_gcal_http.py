@@ -155,3 +155,19 @@ def test_revoke_posts_the_token_and_ignores_errors():
         raise httpx.ConnectTimeout("x")
 
     HttpGoogleCalendar("cid", "s", "1//refresh", http=httpx.Client(transport=httpx.MockTransport(boom))).revoke()
+
+
+def test_list_app_event_ids_pages_and_reads_the_marker():
+    google = Google(api=[
+        httpx.Response(200, json={"items": [
+            {"id": "a", "extendedProperties": {"private": {"timetableEventId": "7"}}}, {"id": "b"}],
+            "nextPageToken": "next"}),
+        httpx.Response(200, json={"items": [{"id": "c", "extendedProperties": {"private": {"other": "x"}}}]}),
+    ])
+    assert client(google).list_app_event_ids("cal@x") == [("a", "7"), ("b", None), ("c", None)]
+    first, second = google.requests[1:]
+    assert first.method == "GET" and str(first.url).startswith(f"{API}/calendars/cal%40x/events?")
+    params = dict(first.url.params)
+    assert params["maxResults"] == "2500" and params["showDeleted"] == "false"
+    assert params["fields"] == "items(id,extendedProperties/private/timetableEventId),nextPageToken"
+    assert "pageToken" not in params and dict(second.url.params)["pageToken"] == "next"

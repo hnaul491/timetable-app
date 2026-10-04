@@ -34,6 +34,10 @@ class GoogleCalendar(Protocol):
 
     def delete_event(self, calendar_id: str, event_id: str) -> None: ...
 
+    def list_app_event_ids(self, calendar_id: str) -> list[tuple[str, str | None]]:
+        """(Google event id, timetableEventId marker or None) of every event in the app's own calendar."""
+        ...
+
 
 GcalFactory = Callable[[str], GoogleCalendar]
 """Builds a client from a refresh token."""

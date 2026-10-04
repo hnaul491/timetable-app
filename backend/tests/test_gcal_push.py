@@ -496,3 +496,65 @@ def test_unrecorded_google_success_is_logged(session, world, monkeypatch, caplog
     with caplog.at_level(logging.WARNING, logger="app.gcal.push"):
         run(session, account, FakeCalendar())
     assert "Google event created but not recorded (row changed); it may be duplicated on the next push" in caplog.text
+
+
+def orphan(fake, event_id, timetable_id="999"):
+    props = {} if timetable_id is None else {"extendedProperties": {"private": {"timetableEventId": timetable_id}}}
+    fake.events[event_id] = {"summary": "old copy", **props}
+
+
+def test_sweep_removes_orphans_and_keeps_tracked_events(session, world):
+    events, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    tracked = {e.gcal_event_id for e in events.values() if e.gcal_event_id}
+    orphan(fake, "dup1", str(events["class"].id))
+    orphan(fake, "dup2", None)
+    account.last_sweep_at = None
+    session.commit()
+    result = run(session, account, fake)
+    assert (result.status, result.failed, result.remaining) == ("ok", 0, 0)
+    assert set(fake.events) == tracked
+    assert account.last_sweep_at == NOW
+
+
+def test_sweep_runs_at_most_once_a_day(session, world):
+    _, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    orphan(fake, "dup1")
+    account.last_sweep_at = NOW - timedelta(hours=23)
+    session.commit()
+    run(session, account, fake)
+    assert "dup1" in fake.events and account.last_sweep_at == NOW - timedelta(hours=23)
+    account.last_sweep_at = NOW - timedelta(hours=25)
+    session.commit()
+    run(session, account, fake)
+    assert "dup1" not in fake.events and account.last_sweep_at == NOW
+
+
+def test_sweep_waits_for_a_push_without_failures(session, world):
+    events, account = world
+    fake = FakeCalendar(fail={"insert_event": [GoogleError("boom")]})
+    result = run(session, account, fake)
+    assert result.failed == 1
+    orphan(fake, "dup1")
+    assert "dup1" in fake.events and account.last_sweep_at is None
+
+
+def test_sweep_stops_when_the_budget_is_nearly_spent(session, world):
+    _, account = world
+    fake = FakeCalendar()
+    run(session, account, fake)
+    orphan(fake, "dup1")
+    account.last_sweep_at = None
+    session.commit()
+    run(session, account, fake, deadline=100.0, clock=lambda: 96.0)  # less than 5 s left
+    assert "dup1" in fake.events and account.last_sweep_at is None
+
+
+def test_sweep_errors_do_not_fail_the_push(session, world):
+    _, account = world
+    fake = FakeCalendar(fail={"list_app_event_ids": [GoogleError("boom")]})
+    result = run(session, account, fake)
+    assert result.status == "ok" and account.last_sweep_at is None

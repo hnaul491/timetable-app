@@ -209,6 +209,7 @@ def test_reconnect_after_disconnect_reuses_the_calendar(client, settings, sessio
     assert [c for c in fake.calls if c[0] == "create_calendar"] == [("create_calendar", "cal1")]
     result = client.post("/api/google/push", headers=AUTH).json()
     assert (result["status"], result["done"]) == ("ok", 2)
+    assert len(fake.events) == 2  # the sweep removed the copies from before the disconnect
 
 
 def test_reconnect_with_a_gone_calendar_recreates_it(client, settings, session, semester):

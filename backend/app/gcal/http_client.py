@@ -179,3 +179,21 @@ class HttpGoogleCalendar:
 
     def delete_event(self, calendar_id: str, event_id: str) -> None:
         self._request("DELETE", f"/calendars/{_q(calendar_id)}/events/{_q(event_id)}")
+
+    def list_app_event_ids(self, calendar_id: str) -> list[tuple[str, str | None]]:
+        found: list[tuple[str, str | None]] = []
+        params = {"fields": "items(id,extendedProperties/private/timetableEventId),nextPageToken",
+                  "showDeleted": "false", "maxResults": "2500"}
+        for _ in range(100):  # bounded: a calendar this size never needs more pages
+            data = _json(self._session.request("GET", f"{API}/calendars/{_q(calendar_id)}/events", params=params))
+            for item in data.get("items") or []:
+                if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+                    continue
+                props = (item.get("extendedProperties") or {}).get("private") or {}
+                marker = props.get("timetableEventId") if isinstance(props, dict) else None
+                found.append((item["id"], marker if isinstance(marker, str) else None))
+            token = data.get("nextPageToken")
+            if not isinstance(token, str) or not token:
+                break
+            params = {**params, "pageToken": token}
+        return found

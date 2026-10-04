@@ -61,6 +61,14 @@ class FakeCalendar:
             self.events[event_id] = body
             self.calls.append(("update_event", event_id))
 
+    def list_app_event_ids(self, calendar_id: str) -> list[tuple[str, str | None]]:
+        self._check("list_app_event_ids")
+        with self._lock:
+            if calendar_id not in self.calendars:
+                raise GoogleNotFound("Google Calendar returned 404")
+            return [(event_id, body.get("extendedProperties", {}).get("private", {}).get("timetableEventId"))
+                    for event_id, body in self.events.items()]
+
     def delete_event(self, calendar_id: str, event_id: str) -> None:
         self._check("delete_event")
         with self._lock:

@@ -151,6 +151,7 @@ class GoogleAccount(Base):
     last_push_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     push_lock_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     scopes: Mapped[str] = mapped_column(Text, default="", server_default="")
+    last_sweep_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class GcalTombstone(Base):
