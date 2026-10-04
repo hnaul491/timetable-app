@@ -34,6 +34,6 @@ def test_postgres_migration_enables_rls_on_every_table():
     command.upgrade(cfg, "head", sql=True)
     sql = buf.getvalue()
     for table in ["semester", "subject", "my_section", "event", "sync_run", "app_secret",
-                  "recurring_rule", "note", "task", "week_review", "google_account", "gcal_tombstone",
+                  "recurring_rule", "note", "task", "week_review", "google_account", "gcal_tombstone", "app_setting",
                   "alembic_version"]:
         assert f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" in sql

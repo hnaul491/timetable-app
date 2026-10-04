@@ -297,3 +297,10 @@ class PushResultOut(BaseModel):
     failed: int
     remaining: int
     error: str | None
+
+
+Language = Literal["en", "vi"]
+
+
+class Preferences(BaseModel):
+    language: Language | None = None

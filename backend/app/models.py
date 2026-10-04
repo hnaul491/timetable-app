@@ -154,3 +154,10 @@ class GcalTombstone(Base):
 
     gcal_event_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class AppSetting(Base):
+    __tablename__ = "app_setting"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[object] = mapped_column(JSON)
