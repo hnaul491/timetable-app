@@ -85,7 +85,7 @@ export function Layout() {
               end={l.to === "/"}
               aria-label={collapsed ? t(l.label) : undefined}
               title={collapsed ? t(l.label) : undefined}
-              className={(s) => `${navClass(s)} gap-3 ${collapsed ? "justify-center px-0" : ""}`}
+              className={(s) => `${navClass(s)} gap-3 ${collapsed ? "justify-center px-0!" : ""}`}
             >
               {l.icon}
               {!collapsed && t(l.label)}
