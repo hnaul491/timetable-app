@@ -412,3 +412,46 @@ class ChatReply(BaseModel):
 class ActionResult(BaseModel):
     status: str
     result: dict | None = None
+
+
+class SearchEvent(BaseModel):
+    id: int
+    title: str
+    start: str
+    end: str
+    room: str | None = None
+    cancelled: bool = False
+
+
+class SearchSubject(BaseModel):
+    id: int
+    name: str
+
+
+class SearchNote(BaseModel):
+    event_id: int
+    event_title: str
+    snippet: str
+
+
+class SearchTask(BaseModel):
+    id: int
+    title: str
+    done: bool
+    due: date | None = None
+    event_id: int | None = None
+
+
+class SearchDocument(BaseModel):
+    id: int
+    name: str
+    subject_id: int
+    web_view_link: str | None = None
+
+
+class SearchResponse(BaseModel):
+    events: list[SearchEvent]
+    subjects: list[SearchSubject]
+    notes: list[SearchNote]
+    tasks: list[SearchTask]
+    documents: list[SearchDocument]
