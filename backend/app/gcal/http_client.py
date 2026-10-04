@@ -7,6 +7,7 @@ from app.gcal.api import GoogleAuthError, GoogleError, GoogleNotFound, GoogleRat
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 API = "https://www.googleapis.com/calendar/v3"
 RATE_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"}
 
@@ -17,6 +18,7 @@ def _q(value: str) -> str:
 
 UNREACHABLE = "Could not reach Google"
 UNEXPECTED = "Google sent an unexpected response"
+CALENDAR = "Google Calendar"
 
 
 def _json(response: httpx.Response) -> dict[str, Any]:
@@ -43,7 +45,13 @@ def _scope_missing(response: httpx.Response) -> bool:
         isinstance(d, dict) and d.get("reason") == "ACCESS_TOKEN_SCOPE_INSUFFICIENT" for d in details)
 
 
-class HttpGoogleCalendar:
+class GoogleSession:
+    """One Google login (refresh token -> access token) shared by the Calendar and Drive clients.
+
+    Error texts are fixed or built from status codes and Google's error reason only: they never
+    contain a token, a secret or a URL.
+    """
+
     def __init__(self, client_id: str, client_secret: str, refresh_token: str,
                  http: httpx.Client | None = None) -> None:
         self._client_id = client_id
@@ -85,31 +93,68 @@ class HttpGoogleCalendar:
             self._access_token = token
         return self._access_token
 
-    def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> httpx.Response:
-        response = self._send(method, path, body)
-        if response.status_code == 401:
+    def granted_scopes(self) -> set[str]:
+        """The scopes Google granted to the current access token."""
+        try:
+            response = self._http.get(TOKENINFO_URL, params={"access_token": self._token()})
+        except httpx.HTTPError:
+            raise GoogleError(UNREACHABLE) from None
+        if response.status_code != 200:
+            raise GoogleError(f"Google token check returned {response.status_code}")
+        scope = _json(response).get("scope")
+        if not isinstance(scope, str):
+            raise GoogleError(UNEXPECTED)
+        return set(scope.split())
+
+    def request(self, method: str, url: str, *, json: Any = None, content: bytes | None = None,
+                headers: dict[str, str] | None = None, params: dict[str, str] | None = None,
+                expect: tuple[int, ...] = (200,), service: str = CALENDAR,
+                bearer: bool = True) -> httpx.Response:
+        """Send a request as the user. Statuses below 400 and those in `expect` are returned as they are."""
+        response = self._send(method, url, json, content, headers, params, bearer)
+        if response.status_code == 401 and bearer:
             self._access_token = None  # expired access token: refresh once and retry
-            response = self._send(method, path, body)
+            response = self._send(method, url, json, content, headers, params, bearer)
         status = response.status_code
-        if status < 400:
+        if status < 400 or status in expect:
             return response
         reason = _reason(response)
         if status == 401:
             raise GoogleAuthError("Google access was revoked or expired — reconnect Google in Settings")
         if status in (404, 410):
-            raise GoogleNotFound(f"Google Calendar returned {status}")
+            raise GoogleNotFound(f"{service} returned {status}")
         if status == 403 and (reason == "insufficientPermissions" or _scope_missing(response)):
-            raise GoogleAuthError("Google Calendar permission is missing — reconnect Google in Settings")
+            raise GoogleAuthError(f"{service} permission is missing — reconnect Google in Settings")
         if status == 429 or (status == 403 and reason in RATE_REASONS):
-            raise GoogleRateLimited("Google rate limit reached; the rest is sent on the next push")
-        raise GoogleError(f"Google Calendar returned {status} ({reason or 'no reason'})")
+            raise GoogleRateLimited(
+                "Google rate limit reached; the rest is sent on the next push" if service == CALENDAR
+                else "Google rate limit reached; try again in a moment")
+        raise GoogleError(f"{service} returned {status} ({reason or 'no reason'})")
 
-    def _send(self, method: str, path: str, body: dict[str, Any] | None) -> httpx.Response:
-        headers = {"Authorization": f"Bearer {self._token()}"}
+    def _send(self, method: str, url: str, json: Any, content: bytes | None, headers: dict[str, str] | None,
+              params: dict[str, str] | None, bearer: bool) -> httpx.Response:
+        sent = dict(headers or {})
+        if bearer:
+            sent["Authorization"] = f"Bearer {self._token()}"
         try:
-            return self._http.request(method, API + path, json=body, headers=headers)
+            return self._http.request(method, url, json=json, content=content, headers=sent, params=params)
         except httpx.HTTPError:
             raise GoogleError(UNREACHABLE) from None
+
+
+class HttpGoogleCalendar:
+    def __init__(self, client_id: str, client_secret: str, refresh_token: str,
+                 http: httpx.Client | None = None, session: GoogleSession | None = None) -> None:
+        self._session = session or GoogleSession(client_id, client_secret, refresh_token, http)
+
+    def close(self) -> None:
+        self._session.close()
+
+    def revoke(self) -> None:
+        self._session.revoke()
+
+    def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> httpx.Response:
+        return self._session.request(method, API + path, json=body)
 
     @staticmethod
     def _id(response: httpx.Response) -> str:
