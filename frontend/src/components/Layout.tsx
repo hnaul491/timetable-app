@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { NavLink, Outlet, useNavigate, useSearchParams } from "react-router";
 import { useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { useChrome } from "../lib/chrome";
+import { OpenSearchContext } from "../lib/searchContext";
 import { useShortcut } from "../lib/shortcuts";
+import { QuickActions } from "./QuickActions";
 import { SearchPalette } from "./SearchPalette";
 import { ShortcutHelp } from "./ShortcutHelp";
 import type { Semester } from "../types";
@@ -33,6 +35,18 @@ export function Layout() {
   const { sidebarCollapsed, toggleSidebar, fullScreen, setFullScreen } = useChrome();
   const [helpOpen, setHelpOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Home-screen shortcut "/?search=1": open the palette once and drop the param.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const searchParam = urlParams.get("search");
+  useEffect(() => {
+    if (searchParam !== "1") return;
+    setSearchOpen(true);
+    setUrlParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("search");
+      return next;
+    }, { replace: true });
+  }, [searchParam, setUrlParams]);
   // Ctrl/Cmd+K toggles the palette, but never opens it on top of another dialog.
   useShortcut("search", "Mod+k", () => {
     if (searchOpen) setSearchOpen(false);
@@ -58,6 +72,7 @@ export function Layout() {
   const semesters = useQuery({ queryKey: ["semesters"], queryFn: () => apiFetch<Semester[]>("/api/semesters") });
   const active = semesters.data?.find((s) => s.is_active);
   return (
+    <OpenSearchContext.Provider value={() => setSearchOpen(true)}>
     <div className="min-h-screen md:flex">
       {!fullScreen && (
       <nav aria-label={t("nav.main")} className={`sticky top-0 hidden h-screen self-start shrink-0 flex-col gap-5 overflow-y-auto border-r border-line bg-surface py-5 md:flex ${collapsed ? "w-16 px-2" : "w-60 px-4"}`}>
@@ -135,6 +150,7 @@ export function Layout() {
           <Icon><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></Icon>
         </button>
       )}
+      {!fullScreen && <QuickActions />}
       <main className="min-w-0 flex-1 px-4 pt-16 md:pt-5 pb-24 md:px-7 md:pb-8">
         <Outlet />
       </main>
@@ -148,5 +164,6 @@ export function Layout() {
       </nav>
       )}
     </div>
+    </OpenSearchContext.Provider>
   );
 }

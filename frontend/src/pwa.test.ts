@@ -21,6 +21,18 @@ describe("installable app", () => {
     ]);
   });
 
+  it("declares the four home-screen shortcuts with existing 96px icons", () => {
+    const manifest = JSON.parse(read("public/manifest.webmanifest").toString());
+    expect(manifest.shortcuts.map((s: { url: string }) => s.url)).toEqual(["/events/new", "/free-time", "/assistant", "/?search=1"]);
+    for (const s of manifest.shortcuts) {
+      expect(s.name).toBeTruthy();
+      expect(s.short_name).toBeTruthy();
+      expect(s.icons).toHaveLength(1);
+      expect(s.icons[0]).toMatchObject({ sizes: "96x96", type: "image/png" });
+      expect(pngSize(read("public" + s.icons[0].src))).toEqual([96, 96]);
+    }
+  });
+
   it("ships real PNG icons of the right sizes", () => {
     expect(pngSize(read("public/icons/icon-192.png"))).toEqual([192, 192]);
     expect(pngSize(read("public/icons/icon-512.png"))).toEqual([512, 512]);

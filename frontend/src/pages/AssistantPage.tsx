@@ -94,6 +94,19 @@ export function AssistantPage() {
         : null;
   const quick = eventId !== null ? QUICK_EVENT : subjectId !== null ? QUICK_SUBJECT : QUICK;
   const clearContext = () => setParams({}, { replace: true });
+  // "/assistant?compose=1" (quick-action menu) focuses the composer once, then drops the param.
+  const [composer, setComposer] = useState<HTMLTextAreaElement | null>(null);
+  const wantsCompose = params.get("compose") === "1";
+  useEffect(() => {
+    if (!wantsCompose) return;
+    if (!composer) return; // the composer mounts once the page has loaded
+    composer.focus();
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("compose");
+      return next;
+    }, { replace: true });
+  }, [wantsCompose, composer, setParams]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState<string | null>(null);
   const [hidePrivacy, setHidePrivacy] = useState(privacyDismissed);
@@ -405,6 +418,7 @@ export function AssistantPage() {
             className="flex items-end gap-2"
           >
             <textarea
+              ref={setComposer}
               aria-label={t("ai.composer")}
               value={text}
               onChange={(e) => setText(e.target.value)}

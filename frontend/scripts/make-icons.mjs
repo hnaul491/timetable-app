@@ -19,7 +19,14 @@ function chunk(type, data) {
   crc.writeUInt32BE(crc32(body));
   return Buffer.concat([len, body, crc]);
 }
-function png(size) {
+// Plain white shapes (unit square coordinates) for the 96px home-screen shortcut icons.
+const SHAPES = {
+  plus: (u, v) => (Math.abs(u - 0.5) < 0.07 && Math.abs(v - 0.5) < 0.25) || (Math.abs(v - 0.5) < 0.07 && Math.abs(u - 0.5) < 0.25),
+  clock: (u, v) => { const d = Math.hypot(u - 0.5, v - 0.5); return (d < 0.3 && d > 0.22) || (Math.abs(u - 0.5) < 0.04 && v > 0.32 && v < 0.5) || (Math.abs(v - 0.5) < 0.04 && u > 0.5 && u < 0.64); },
+  spark: (u, v) => Math.abs(u - 0.5) + Math.abs(v - 0.5) < 0.28 && Math.abs(u - 0.5) * Math.abs(v - 0.5) < 0.012,
+  search: (u, v) => { const d = Math.hypot(u - 0.45, v - 0.45); return (d < 0.22 && d > 0.15) || (Math.abs(u - v) < 0.05 && u > 0.6 && u < 0.76); },
+};
+function png(size, shape) {
   const stride = size * 3 + 1;
   const raw = Buffer.alloc(stride * size);
   const bar = Math.round(size * 0.13);
@@ -33,7 +40,8 @@ function png(size) {
     for (let x = 0; x < size; x++) {
       const crossbar = y >= top && y < top + bar && x >= left && x < right;
       const stem = x >= mid - bar / 2 && x < mid + bar / 2 && y >= top && y < bottom;
-      const [r, g, b] = crossbar || stem ? [255, 255, 255] : [0x2e, 0x55, 0xe6];
+      const on = shape ? SHAPES[shape]((x + 0.5) / size, (y + 0.5) / size) : crossbar || stem;
+      const [r, g, b] = on ? [255, 255, 255] : [0x2e, 0x55, 0xe6];
       const o = y * stride + 1 + x * 3;
       raw[o] = r;
       raw[o + 1] = g;
@@ -56,5 +64,8 @@ function png(size) {
 mkdirSync("public/icons", { recursive: true });
 for (const [name, size] of [["icon-192.png", 192], ["icon-512.png", 512], ["apple-touch-icon.png", 180]]) {
   writeFileSync(`public/icons/${name}`, png(size));
+}
+for (const [name, shape] of [["shortcut-event.png", "plus"], ["shortcut-free-time.png", "clock"], ["shortcut-assistant.png", "spark"], ["shortcut-search.png", "search"]]) {
+  writeFileSync(`public/icons/${name}`, png(96, shape));
 }
 console.log("icons written to public/icons");
