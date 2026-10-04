@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { useLocale, useT, type MessageKey } from "../i18n";
 import { INTL_LOCALE } from "../i18n/locale";
 import { apiFetch } from "../lib/api";
-import { applyTheme, storeTheme } from "../lib/theme";
+import { setTheme } from "../lib/theme";
 import { parisParts, formatLongDate, TZ } from "../lib/time";
 import type { SearchResults } from "../types";
 import { Dialog } from "./ui/Dialog";
@@ -84,9 +84,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
   const toggleTheme = () => {
     onClose();
     const dark = document.documentElement.dataset.theme === "dark";
-    const next = dark ? "light" : "dark";
-    storeTheme(next);
-    applyTheme(next);
+    setTheme(dark ? "light" : "dark");
   };
 
   const items = useMemo<Item[]>(() => {

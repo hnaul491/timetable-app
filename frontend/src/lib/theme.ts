@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 export type ThemeChoice = "system" | "light" | "dark";
 export const THEME_KEY = "timetable:theme";
@@ -13,12 +13,30 @@ export function readTheme(): ThemeChoice {
   }
 }
 
+const THEME_EVENT = "timetable:theme-change";
+
 export function storeTheme(choice: ThemeChoice): void {
   try {
     localStorage.setItem(THEME_KEY, choice);
   } catch {
     // storage blocked: the choice lasts until the page is reloaded
   }
+  window.dispatchEvent(new Event(THEME_EVENT));
+}
+
+/** Saves and applies a choice from anywhere; mounted useTheme hooks follow it. */
+export function setTheme(choice: ThemeChoice): void {
+  storeTheme(choice);
+  applyTheme(choice);
+}
+
+function subscribe(onChange: () => void): () => void {
+  window.addEventListener(THEME_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(THEME_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
 }
 
 export function resolveTheme(choice: ThemeChoice, prefersDark: boolean): "light" | "dark" {
@@ -37,7 +55,7 @@ export function applyTheme(choice: ThemeChoice): void {
 
 /** Current choice plus a setter that saves and applies it; follows the system setting live in "system" mode. */
 export function useTheme(): [ThemeChoice, (choice: ThemeChoice) => void] {
-  const [choice, setChoice] = useState<ThemeChoice>(readTheme);
+  const choice = useSyncExternalStore(subscribe, readTheme, () => "system" as ThemeChoice);
   useEffect(() => {
     applyTheme(choice);
     if (choice !== "system" || typeof window.matchMedia !== "function") return;
@@ -46,13 +64,7 @@ export function useTheme(): [ThemeChoice, (choice: ThemeChoice) => void] {
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);
   }, [choice]);
-  return [
-    choice,
-    (next) => {
-      storeTheme(next);
-      setChoice(next);
-    },
-  ];
+  return [choice, setTheme];
 }
 
 /** Keeps the page in step with the OS light/dark setting while the choice is "system", on every page. */
