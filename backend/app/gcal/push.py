@@ -95,7 +95,7 @@ def plan_ops(session: Session, account: GoogleAccount, now: datetime, app_url: s
         return ops
     since = now - KEEP_PAST
     # Only the active semester is reconciled; other semesters' rows (and their Google copies) are left untouched.
-    visible, _ = list_visible_events(session, semester.id, FAR_PAST, FAR_FUTURE)
+    visible, _ = list_visible_events(session, semester.id, FAR_PAST, FAR_FUTURE, with_counts=False)
     wanted = {e.id: e for e in visible if e.kind in account.kinds and e.status != "cancelled"}
     rows = session.scalars(select(Event).where(Event.semester_id == semester.id).order_by(Event.start_at, Event.id))
     for row in rows:

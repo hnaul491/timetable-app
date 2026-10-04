@@ -621,3 +621,29 @@ def test_sweep_ignores_non_ascii_digit_markers(session, world):
     result = run(session, account, fake)
     assert result.status == "ok"
     assert "odd" in fake.events
+
+
+def test_visible_events_without_counts_are_the_same_but_zeroed(session, semester, world):
+    from dataclasses import replace
+    from datetime import datetime as dt
+
+    from sqlalchemy import event as sa_event
+
+    from app.models import Note, Task
+    from app.services.events_query import list_visible_events
+    events, _ = world
+    session.add(Note(event_id=events["class"].id, tab="after", body="x", important=True, updated_at=NOW))
+    session.add(Task(title="t", status="todo", event_id=events["class"].id, source="manual", created_at=NOW))
+    session.commit()
+    span = (dt(2000, 1, 1), dt(2100, 1, 1))
+    full, _ = list_visible_events(session, semester.id, *span)
+    statements: list[str] = []
+    listener = lambda conn, cursor, statement, *args: statements.append(statement)  # noqa: E731
+    sa_event.listen(session.get_bind(), "before_cursor_execute", listener)
+    try:
+        bare, _ = list_visible_events(session, semester.id, *span, with_counts=False)
+    finally:
+        sa_event.remove(session.get_bind(), "before_cursor_execute", listener)
+    assert not [s for s in statements if "FROM note" in s or "FROM task" in s]
+    assert bare == [replace(e, note_count=0, open_tasks=0, important=False) for e in full]
+    assert any(e.note_count for e in full)

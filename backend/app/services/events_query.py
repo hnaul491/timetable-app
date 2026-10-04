@@ -113,7 +113,7 @@ def next_event(session: Session, event: Event) -> Event | None:
 
 
 def list_visible_events(
-    session: Session, semester_id: int, start: datetime, end: datetime
+    session: Session, semester_id: int, start: datetime, end: datetime, with_counts: bool = True
 ) -> tuple[list[VisibleEvent], list[str]]:
     subjects = _subjects(session, semester_id)
     chosen = _chosen(session, list(subjects))
@@ -136,7 +136,7 @@ def list_visible_events(
             if pick != ALL_SECTIONS and pick != event.section:
                 continue
         visible.append(_to_visible(event, subject))
-    return _with_counts(session, visible), sorted(missing)
+    return (_with_counts(session, visible) if with_counts else visible), sorted(missing)
 
 
 def section_choices(session: Session, semester_id: int) -> list[SectionChoice]:
