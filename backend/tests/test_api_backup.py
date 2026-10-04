@@ -80,7 +80,7 @@ def test_build_backup_content_and_no_secrets(session, seeded):
     banned = ("token", "secret", "key", "session_uri")
     assert not [k for k in keys(data) if any(b in k.lower() for b in banned)]
     text = json.dumps(data)
-    for leaked in (SECRET, SESSION_URI, "gcal-id-1", "hello chat", "internal-marker-value", "drive-file-1"):
+    for leaked in (SECRET, SESSION_URI, "gcal-id-1", "hello chat", "internal-marker-value"):
         assert leaked not in text
 
 
@@ -204,3 +204,55 @@ def test_sync_without_drive_scope_skips(client, settings, seeded):
     configure(client, settings, drive, scopes=("https://www.googleapis.com/auth/calendar.app.created",))
     assert sync(client).status_code == 200
     assert not drive.files
+
+
+def test_documents_carry_zeus_uid_and_drive_file_id(session, seeded, semester):
+    event = session.query(Event).filter_by(zeus_uid="u1").one()
+    session.query(Document).update({"event_id": event.id})
+    session.commit()
+    doc = backup_service.build_backup(session, NOW)["documents"][0]
+    assert doc["event_zeus_uid"] == "u1" and doc["drive_file_id"] == "drive-file-1"
+
+
+def test_zeus_events_only_when_referenced(session, seeded, semester):
+    session.add(Event(source="zeus", zeus_uid="u2", semester_id=semester.id, title_raw="Unreferenced",
+                      start_at=datetime(2026, 10, 21, 9), end_at=datetime(2026, 10, 21, 10), kind="class"))
+    session.commit()
+    data = backup_service.build_backup(session, NOW)
+    assert [e["zeus_uid"] for e in data["zeus_events"]] == ["u1"]
+    ev = data["zeus_events"][0]
+    assert set(ev) == {"zeus_uid", "semester_id", "subject_id", "title_raw", "start_at", "end_at", "kind", "room",
+                       "status"}
+    assert "gcal-id-1" not in json.dumps(data)
+
+
+@pytest.mark.parametrize("lost", ["root", "backups"])
+def test_missing_folders_are_recreated(client, settings, session, seeded, lost):
+    drive = FakeDrive()
+    configure(client, settings, drive)
+    assert client.post("/api/backup/drive", headers=AUTH).status_code == 200
+    folder = session.get(AppSetting, "backup_folder_id").value
+    root = session.get(AppSetting, "drive_root_folder").value
+    drive.trashed_folders.add(root if lost == "root" else folder)
+    set_day(client, 1)
+    assert client.post("/api/backup/drive", headers=AUTH).status_code == 200
+    session.expire_all()
+    new_folder = session.get(AppSetting, "backup_folder_id").value
+    assert new_folder not in drive.trashed_folders and new_folder != folder
+    assert drive.parents[max(drive.files, key=lambda f: int(f[4:]))] == new_folder
+    new_root = session.get(AppSetting, "drive_root_folder").value
+    assert new_root not in drive.trashed_folders
+    assert (new_root != root) == (lost == "root")
+
+
+@pytest.mark.parametrize("clock_value, pruned", [(100.0, False), (0.0, True)])
+def test_prune_skipped_near_deadline(session, seeded, clock_value, pruned):
+    drive = FakeDrive()
+    root = drive.create_folder("Timetable", None)
+    folder = drive.create_folder("Backups", root)
+    session.add_all([AppSetting(key="drive_root_folder", value=root), AppSetting(key="backup_folder_id", value=folder)])
+    session.commit()
+    for day in range(10):
+        drive.upload_file(f"timetable-backup-2026-10-{day + 1:02d}.json", "application/json", b"{}", folder)
+    backup_service.upload_backup(session, drive, NOW, deadline=60.0, clock=lambda: clock_value)
+    assert bool(drive.trashed) is pruned

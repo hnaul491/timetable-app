@@ -46,7 +46,12 @@ def build_backup(session: Session, now: datetime) -> dict:
     """Everything the user typed, as plain JSON. Secrets, tokens, Google ids, upload sessions, pending actions
     and chat messages are never read here."""
     sections = {row.subject_id: row.section for row in session.scalars(select(MySection))}
-    zeus_uid = {e.id: e.zeus_uid for e in session.scalars(select(Event).where(Event.zeus_uid.is_not(None)))}
+    zeus = {e.id: e for e in session.scalars(select(Event).where(Event.zeus_uid.is_not(None)))}
+    zeus_uid = {event_id: e.zeus_uid for event_id, e in zeus.items()}
+    notes = list(session.scalars(select(Note).order_by(Note.id)))
+    tasks = list(session.scalars(select(Task).order_by(Task.id)))
+    documents = list(session.scalars(select(Document).order_by(Document.id)))
+    referenced = {x.event_id for x in (*notes, *tasks, *documents) if x.event_id in zeus}
     return {
         "format": FORMAT, "version": VERSION, "created_at": iso_utc(now),
         "semesters": [
@@ -70,21 +75,27 @@ def build_backup(session: Session, now: datetime) -> dict:
         "notes": [
             {"id": n.id, "event_id": n.event_id, "event_zeus_uid": zeus_uid.get(n.event_id), "tab": n.tab,
              "body": n.body, "important": n.important, "updated_at": _iso(n.updated_at)}
-            for n in session.scalars(select(Note).order_by(Note.id))],
+            for n in notes],
         "tasks": [
             {"id": t.id, "note_id": t.note_id, "event_id": t.event_id, "event_zeus_uid": zeus_uid.get(t.event_id),
              "subject_id": t.subject_id, "title": t.title, "status": t.status, "due_date": _iso(t.due_date),
              "important": t.important, "position": t.position, "source": t.source, "created_at": _iso(t.created_at)}
-            for t in session.scalars(select(Task).order_by(Task.id))],
+            for t in tasks],
         "week_review": [
             {"semester_id": w.semester_id, "week_start": _iso(w.week_start), "reviewed_at": _iso(w.reviewed_at)}
             for w in session.scalars(select(WeekReview).order_by(WeekReview.semester_id, WeekReview.week_start))],
         "settings": {row.key: row.value for row in session.scalars(
             select(AppSetting).where(AppSetting.key.in_(SETTING_KEYS)))},
+        "zeus_events": [
+            {"zeus_uid": e.zeus_uid, "semester_id": e.semester_id, "subject_id": e.subject_id,
+             "title_raw": e.title_raw, "start_at": _iso(e.start_at), "end_at": _iso(e.end_at), "kind": e.kind,
+             "room": e.room, "status": e.status}
+            for event_id, e in sorted(zeus.items()) if event_id in referenced],
         "documents": [
-            {"id": d.id, "subject_id": d.subject_id, "event_id": d.event_id, "name": d.name,
+            {"id": d.id, "subject_id": d.subject_id, "event_id": d.event_id, "event_zeus_uid": zeus_uid.get(d.event_id),
+             "drive_file_id": d.drive_file_id, "name": d.name,
              "mime_type": d.mime_type, "size": d.size, "tag": d.tag, "created_at": _iso(d.created_at)}
-            for d in session.scalars(select(Document).order_by(Document.id))],
+            for d in documents],
     }
 
 
@@ -105,11 +116,22 @@ def _set_setting(session: Session, key: str, value: str) -> None:
 
 
 def backup_folder(session: Session, drive: GoogleDrive) -> str:
-    """The id of Timetable/Backups, creating whatever is missing."""
-    row = session.get(AppSetting, FOLDER_KEY)
-    if row is not None and isinstance(row.value, str) and row.value and drive.folder_exists(row.value):
-        return row.value
+    """The id of Timetable/Backups, creating whatever is missing. A deleted or trashed Timetable root also
+    invalidates every cached folder id below it (Backups, semesters, subjects)."""
     root = docs._root_id(session)
+    if root is not None and not drive.folder_exists(root):
+        docs._set_root(session, None)
+        session.query(AppSetting).filter(AppSetting.key == FOLDER_KEY).delete()
+        for semester in session.scalars(select(Semester)):
+            semester.drive_folder_id = None
+        for subject in session.scalars(select(Subject)):
+            subject.drive_folder_id = None
+        root = None
+        session.commit()
+    row = session.get(AppSetting, FOLDER_KEY)
+    if root is not None and row is not None and isinstance(row.value, str) and row.value \
+            and drive.folder_exists(row.value):
+        return row.value
     if root is None:
         root = drive.create_folder(docs.ROOT_NAME, None)
         docs._set_root(session, root)
@@ -127,7 +149,8 @@ def prune(drive: GoogleDrive, folder: str) -> None:
         drive.trash(old.id)
 
 
-def upload_backup(session: Session, drive: GoogleDrive, now: datetime) -> str:
+def upload_backup(session: Session, drive: GoogleDrive, now: datetime, deadline: float | None = None,
+                  clock: Callable[[], float] = time.monotonic) -> str:
     """Upload one backup, record the time, then prune. Upload errors propagate; prune errors are only logged."""
     folder = backup_folder(session, drive)
     name = file_name(now)
@@ -136,17 +159,19 @@ def upload_backup(session: Session, drive: GoogleDrive, now: datetime) -> str:
     _set_setting(session, LAST_KEY, now.isoformat())
     session.commit()
     try:
-        prune(drive, folder)
+        if deadline is None or deadline - clock() >= MIN_BUDGET_S:
+            prune(drive, folder)
     except Exception as exc:  # noqa: BLE001 - the backup itself is safe in Drive
         logger.warning("Pruning old backups failed (%s)", type(exc).__name__)
     return name
 
 
-def backup_now(session: Session, settings: Settings, factory: DriveFactory, now: datetime) -> str:
+def backup_now(session: Session, settings: Settings, factory: DriveFactory, now: datetime,
+               deadline: float | None = None) -> str:
     """Back up to Drive: 409 without Drive, 502 when Google fails."""
     drive = docs.open_drive(session, settings, factory)
     try:
-        return upload_backup(session, drive, now)
+        return upload_backup(session, drive, now, deadline)
     except GoogleError as exc:
         session.rollback()
         raise docs.google_error(exc) from exc
@@ -164,7 +189,7 @@ def run_weekly_backup(session: Session, settings: Settings, factory: DriveFactor
         if last is not None and now - last < EVERY:
             return
         try:
-            backup_now(session, settings, factory, now)
+            backup_now(session, settings, factory, now, deadline)
         except HTTPException as exc:
             if exc.status_code != 409:
                 logger.warning("Automatic backup failed (HTTP %s)", exc.status_code)

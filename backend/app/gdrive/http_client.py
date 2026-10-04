@@ -15,6 +15,7 @@ UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 SERVICE = "Google Drive"
 FILE_FIELDS = "id,name,mimeType,size,webViewLink"
 UPLOAD_TIMEOUT = httpx.Timeout(5.0, read=40.0)  # Drive can be slow to answer the last chunk
+SMALL_UPLOAD_TIMEOUT = httpx.Timeout(5.0, read=10.0)  # a backup is small: fail fast inside the cron budget
 _RANGE = re.compile(r"^bytes=0-(\d+)$")
 
 
@@ -108,7 +109,7 @@ class HttpGoogleDrive:
                 f"--{boundary}\r\nContent-Type: {mime_type}\r\n\r\n").encode() + data + f"\r\n--{boundary}--".encode()
         response = self._call("POST", UPLOAD, params={"uploadType": "multipart", "fields": FILE_FIELDS},
                               content=body, headers={"Content-Type": f"multipart/related; boundary={boundary}"},
-                              timeout=UPLOAD_TIMEOUT)
+                              timeout=SMALL_UPLOAD_TIMEOUT)
         file = _drive_file(_json(response))
         if file is None:
             raise GoogleError(UNEXPECTED)
