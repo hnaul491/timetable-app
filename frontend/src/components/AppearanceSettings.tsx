@@ -12,9 +12,9 @@ export function AppearanceSettings() {
   const [theme, setTheme] = useTheme();
   return (
     <section aria-labelledby="appearance-heading" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
-      <h2 id="appearance-heading" className="text-base font-bold">
+      <h3 id="appearance-heading" className="text-base font-bold">
         {t("settings.appearance.title")}
-      </h2>
+      </h3>
       <label className="flex flex-col gap-1 text-sm font-semibold text-ink-2">
         {t("settings.appearance.language")}
         <select

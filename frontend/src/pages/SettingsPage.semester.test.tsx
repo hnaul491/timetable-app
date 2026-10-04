@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
 import { ConfirmProvider } from "../components/ui/Confirm";
-import { SettingsPage } from "./SettingsPage";
+import { SettingsAt } from "../test/settingsRoute";
 
 const SEMESTERS = [
   { id: 1, code: "S3", name: "Fall 2026", zeus_group_id: 10, start_date: null, end_date: null, is_active: true },
@@ -24,12 +24,13 @@ vi.mock("../lib/api", async (importOriginal) => ({
 
 describe("SettingsPage semester switcher (phones)", () => {
   it("has a compact semester select at the top that activates the chosen semester", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
         <ToastProvider>
           <ConfirmProvider>
-            <SettingsPage />
+            <SettingsAt url="/settings/general" />
           </ConfirmProvider>
         </ToastProvider>
       </QueryClientProvider>,
@@ -42,4 +43,6 @@ describe("SettingsPage semester switcher (phones)", () => {
     await userEvent.selectOptions(select, "2");
     expect(apiFetch).toHaveBeenCalledWith("/api/semesters/2/activate", { method: "PUT" });
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 });

@@ -30,7 +30,7 @@ export function SyncBanner({ status, now = new Date() }: { status: SyncStatus | 
     return (
       <Banner tone="warn">
         {t("calendar.banner.noDataBefore")}{" "}
-        <Link to="/settings" className="font-semibold underline">{t("calendar.banner.noDataLink")}</Link>
+        <Link to="/settings/school" className="font-semibold underline">{t("calendar.banner.noDataLink")}</Link>
         {t("calendar.banner.noDataAfter")}
       </Banner>
     );
@@ -39,7 +39,7 @@ export function SyncBanner({ status, now = new Date() }: { status: SyncStatus | 
     return (
       <Banner tone="error">
         {t("calendar.banner.authFailedBefore")}{" "}
-        <Link to="/settings" className="font-semibold underline">{t("calendar.banner.authFailedLink")}</Link>
+        <Link to="/settings/school" className="font-semibold underline">{t("calendar.banner.authFailedLink")}</Link>
         {t("calendar.banner.authFailedAfter", { since: sinceText })}
       </Banner>
     );
@@ -58,7 +58,7 @@ export function SyncBanner({ status, now = new Date() }: { status: SyncStatus | 
     return (
       <Banner tone="warn">
         {t("calendar.banner.staleBefore", { since: sinceText })}{" "}
-        <Link to="/settings" className="font-semibold underline">{t("calendar.banner.staleLink")}</Link>{" "}
+        <Link to="/settings/school" className="font-semibold underline">{t("calendar.banner.staleLink")}</Link>{" "}
         {t("calendar.banner.staleAfter")}
       </Banner>
     );
@@ -72,7 +72,7 @@ export function MissingSectionsBanner({ names }: { names: string[] }) {
   return (
     <Banner tone="warn">
       {t("calendar.banner.missingBefore", { names: names.join(", ") })}{" "}
-      <Link to="/settings" className="font-semibold underline">{t("calendar.banner.missingLink")}</Link>
+      <Link to="/settings/school" className="font-semibold underline">{t("calendar.banner.missingLink")}</Link>
     </Banner>
   );
 }
@@ -109,7 +109,7 @@ export function GoogleBanner({ status }: { status: GoogleStatus | undefined }) {
   return (
     <Banner tone="error">
       {t("calendar.banner.googleStopped", { reason: status.last_push_error ? translateServerMessage(status.last_push_error, locale) : t("calendar.banner.accessRevoked") })}{" "}
-      <Link to="/settings" className="font-semibold underline">
+      <Link to="/settings/google" className="font-semibold underline">
         {t("calendar.banner.reconnectGoogle")}
       </Link>
     </Banner>

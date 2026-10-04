@@ -293,7 +293,7 @@ export function AssistantPage() {
         <section className="flex flex-col items-start gap-3 rounded-2xl border border-line bg-surface p-5">
           <h2 className="text-base font-bold">{t("ai.disabledTitle")}</h2>
           <p className="text-sm text-ink-2">{t("ai.disabledBody")}</p>
-          <Link to="/settings" className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
+          <Link to="/settings/ai" className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
             {t("ai.openSettings")}
           </Link>
         </section>

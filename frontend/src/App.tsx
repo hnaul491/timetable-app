@@ -49,7 +49,7 @@ const createRouter = () => createBrowserRouter([
     children: [
       { index: true, element: <CalendarPage /> },
       { path: "board", element: <BoardPage /> },
-      { path: "settings", element: <SettingsPage /> },
+      { path: "settings/:section?", element: <SettingsPage /> },
       { path: "assistant", element: <AssistantPage /> },
       { path: "review", element: <ReviewPage /> },
       { path: "subjects", element: <SubjectsPage /> },

@@ -58,7 +58,7 @@ export function BackupSettings() {
   const last = status.data?.last_at;
   return (
     <section className={card}>
-      <h2 className="text-base font-bold">{t("backup.title")}</h2>
+      <h3 className="text-base font-bold">{t("backup.title")}</h3>
       <p className="text-sm text-muted">{t("backup.help")}</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={primary} disabled={download.isPending} onClick={() => download.mutate()}>

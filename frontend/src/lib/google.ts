@@ -65,3 +65,12 @@ export async function forgetProviderToken(): Promise<void> {
     // best effort
   }
 }
+
+/** True while a Google connect is waiting to be finished by the Google settings card (does not consume the flag). */
+export function connectPending(): boolean {
+  try {
+    return sessionStorage.getItem(FLAG_KEY) === "1";
+  } catch {
+    return false;
+  }
+}

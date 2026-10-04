@@ -39,7 +39,7 @@ export function RecurringList() {
 
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
-      <h2 className="text-base font-bold">{t("settings.recurring.title")}</h2>
+      <h3 className="text-base font-bold">{t("settings.recurring.title")}</h3>
       <p className="text-sm text-muted">{t("settings.recurring.help")}</p>
       {rules.data?.length === 0 && <p className="text-sm">{t("settings.recurring.none")}</p>}
       {rules.data?.map((rule) => (

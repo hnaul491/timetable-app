@@ -44,7 +44,7 @@ export function SemesterSettings() {
   };
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5">
-      <h2 className="text-base font-bold">{t("settings.semesters.title")}</h2>
+      <h3 className="text-base font-bold">{t("settings.semesters.title")}</h3>
       <p className="text-sm text-muted">{t("settings.semesters.help")}</p>
       {semesters.data?.map((s) => <SemesterRow key={s.id} semester={s} onSave={(g) => void askSave(s, g)} onActivate={() => activate.mutate(s)} />)}
     </section>

@@ -180,7 +180,7 @@ describe("DocumentsSection", () => {
   it("shows reconnect when drive is off", async () => {
     setup({ status: { drive_enabled: false } });
     expect(await screen.findByText(/Reconnect Google in Settings to turn them on/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings");
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings/google");
     expect(screen.queryByRole("button", { name: "Upload documents" })).not.toBeInTheDocument();
   });
 

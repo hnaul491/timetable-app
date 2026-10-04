@@ -158,7 +158,7 @@ describe("AssistantPage", () => {
     route();
     renderPage();
     expect(await screen.findByText("The assistant is not set up")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings");
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute("href", "/settings/ai");
     expect(screen.queryByRole("textbox", { name: "Message the assistant" })).toBeNull();
   });
 

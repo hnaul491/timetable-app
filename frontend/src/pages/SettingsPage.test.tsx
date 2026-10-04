@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../components/ui/Toast";
 import { ApiError } from "../lib/api";
-import { SettingsPage } from "./SettingsPage";
+import { SettingsAt } from "../test/settingsRoute";
 
 const syncRun = { status: "ok", fetched: 12, inserted: 1, updated: 2, cancelled: 0, finished_at: "2026-10-19T10:00:00Z", error: null };
 let syncOk = false;
@@ -34,7 +34,7 @@ describe("SettingsPage", () => {
     render(
       <QueryClientProvider client={client}>
         <ToastProvider>
-          <SettingsPage />
+          <SettingsAt />
         </ToastProvider>
       </QueryClientProvider>,
     );
@@ -47,7 +47,7 @@ describe("SettingsPage", () => {
     render(
       <QueryClientProvider client={client}>
         <ToastProvider>
-          <SettingsPage />
+          <SettingsAt />
         </ToastProvider>
       </QueryClientProvider>,
     );
@@ -62,7 +62,7 @@ describe("SettingsPage", () => {
     render(
       <QueryClientProvider client={client}>
         <ToastProvider>
-          <SettingsPage />
+          <SettingsAt />
         </ToastProvider>
       </QueryClientProvider>,
     );
