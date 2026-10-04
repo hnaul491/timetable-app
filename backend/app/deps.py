@@ -1,5 +1,7 @@
+from collections.abc import Iterator
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -49,7 +51,12 @@ def get_drive_factory(settings: Settings = Depends(get_settings)) -> DriveFactor
     return make
 
 
-def get_llm(settings: Settings = Depends(get_settings)) -> LLMProvider | None:
+def get_llm(settings: Settings = Depends(get_settings)) -> Iterator[LLMProvider | None]:
     if not settings.ai_enabled:
-        return None
-    return GeminiProvider(settings.gemini_api_key, settings.gemini_model)
+        yield None
+        return
+    http = httpx.Client(timeout=30)
+    try:
+        yield GeminiProvider(settings.gemini_api_key, settings.gemini_model, http=http)
+    finally:
+        http.close()

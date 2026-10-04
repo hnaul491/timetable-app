@@ -73,7 +73,8 @@ def test_generate_json_parses_text():
     out = p.generate_json("S", "prompt", {"type": "array"})
     assert out == [{"title": "T"}]
     body = json.loads(seen[0].content)
-    assert body["generationConfig"] == {"responseMimeType": "application/json", "responseSchema": {"type": "array"}}
+    assert body["generationConfig"] == {"responseMimeType": "application/json", "responseSchema": {"type": "array"},
+                                         "thinkingConfig": {"thinkingBudget": 0}}
     assert body["contents"] == [{"role": "user", "parts": [{"text": "prompt"}]}]
 
 
@@ -119,3 +120,37 @@ def test_empty_candidates_is_unavailable():
 
 def test_default_client_has_30s_timeout():
     assert GeminiProvider(KEY, "m")._http.timeout.read == 30
+
+
+def test_parallel_tool_results_are_one_user_content():
+    p, seen = make(ok([{"text": "ok"}]))
+    turns = [
+        Turn("user", text="q"),
+        Turn("model", calls=[FunctionCall("a", {}), FunctionCall("b", {})]),
+        Turn("tool", results=[("a", {"x": 1}), ("b", {"y": 2})]),
+    ]
+    p.generate("S", turns, [])
+    contents = json.loads(seen[0].content)["contents"]
+    assert len(contents) == 3
+    assert contents[2] == {"role": "user", "parts": [
+        {"functionResponse": {"name": "a", "response": {"content": {"x": 1}}}},
+        {"functionResponse": {"name": "b", "response": {"content": {"y": 2}}}}]}
+
+
+def test_thinking_disabled_for_25_flash_only():
+    p, seen = make(ok([{"text": '[]'}]), model="gemini-2.5-flash-lite")
+    p.generate("S", [Turn("user", text="x")], [])
+    p.generate_json("S", "p", {})
+    for req in seen:
+        assert json.loads(req.content)["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    p2, seen2 = make(ok([{"text": "hi"}]), model="gemini-3-pro")
+    p2.generate("S", [Turn("user", text="x")], [])
+    assert "thinkingConfig" not in json.loads(seen2[0].content).get("generationConfig", {})
+
+
+def test_empty_stop_candidate_is_empty_reply_but_safety_is_unavailable():
+    p, _ = make(lambda r: httpx.Response(200, json={"candidates": [{"finishReason": "STOP"}]}))
+    assert p.generate("S", [Turn("user", text="x")], []).text is None
+    p, _ = make(lambda r: httpx.Response(200, json={"candidates": [{"finishReason": "SAFETY"}]}))
+    with pytest.raises(AIUnavailable):
+        p.generate("S", [Turn("user", text="x")], [])

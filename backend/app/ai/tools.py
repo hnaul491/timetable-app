@@ -2,6 +2,7 @@
 
 The model has no write tool: every write happens in routers/ai.py when the user confirms an action.
 """
+import logging
 from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
@@ -21,6 +22,20 @@ MAX_RANGE_DAYS = 31
 MAX_SLOTS = 60
 ACTION_TTL = timedelta(hours=24)
 EVENT_KINDS = ("work", "french_ext", "other")
+
+
+log = logging.getLogger(__name__)
+
+
+def _int_arg(value: object) -> int | None:
+    """Models send whole numbers as 3 or 3.0; anything else is not an id."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
 
 
 class ToolError(Exception):
@@ -251,7 +266,8 @@ def _propose_task(session: Session, args: dict, now: datetime) -> dict:
     subject_id = None
     event_id = None
     if args.get("event_id") is not None:
-        event = session.get(Event, args["event_id"]) if isinstance(args["event_id"], int) else None
+        found = _int_arg(args["event_id"])
+        event = session.get(Event, found) if found is not None else None
         if event is None:
             raise ToolError("unknown event_id")
         event_id, subject_id = event.id, event.subject_id
@@ -275,7 +291,8 @@ def _propose_event(session: Session, args: dict, now: datetime) -> dict:
 
 
 def _propose_note(session: Session, args: dict, now: datetime) -> dict:
-    event = session.get(Event, args["event_id"]) if isinstance(args.get("event_id"), int) else None
+    found = _int_arg(args.get("event_id"))
+    event = session.get(Event, found) if found is not None else None
     if event is None:
         raise ToolError("unknown event_id")
     if args.get("tab") not in ("after", "before"):
@@ -318,3 +335,7 @@ def execute_tool(session: Session, name: str, args: dict, now: datetime) -> dict
         return {"error": f"unknown tool '{name}'"}
     except ToolError as exc:
         return {"error": str(exc)}
+    except Exception as exc:
+        log.warning("assistant tool %s failed: %s", name, type(exc).__name__)
+        session.rollback()
+        return {"error": "tool failed"}

@@ -9,15 +9,17 @@ class FakeProvider:
         self.json_result = json_result
         self.calls: list[dict] = []
 
-    def generate(self, system: str, turns: list[Turn], tools: list[ToolDecl]) -> LLMReply:
-        self.calls.append({"kind": "generate", "system": system, "turns": list(turns), "tools": list(tools)})
+    def generate(self, system: str, turns: list[Turn], tools: list[ToolDecl],
+                 timeout: float | None = None) -> LLMReply:
+        self.calls.append({"kind": "generate", "system": system, "turns": list(turns), "tools": list(tools),
+                           "timeout": timeout})
         item = self.script.pop(0)
         if isinstance(item, Exception):
             raise item
         return item
 
-    def generate_json(self, system: str, prompt: str, schema: dict):
-        self.calls.append({"kind": "json", "system": system, "prompt": prompt, "schema": schema})
+    def generate_json(self, system: str, prompt: str, schema: dict, timeout: float | None = None):
+        self.calls.append({"kind": "json", "system": system, "prompt": prompt, "schema": schema, "timeout": timeout})
         if isinstance(self.json_result, Exception):
             raise self.json_result
         return self.json_result
