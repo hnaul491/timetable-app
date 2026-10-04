@@ -197,3 +197,63 @@ def test_thought_signature_is_kept_and_sent_back():
                               Turn(role="tool", tool_name="get_subjects", tool_result={"items": []})], [])
     model_part = bodies[1]["contents"][1]["parts"][0]
     assert model_part["thoughtSignature"] == "sig-abc" and model_part["functionCall"]["name"] == "get_subjects"
+
+
+# ---- streaming ------------------------------------------------------------------------------------------
+
+def sse(*chunks):
+    return "".join(f"data: {json.dumps({'candidates': [{'content': {'role': 'model', 'parts': c}}]})}\r\n\r\n"
+                   for c in chunks)
+
+
+def sse_handler(body, status=200):
+    return lambda r: httpx.Response(status, content=body.encode(), headers={"content-type": "text/event-stream"})
+
+
+def test_stream_yields_deltas_and_calls_with_signature():
+    from app.ai.provider import CallPart, TextDelta
+    body = sse([{"text": "Hel"}], [{"text": "lo"}],
+               [{"functionCall": {"name": "get_tasks", "args": {"status": "todo"}}, "thoughtSignature": "sig"}])
+    p, seen = make(sse_handler(body), model="gemini-2.5-flash")
+    tools = [ToolDecl("get_tasks", "t", {"type": "object", "properties": {}})]
+    parts = list(p.stream("SYS", [Turn("user", text="hi")], tools))
+    assert parts == [TextDelta("Hel"), TextDelta("lo"),
+                     CallPart(FunctionCall("get_tasks", {"status": "todo"}, thought_signature="sig"))]
+    req = seen[0]
+    assert str(req.url) == ("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent"
+                            "?alt=sse")
+    assert req.headers["x-goog-api-key"] == KEY
+    assert KEY not in str(req.url)
+    sent = json.loads(req.content)
+    assert sent["systemInstruction"] == {"parts": [{"text": "SYS"}]}
+    assert "tools" in sent and "generationConfig" in sent
+
+
+def test_stream_skips_empty_chunks_and_blank_text():
+    from app.ai.provider import TextDelta
+    body = sse([{"text": ""}], [], [{"text": "x"}]) + "data: [DONE]\n\n: comment\n\n"
+    p, _ = make(sse_handler(body))
+    assert list(p.stream("S", [Turn("user", text="x")], [])) == [TextDelta("x")]
+
+
+@pytest.mark.parametrize("status,exc", [(429, AIRateLimited), (500, AIUnavailable), (403, AIUnavailable)])
+def test_stream_error_status_before_iteration(status, exc):
+    p, _ = make(lambda r: httpx.Response(status, json={"error": {"status": "X", "message": f"bad {KEY}"}}))
+    with pytest.raises(exc) as info:
+        list(p.stream("S", [Turn("user", text="x")], []))
+    assert KEY not in str(info.value) and info.value.__cause__ is None
+
+
+def test_stream_transport_error_is_unavailable():
+    def boom(r):
+        raise httpx.ConnectError(f"cannot reach {r.url}")
+    p, _ = make(boom)
+    with pytest.raises(AIUnavailable) as info:
+        list(p.stream("S", [Turn("user", text="x")], []))
+    assert KEY not in str(info.value) and info.value.__cause__ is None
+
+
+def test_stream_garbled_chunk_is_unavailable():
+    p, _ = make(sse_handler("data: {not json\n\n"))
+    with pytest.raises(AIUnavailable):
+        list(p.stream("S", [Turn("user", text="x")], []))
