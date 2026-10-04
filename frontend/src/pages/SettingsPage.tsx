@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { AISettings } from "../components/AISettings";
 import { AppearanceSettings } from "../components/AppearanceSettings";
 import { BackupSettings } from "../components/BackupSettings";
@@ -43,6 +43,7 @@ function SectionContent({ id }: { id: SectionId }) {
 export function SettingsPage() {
   const t = useT();
   const navigate = useNavigate();
+  const location = useLocation();
   const { section } = useParams();
   const desktop = useIsDesktop();
   const status = useSettingsStatus();
@@ -52,14 +53,18 @@ export function SettingsPage() {
   const matches = matchSections(query, (id) => t(`settings.sections.${id}`));
   const current = isSectionId(section) ? section : null;
   const effective = current ?? (desktop ? "general" : null);
-  const filteredOut = desktop && effective !== null && query.trim() !== "" && matches.length > 0 && !matches.some((s) => s.id === effective);
+  const filteredOut = query.trim() !== "" && matches.length > 0 && effective !== null && !matches.some((s) => s.id === effective);
+  const desktopRef = useRef(desktop);
+  desktopRef.current = desktop;
 
   useEffect(() => {
-    if (filteredOut) navigate(`/settings/${matches[0].id}`, { replace: true });
-  });
-  useEffect(() => {
-    if (!desktop && current) heading.current?.focus();
-  }, [desktop, current]);
+    if (!desktopRef.current && current) heading.current?.focus();
+  }, [current]);
+
+  const goBack = () => {
+    if ((location.state as { fromList?: boolean } | null)?.fromList) navigate(-1);
+    else navigate("/settings", { replace: true });
+  };
 
   if (section !== undefined && !current) return <Navigate to="/settings" replace />;
   if (!current && connectPending()) return <Navigate to="/settings/google" replace />;
@@ -74,6 +79,10 @@ export function SettingsPage() {
             <div className="flex items-center gap-2.5">
               <Link
                 to="/settings"
+                onClick={(e) => {
+                  e.preventDefault();
+                  goBack();
+                }}
                 aria-label={t("settings.back")}
                 className="flex size-9 items-center justify-center rounded-xl border border-line bg-surface text-accent-strong"
               >
@@ -85,6 +94,7 @@ export function SettingsPage() {
                 {t(`settings.sections.${current}`)}
               </h2>
             </div>
+            <h1 className="sr-only">{t("settings.title")}</h1>
             <SectionContent key={current} id={current} />
           </>
         ) : (
@@ -112,9 +122,13 @@ export function SettingsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") {
+              if (e.key === "Escape" && query !== "") {
                 e.preventDefault();
+                e.stopPropagation();
                 setQuery("");
+              } else if (e.key === "Enter" && matches.length > 0 && query.trim() !== "") {
+                e.preventDefault();
+                navigate(`/settings/${matches[0].id}`, { state: { fromList: true } });
               }
             }}
             placeholder={t("settings.find.placeholder")}
@@ -123,18 +137,24 @@ export function SettingsPage() {
         </label>
       </div>
       <div className="grid grid-cols-[236px_1fr] items-start gap-5">
-        <SectionList items={matches} status={status} variant="rail" />
-        {matches.length === 0 ? (
-          <p role="status" className="rounded-2xl border border-line bg-surface p-8 text-center text-sm text-muted">
-            {t("settings.find.noMatch", { query: query.trim() })}
-          </p>
-        ) : (
-          effective && (
-            <div className="min-w-0">
-              <h2 className="sr-only">{t(`settings.sections.${effective}`)}</h2>
-              <SectionContent key={effective} id={effective} />
-            </div>
-          )
+        <div className="sticky top-3 flex flex-col gap-2">
+          <SectionList items={matches} status={status} variant="rail" />
+          {matches.length === 0 && (
+            <p role="status" className="px-3 text-sm text-muted">
+              {t("settings.find.noMatch", { query: query.trim() })}
+            </p>
+          )}
+          {filteredOut && (
+            <p role="status" className="px-3 text-xs text-muted">
+              {t("settings.find.openFirst", { title: t(`settings.sections.${matches[0].id}`) })}
+            </p>
+          )}
+        </div>
+        {effective && (
+          <div className="min-w-0">
+            <h2 className="sr-only">{t(`settings.sections.${effective}`)}</h2>
+            <SectionContent key={effective} id={effective} />
+          </div>
         )}
       </div>
     </div>

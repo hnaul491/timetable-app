@@ -42,7 +42,8 @@ export function useSettingsStatus(now: Date = new Date()): Record<SectionId, Sec
 
   let school: SectionStatus = { text: "", dot: "none" };
   const run = sync.data?.last_run;
-  if (key.data && key.data.configured === false) school = { text: t("settings.status.addLink"), dot: "warn" };
+  if (key.isError) school = { text: t("settings.status.needsAttention"), dot: "warn" };
+  else if (key.data && key.data.configured === false) school = { text: t("settings.status.addLink"), dot: "warn" };
   else if (sync.data) {
     const last = sync.data.last_success_at ?? (run?.status === "ok" ? run.finished_at : null);
     if (run && (run.status === "failed" || run.status === "auth_failed")) school = { text: t("settings.status.syncFailed"), dot: "warn" };

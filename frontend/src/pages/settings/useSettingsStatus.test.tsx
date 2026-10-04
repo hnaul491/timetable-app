@@ -3,8 +3,10 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../i18n";
+import { apiFetch } from "../../lib/api";
 import { useSettingsStatus } from "./useSettingsStatus";
 
+const fetcher = () => vi.mocked(apiFetch);
 const NOW = new Date("2026-10-19T12:00:00Z");
 let data: Record<string, unknown> = {};
 
@@ -33,6 +35,7 @@ function statusFor(locale: "en" | "vi" = "en") {
 }
 
 beforeEach(() => {
+  fetcher().mockImplementation(async (path: string) => (data[path] ?? []) as never);
   localStorage.setItem("timetable:theme", "dark");
   data = base();
 });
@@ -91,5 +94,28 @@ describe("useSettingsStatus", () => {
     const b = statusFor();
     await waitFor(() => expect(b.result.current.backup).toEqual({ text: "Never", dot: "none" }));
     expect(b.result.current.google).toEqual({ text: "Not connected", dot: "none" });
+  });
+
+  it("is empty with a neutral dot while loading", () => {
+    fetcher().mockImplementation(() => new Promise(() => {}));
+    const { result } = statusFor();
+    for (const id of ["school", "subjects", "google", "ai", "backup"] as const) expect(result.current[id]).toEqual({ text: "", dot: "none" });
+  });
+
+  it("stays empty when a query fails, except a failed Zeus link check which needs attention", async () => {
+    fetcher().mockImplementation(async (path: string) => {
+      throw new Error(path === "/api/settings/zeus-key" ? "403" : "boom");
+    });
+    const { result } = statusFor();
+    await waitFor(() => expect(result.current.school).toEqual({ text: "Needs attention", dot: "warn" }));
+    for (const id of ["subjects", "google", "ai", "backup"] as const) expect(result.current[id]).toEqual({ text: "", dot: "none" });
+
+    fetcher().mockImplementation(async (path: string) => {
+      if (path === "/api/settings/zeus-key") return { configured: true };
+      throw new Error("boom");
+    });
+    const sync = statusFor();
+    await waitFor(() => expect(fetcher().mock.calls.length).toBeGreaterThan(8));
+    expect(sync.result.current.school).toEqual({ text: "", dot: "none" });
   });
 });

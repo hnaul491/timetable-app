@@ -2,7 +2,7 @@ export const settings = {
   title: "Settings",
   sectionsLabel: "Settings sections",
   back: "Back to Settings",
-  find: { label: "Find a setting", placeholder: "Find a setting…", noMatch: "No setting matches “{query}”." },
+  find: { label: "Find a setting", placeholder: "Find a setting…", noMatch: "No setting matches “{query}”.", openFirst: "Press Enter to open {title}" },
   sections: {
     general: "General",
     school: "School timetable",

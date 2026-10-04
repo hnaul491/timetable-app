@@ -4,7 +4,7 @@ export const settings: Messages["settings"] = {
   title: "Cài đặt",
   sectionsLabel: "Các mục cài đặt",
   back: "Quay lại Cài đặt",
-  find: { label: "Tìm cài đặt", placeholder: "Tìm cài đặt…", noMatch: "Không có cài đặt nào khớp “{query}”." },
+  find: { label: "Tìm cài đặt", placeholder: "Tìm cài đặt…", noMatch: "Không có cài đặt nào khớp “{query}”.", openFirst: "Nhấn Enter để mở {title}" },
   sections: {
     general: "Chung",
     school: "Thời khoá biểu trường",
@@ -15,7 +15,7 @@ export const settings: Messages["settings"] = {
   },
   status: {
     synced: "Đã đồng bộ {when}",
-    syncFailed: "Đồng bộ lỗi",
+    syncFailed: "Đồng bộ thất bại",
     needsAttention: "Cần chú ý",
     addLink: "Thêm liên kết Zeus",
     neverSynced: "Chưa đồng bộ",
@@ -28,7 +28,7 @@ export const settings: Messages["settings"] = {
     googleReconnect: "Cần kết nối lại",
     googleNone: "Chưa kết nối",
     aiOff: "Tắt",
-    backupNever: "Chưa có",
+    backupNever: "Chưa sao lưu",
     backupDownloadOnly: "Chỉ tải xuống",
   },
   syncStatus: { running: "đang chạy", ok: "thành công", partial: "một phần", failed: "thất bại", auth_failed: "liên kết hết hạn" },

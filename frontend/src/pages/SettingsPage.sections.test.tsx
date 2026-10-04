@@ -5,9 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { ConfirmProvider } from "../components/ui/Confirm";
 import { ToastProvider } from "../components/ui/Toast";
+import { apiFetch } from "../lib/api";
 import { SettingsAt } from "../test/settingsRoute";
 
 const recent = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+
+vi.mock("../lib/google", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/google")>()),
+  takeProviderRefreshToken: vi.fn(async () => "refresh-token"),
+}));
 
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
@@ -34,14 +40,14 @@ vi.mock("../lib/api", async (importOriginal) => {
   };
 });
 
-function mount(url?: string, locale: "en" | "vi" = "en") {
+function mount(url?: string, locale: "en" | "vi" = "en", before?: string[]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <I18nProvider locale={locale}>
         <ToastProvider>
           <ConfirmProvider>
-            <SettingsAt url={url} />
+            <SettingsAt url={url} before={before} />
           </ConfirmProvider>
         </ToastProvider>
       </I18nProvider>
@@ -126,44 +132,57 @@ describe("Settings sections (desktop)", () => {
     sessionStorage.setItem("timetable:google-connect", "1");
     mount("/settings");
     await waitFor(() => expect(path()).toBe("/settings/google"));
+    await waitFor(() =>
+      expect(vi.mocked(apiFetch).mock.calls.filter(([p, init]) => p === "/api/google/connect" && init?.method === "POST")).toHaveLength(1),
+    );
   });
 });
 
 describe("Settings finder", () => {
-  it("filters by keyword and selects the first match", async () => {
+  it("only filters while typing: the open section stays, with a hint to open the first match", async () => {
     mount("/settings/general");
     await userEvent.type(screen.getByRole("searchbox", { name: "Find a setting" }), "model");
     expect(within(list()).getAllByRole("link")).toHaveLength(1);
-    await waitFor(() => expect(path()).toBe("/settings/ai"));
+    expect(path()).toBe("/settings/general");
+    expect(screen.getByRole("heading", { level: 3, name: "Appearance" })).toBeInTheDocument();
+    expect(screen.getByText("Press Enter to open AI assistant")).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(path()).toBe("/settings/ai");
     expect(screen.getByRole("heading", { level: 3, name: "AI assistant" })).toBeInTheDocument();
+    expect(screen.queryByText(/Press Enter/)).toBeNull();
   });
 
-  it("keeps the current section when it still matches", async () => {
+  it("keeps the current section without a hint when it still matches", async () => {
     mount("/settings/backup");
     await userEvent.type(screen.getByRole("searchbox", { name: "Find a setting" }), "drive");
     expect(within(list()).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/settings/google", "/settings/backup"]);
     expect(path()).toBe("/settings/backup");
+    expect(screen.queryByText(/Press Enter/)).toBeNull();
   });
 
   it("matches Vietnamese keywords without accents", async () => {
     mount("/settings/google", "vi");
     const box = screen.getByRole("searchbox", { name: "Tìm cài đặt" });
     await userEvent.type(box, "thoi khoa");
-    await waitFor(() => expect(path()).toBe("/settings/school"));
+    expect(screen.getByText("Nhấn Enter để mở Thời khoá biểu trường")).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(path()).toBe("/settings/school");
     await userEvent.clear(box);
-    await userEvent.type(box, "sao luu");
-    await waitFor(() => expect(path()).toBe("/settings/backup"));
+    await userEvent.type(box, "sao luu{Enter}");
+    expect(path()).toBe("/settings/backup");
     await userEvent.clear(box);
-    await userEvent.type(box, "TIẾNG VIỆT");
-    await waitFor(() => expect(path()).toBe("/settings/general"));
+    await userEvent.type(box, "TIẾNG VIỆT{Enter}");
+    expect(path()).toBe("/settings/general");
   });
 
-  it("says when nothing matches, and Escape clears the search", async () => {
+  it("says when nothing matches, Enter does nothing, and Escape clears the search", async () => {
     mount("/settings/general");
     const box = screen.getByRole("searchbox", { name: "Find a setting" });
-    await userEvent.type(box, "zzz");
+    await userEvent.type(box, "zzz{Enter}");
+    expect(path()).toBe("/settings/general");
     expect(screen.getByText("No setting matches “zzz”.")).toBeInTheDocument();
     expect(within(list()).queryAllByRole("link")).toHaveLength(0);
+    expect(screen.getByRole("heading", { level: 3, name: "Appearance" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     expect(box).toHaveValue("");
     expect(within(list()).getAllByRole("link")).toHaveLength(6);
@@ -177,7 +196,7 @@ describe("Settings on a phone", () => {
   });
 
   it("shows the list, opens a section with a back button, and returns", async () => {
-    mount("/settings");
+    mount("/settings", "en", ["/start"]);
     expect(path()).toBe("/settings");
     expect(screen.queryByRole("searchbox")).toBeNull();
     expect(within(list()).getAllByRole("link")).toHaveLength(6);
@@ -190,8 +209,21 @@ describe("Settings on a phone", () => {
     expect(document.querySelector("[data-section]")?.className).toContain("settings-in");
     expect(screen.queryByRole("navigation", { name: "Settings sections" })).toBeNull();
 
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("link", { name: "Back to Settings" }));
     expect(path()).toBe("/settings");
     expect(screen.getByRole("navigation", { name: "Settings sections" })).toBeInTheDocument();
+    // the back button popped the history entry: browser Back leaves Settings instead of reopening Backup
+    await userEvent.click(screen.getByRole("button", { name: "history-back" }));
+    expect(path()).toBe("/start");
+  });
+
+  it("replaces the entry when the section was opened directly", async () => {
+    mount("/settings/backup", "en", ["/start"]);
+    await userEvent.click(screen.getByRole("link", { name: "Back to Settings" }));
+    expect(path()).toBe("/settings");
+    await userEvent.click(screen.getByRole("button", { name: "history-back" }));
+    expect(path()).toBe("/start");
   });
 });

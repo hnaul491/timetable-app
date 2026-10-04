@@ -24,12 +24,13 @@ export function SectionList({
   return (
     <nav
       aria-label={t("settings.sectionsLabel")}
-      className={grouped ? "flex flex-col overflow-hidden rounded-2xl border border-line bg-surface" : "sticky top-3 flex flex-col gap-0.5"}
+      className={grouped ? "flex flex-col overflow-hidden rounded-2xl border border-line bg-surface" : "flex flex-col gap-0.5"}
     >
       {items.map((s) => (
         <NavLink
           key={s.id}
           to={`/settings/${s.id}`}
+          state={{ fromList: true }}
           className={({ isActive }) =>
             grouped
               ? "flex items-center gap-2.5 border-t border-line px-3.5 py-3 first:border-t-0"
