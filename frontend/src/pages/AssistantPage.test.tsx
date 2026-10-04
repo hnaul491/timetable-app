@@ -138,6 +138,7 @@ describe("AssistantPage", () => {
     });
     renderPage();
     await userEvent.type(await screen.findByRole("textbox", { name: "Message the assistant" }), "hello{Enter}");
+    expect(await screen.findByText(/You can pick another model in Settings\./)).toBeInTheDocument();
     expect(await screen.findByText(/AI limit reached, try again later/)).toBeInTheDocument();
   });
 
