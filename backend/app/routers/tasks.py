@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_user
 from app.db import get_session
 from app.deps import get_now
-from app.models import Note, Subject, Task
+from app.models import Event, Note, Subject, Task
 from app.schemas import Deleted, TaskCreate, TaskOut, TaskPatch
 from app.services.note_tasks import update_line
 from app.services.task_query import task_out_list
@@ -35,15 +35,29 @@ def list_tasks(status: Literal["todo", "doing", "done"] | None = None, subject_i
     return task_out_list(session, list(session.scalars(query)))
 
 
+def add_task(session: Session, body: TaskCreate, now: datetime, source: str) -> Task:
+    """Validate and add (not commit) a task; an event link must belong to the same subject when one is given."""
+    subject_id = body.subject_id
+    if subject_id is not None and session.get(Subject, subject_id) is None:
+        raise HTTPException(status_code=422, detail="unknown subject")
+    if body.event_id is not None:
+        event = session.get(Event, body.event_id)
+        if event is None:
+            raise HTTPException(status_code=422, detail="unknown event")
+        if subject_id is not None and event.subject_id != subject_id:
+            raise HTTPException(status_code=422, detail="event does not belong to this subject")
+        subject_id = event.subject_id
+    task = Task(note_id=None, event_id=body.event_id, subject_id=subject_id, title=body.title.strip(),
+                status="todo", due_date=body.due_date, important=body.important, position=0,
+                source=source, created_at=now)
+    session.add(task)
+    return task
+
+
 @router.post("/tasks", response_model=TaskOut, status_code=201)
 def create_task(body: TaskCreate, session: Session = Depends(get_session),
                 now: datetime = Depends(get_now)) -> TaskOut:
-    if body.subject_id is not None and session.get(Subject, body.subject_id) is None:
-        raise HTTPException(status_code=422, detail="unknown subject")
-    task = Task(note_id=None, event_id=None, subject_id=body.subject_id, title=body.title.strip(),
-                status="todo", due_date=body.due_date, important=body.important, position=0,
-                source="manual", created_at=now)
-    session.add(task)
+    task = add_task(session, body, now, "manual")
     session.commit()
     return task_out_list(session, [task])[0]
 

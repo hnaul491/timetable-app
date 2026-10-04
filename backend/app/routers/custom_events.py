@@ -41,14 +41,20 @@ def _custom_event(session: Session, event_id: int) -> Event:
     return event
 
 
-@router.post("/events", response_model=EventOut, status_code=201)
-def create_event(body: CustomEventIn, session: Session = Depends(get_session)) -> EventOut:
+def add_custom_event(session: Session, body: CustomEventIn) -> Event:
+    """Validate and add (not commit) an own event in the active semester."""
     semester = _semester(session)
     start, end = _span(body)
     event = Event(source="custom", semester_id=semester.id, subject_id=None, section=None,
                   title_raw=body.title.strip(), start_at=start, end_at=end, room=body.room.strip(),
                   description="", kind=body.kind, status="normal")
     session.add(event)
+    return event
+
+
+@router.post("/events", response_model=EventOut, status_code=201)
+def create_event(body: CustomEventIn, session: Session = Depends(get_session)) -> EventOut:
+    event = add_custom_event(session, body)
     session.commit()
     return event_out(describe_event(session, event))
 

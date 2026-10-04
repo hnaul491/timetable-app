@@ -194,3 +194,25 @@ class DocumentUpload(Base):
     size: Mapped[int] = mapped_column(BigInteger)
     received: Mapped[int] = mapped_column(BigInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class PendingAction(Base):
+    __tablename__ = "pending_action"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    payload: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_message"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    actions: Mapped[list[int]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime)

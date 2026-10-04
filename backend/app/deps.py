@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.ai.gemini import GeminiProvider
+from app.ai.provider import LLMProvider
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.gcal.api import GcalFactory, GoogleCalendar
@@ -45,3 +47,9 @@ def get_drive_factory(settings: Settings = Depends(get_settings)) -> DriveFactor
         return HttpGoogleDrive(GoogleSession(settings.google_client_id, settings.google_client_secret, refresh_token))
 
     return make
+
+
+def get_llm(settings: Settings = Depends(get_settings)) -> LLMProvider | None:
+    if not settings.ai_enabled:
+        return None
+    return GeminiProvider(settings.gemini_api_key, settings.gemini_model)

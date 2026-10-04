@@ -179,6 +179,7 @@ class TaskCreate(BaseModel):
     title: TaskTitle
     due_date: date | None = None
     subject_id: int | None = None
+    event_id: int | None = None
     important: bool = False
 
 
@@ -342,3 +343,66 @@ class UploadChunkOut(BaseModel):
 class DocumentPatch(BaseModel):
     tag: Literal["slides", "exercises", "other"] | None = None
     event_id: int | None = None
+
+
+class AiStatus(BaseModel):
+    enabled: bool
+    model: str
+
+
+class SuggestIn(BaseModel):
+    event_id: int
+    tab: Literal["after", "before"]
+    locale: Literal["en", "vi"] | None = None
+
+
+class Suggestion(BaseModel):
+    title: str
+    due_date: date | None = None
+
+
+class SuggestOut(BaseModel):
+    suggestions: list[Suggestion]
+
+
+class ChatContext(BaseModel):
+    path: str | None = Field(default=None, max_length=200)
+    event_id: int | None = None
+    subject_id: int | None = None
+    date: str | None = Field(default=None, max_length=10)
+
+
+class ChatIn(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    context: ChatContext = Field(default_factory=ChatContext)
+    locale: Literal["en", "vi"] | None = None
+
+
+class PendingActionOut(BaseModel):
+    id: int
+    kind: str
+    status: str
+    summary: str
+    payload: dict
+    result: dict | None = None
+    expires_at: str
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    actions: list[PendingActionOut]
+
+
+class ChatHistory(BaseModel):
+    messages: list[ChatMessageOut]
+
+
+class ChatReply(BaseModel):
+    message: ChatMessageOut
+
+
+class ActionResult(BaseModel):
+    status: str
+    result: dict | None = None

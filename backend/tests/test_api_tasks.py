@@ -81,3 +81,20 @@ def test_whitespace_only_titles_rejected(client, semester):
     assert client.post("/api/tasks", headers=AUTH, json={"title": "   "}).status_code == 422
     task = client.post("/api/tasks", headers=AUTH, json={"title": "Buy notebook"}).json()
     assert client.patch(f"/api/tasks/{task['id']}", headers=AUTH, json={"title": "   "}).status_code == 422
+
+
+def test_task_can_link_to_an_event_of_the_same_subject(client, session, semester):
+    event_id = class_with_note(client, session, semester, "")
+    event = session.get(Event, event_id)
+    other = Subject(semester_id=semester.id, display_name="Other", aliases=[])
+    session.add(other)
+    session.commit()
+    ok = client.post("/api/tasks", headers=AUTH, json={"title": "Prep", "event_id": event_id})
+    assert ok.status_code == 201
+    assert (ok.json()["event_id"], ok.json()["subject_id"], ok.json()["source"]) == (event_id, event.subject_id, "manual")
+    same = client.post("/api/tasks", headers=AUTH, json={"title": "Prep", "event_id": event_id,
+                                                         "subject_id": event.subject_id})
+    assert same.status_code == 201
+    assert client.post("/api/tasks", headers=AUTH, json={"title": "x", "event_id": event_id,
+                                                          "subject_id": other.id}).status_code == 422
+    assert client.post("/api/tasks", headers=AUTH, json={"title": "x", "event_id": 9999}).status_code == 422
