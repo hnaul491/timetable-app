@@ -22,6 +22,7 @@ const ACTIONS: { key: string; label: MessageKey; to?: string }[] = [
   { key: "review", label: "shortcuts.goReview", to: "/review" },
   { key: "assistant", label: "shortcuts.goAssistant", to: "/assistant" },
   { key: "settings", label: "shortcuts.goSettings", to: "/settings" },
+  { key: "free-time", label: "shortcuts.goFreeTime", to: "/free-time" },
   { key: "new", label: "shortcuts.newEvent", to: "/events/new" },
   { key: "theme", label: "search.toggleTheme" },
 ];

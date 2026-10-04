@@ -109,6 +109,15 @@ describe("SearchPalette", () => {
     expect(screen.queryByRole("dialog", { name: "Search" })).toBeNull();
   });
 
+  it("offers a Free time quick action", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.keyboard("/");
+    await user.type(await screen.findByRole("combobox", { name: "Search" }), "free");
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("path").textContent).toBe("/free-time");
+  });
+
   it("debounces the request and groups results with headings", async () => {
     const user = userEvent.setup();
     setup();

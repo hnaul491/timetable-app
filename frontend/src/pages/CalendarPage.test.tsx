@@ -68,6 +68,11 @@ describe("CalendarPage", () => {
     expect(calendarHref()).toBe("/?date=2026-11-18&view=day"); // "Back to calendar" returns here
   });
 
+  it("links to the free time finder from the header", async () => {
+    renderAt("/?date=2026-11-11&view=week");
+    expect(await screen.findByRole("link", { name: "Free time" })).toHaveAttribute("href", "/free-time");
+  });
+
   it("ignores a broken date in the address", async () => {
     renderAt("/?date=2026-13-45&view=week");
     expect(await screen.findByRole("heading", { level: 1 })).not.toHaveTextContent("NaN");

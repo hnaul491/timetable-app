@@ -15,6 +15,7 @@ export const shortcuts = {
   goReview: "Go to Review",
   goAssistant: "Go to Assistant",
   goSettings: "Go to Settings",
+  goFreeTime: "Go to Free time",
   save: "Save",
   delete: "Delete",
   search: "Search",

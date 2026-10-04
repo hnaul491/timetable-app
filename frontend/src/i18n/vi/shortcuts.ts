@@ -17,6 +17,7 @@ export const shortcuts: Messages["shortcuts"] = {
   goReview: "Đến Ôn tập",
   goAssistant: "Đến Trợ lý",
   goSettings: "Đến Cài đặt",
+  goFreeTime: "Đến Thời gian rảnh",
   save: "Lưu",
   delete: "Xoá",
   search: "Tìm kiếm",

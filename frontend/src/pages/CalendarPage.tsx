@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, type ReactNode } from "react";
-import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router";
 import { ErrorPanel, GoogleBanner, MissingSectionsBanner, SyncBanner } from "../components/Banners";
 import { EventForm, type FormValues } from "../components/EventForm";
 import { EventPanel } from "../components/EventPanel";
@@ -177,6 +177,9 @@ export function CalendarPage() {
             {fullScreen ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
           </svg>
         </button>
+        <Link to="/free-time" className={`flex items-center ${buttonClass}`}>
+          {t("freeTime.open")}
+        </Link>
         <button type="button" onClick={() => openNew(anchor, "09:00")} className="flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-strong">
           {t("calendar.header.addEvent")}
         </button>
