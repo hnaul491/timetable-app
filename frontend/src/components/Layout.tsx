@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink, Outlet, useNavigate, useSearchParams } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useT, type MessageKey } from "../i18n";
 import { apiFetch } from "../lib/api";
 import { useChrome } from "../lib/chrome";
@@ -33,6 +33,8 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout() {
   const t = useT();
+  // the assistant pins its message box to the bottom, so it needs no room for the quick-action button
+  const onAssistantPage = useLocation().pathname.startsWith("/assistant");
   const navigate = useNavigate();
   const { sidebarCollapsed, toggleSidebar, fullScreen, setFullScreen } = useChrome();
   const hintTitle = useHintTitle();
@@ -156,7 +158,7 @@ export function Layout() {
         </button>
       )}
       {!fullScreen && <QuickActions />}
-      <main className="min-w-0 flex-1 px-4 pt-16 md:pt-5 pb-36 md:px-7 md:pb-24">
+      <main className={`min-w-0 flex-1 px-4 pt-16 md:px-7 md:pt-5 ${onAssistantPage ? "pb-20 md:pb-4" : "pb-36 md:pb-24"}`}>
         <Outlet />
       </main>
       {!fullScreen && (

@@ -105,6 +105,26 @@ describe("AssistantPage", () => {
     expect(JSON.parse(post[1].body)).toMatchObject({ message: "plan my week", context: { path: "/" }, locale: "en" });
   });
 
+  it("shows **bold** and `code` as formatting, and still never renders HTML", async () => {
+    history = [reply({ id: 3, content: "Your **Relational Databases** class\n- Use `SELECT` <img src=x>", actions: [] })];
+    route();
+    renderPage();
+    const bold = await screen.findByText("Relational Databases");
+    expect(bold.tagName).toBe("STRONG");
+    expect(screen.getByText("SELECT").tagName).toBe("CODE");
+    expect(screen.getByText(/<img src=x>/)).toBeInTheDocument();
+    expect(document.querySelector("img")).toBeNull();
+    expect(screen.queryByText(/\*\*/)).toBeNull();
+  });
+
+  it("keeps the message box pinned to the bottom of the screen", async () => {
+    route();
+    renderPage();
+    const bar = await screen.findByTestId("composer-bar");
+    expect(bar.className).toMatch(/\bsticky\b/);
+    expect(bar).toContainElement(screen.getByRole("textbox", { name: "Message the assistant" }));
+  });
+
   it("Shift+Enter adds a line and does not send", async () => {
     route();
     renderPage();

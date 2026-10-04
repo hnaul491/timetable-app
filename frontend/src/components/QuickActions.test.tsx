@@ -179,14 +179,14 @@ describe("quick-action button", () => {
     expect(off.querySelector("kbd")).toBeNull();
   });
 
-  it("is hidden below md on the assistant page only", () => {
+  it("is hidden on the assistant page, where the message box is pinned to the bottom", () => {
     setup("/assistant");
-    expect(fab().parentElement!.className).toContain("max-md:hidden");
+    expect(fab().parentElement!.className.split(" ")).toContain("hidden");
   });
 
   it("is not hidden on other pages", () => {
     setup("/board");
-    expect(fab().parentElement!.className).not.toContain("max-md:hidden");
+    expect(fab().parentElement!.className.split(" ")).not.toContain("hidden");
   });
 
   it("fades out for 120 ms before unmounting, keeping Escape focus return", async () => {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { ActionCard } from "../components/ActionCard";
 import { useConfirm } from "../components/ui/Confirm";
@@ -46,7 +46,17 @@ function privacyDismissed(): boolean {
   }
 }
 
-/** Plain-text paragraphs and bullet lists; the text is never interpreted as HTML. */
+/** **bold** and `code` spans as React elements; everything else stays plain text (never parsed as HTML). */
+function inlineMarks(line: string): ReactNode[] {
+  return line.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g).map((part, i) => {
+    if (part.length > 4 && part.startsWith("**") && part.endsWith("**")) return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+    if (part.length > 2 && part.startsWith("`") && part.endsWith("`"))
+      return <code key={i} className="rounded bg-subtle px-1 py-px font-mono text-[0.9em]">{part.slice(1, -1)}</code>;
+    return part;
+  });
+}
+
+/** Plain-text paragraphs and bullet lists with bold/code spans; the text is never interpreted as HTML. */
 function RichText({ text }: { text: unknown }) {
   if (typeof text !== "string") return null;
   const blocks: { bullets: boolean; lines: string[] }[] = [];
@@ -65,11 +75,11 @@ function RichText({ text }: { text: unknown }) {
         b.bullets ? (
           <ul key={i} className="list-disc pl-5">
             {b.lines.map((l, j) => (
-              <li key={j}>{l}</li>
+              <li key={j}>{inlineMarks(l)}</li>
             ))}
           </ul>
         ) : (
-          <p key={i}>{b.lines[0]}</p>
+          <p key={i}>{inlineMarks(b.lines[0])}</p>
         ),
       )}
     </div>
@@ -407,9 +417,12 @@ export function AssistantPage() {
                 </p>
               </div>
             )}
-            <div ref={endRef} />
+            {/* scroll margin keeps the newest message clear of the pinned message box */}
+            <div ref={endRef} className="scroll-mb-56" />
           </div>
 
+          {/* pinned to the bottom of the screen (above the phone nav bar) while the conversation scrolls */}
+          <div data-testid="composer-bar" className="sticky bottom-[4.25rem] z-10 -mx-4 flex flex-col gap-2 border-t border-line bg-canvas/95 px-4 pt-3 pb-3 backdrop-blur md:bottom-0 md:mx-0 md:px-0 md:pb-4">
           {messages.length === 0 && !sending && !live && (
             <div role="group" aria-label={t("ai.quickPromptsLabel")} className="flex flex-wrap gap-2">
               {quick.map((k) => (
@@ -458,6 +471,7 @@ export function AssistantPage() {
               {t("ai.send")}
             </button>
           </form>
+          </div>
         </>
       )}
     </div>

@@ -86,7 +86,7 @@ export function QuickActions() {
   };
 
   return (
-    <div ref={root} className={`fixed right-4 bottom-[5.5rem] z-40 flex flex-col items-end gap-2 md:right-6 md:bottom-6 ${onAssistant ? "max-md:hidden" : ""}`}>
+    <div ref={root} className={`fixed right-4 bottom-[5.5rem] z-40 flex flex-col items-end gap-2 md:right-6 md:bottom-6 ${onAssistant ? "hidden" : ""}`}>
       {open && (
         <div
           role="menu"
