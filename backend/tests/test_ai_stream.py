@@ -206,11 +206,11 @@ def test_deadline_with_no_text_is_limit_reply(session, semester, monkeypatch):
     assert ev[-1]["data"]["message"]["content"] == LIMIT_REPLY["en"]
 
 
-def test_deadline_passing_on_the_last_part_is_not_cut(session, semester, monkeypatch):
+def test_deadline_passing_on_the_last_part_cuts_without_waiting(session, semester, monkeypatch):
+    # we never block on another chunk after the deadline, so a stream that just ended is still marked cut
     from app.ai import assistant
     clock = Clock()
     monkeypatch.setattr(assistant, "_clock", clock)
-    llm = slow_provider(clock, [TextDelta("Hel"), TextDelta("lo")])  # deadline passes as "lo" arrives; stream ends
+    llm = slow_provider(clock, [TextDelta("Hel"), TextDelta("lo")])
     ev = run(session, llm, budget=50)
-    assert names(ev) == ["delta", "delta", "done"]
-    assert ev[-1]["data"]["message"]["content"] == "Hello"
+    assert ev[-1]["data"]["message"]["content"] == "Hello" + assistant.CUT_NOTE["en"]

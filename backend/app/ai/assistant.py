@@ -190,8 +190,8 @@ def stream_chat(session: Session, llm: LLMProvider, user_text: str, context: Cha
                     else:
                         calls.append(part.call)
                     if _clock() >= deadline:
-                        # cut only when more was still coming: a stream that just ended is complete
-                        expired = next(it, None) is not None
+                        # never wait for another chunk here: a stalled stream would block past Vercel's limit
+                        expired = True
                         break
             finally:
                 close = getattr(parts, "close", None)
